@@ -1,3 +1,4 @@
+//! module for database operations
 use dotenv::dotenv;
 use mongodb::{Client, Collection, results::InsertOneResult};
 use std::env;

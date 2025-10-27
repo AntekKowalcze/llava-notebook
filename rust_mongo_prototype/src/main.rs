@@ -1,8 +1,11 @@
 mod db;
-use chrono;
-use serde::{Deserialize, Serialize};
-
+mod models;
+mod save_locally;
 use crate::db::inserting_note;
+use crate::models::Note;
+use crate::save_locally::save_locally;
+use chrono;
+
 //na początku połączyć się z bazą danych tryb offline
 #[tokio::main]
 async fn main() {
@@ -37,7 +40,7 @@ fn create_note() -> Note {
     let title = String::from(get_title().trim());
     let content = String::from(get_content().trim());
     let summary: Vec<&str> = content.split(" ").collect();
-    let mut summary_string = String::from(""); //dodac test do mniej niż 10 słów
+    let mut summary_string = String::from("");
     if summary.len() < 10 {
         summary_string = content.clone(); //copy is not big cuz its less than 10 words (in future check lenght to avoid huge charstrings to be copied)
     } else {
@@ -59,13 +62,6 @@ fn getting_created_at() -> String {
     let time = &chrono::offset::Utc::now().time().to_string()[0..8]; //getting time to seconds
     let created_at = format!("{} {}", day, time);
     created_at
-}
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Note {
-    created_at: String,
-    title: String,
-    summary: String,
-    content: String,
 }
 
 fn get_title() -> String {
@@ -96,8 +92,4 @@ fn get_content() -> String {
         }
     } //in the future make it leavable, to leave creation by typing smth, also in title
     content
-}
-
-fn save_locally(inserting_object: Note, local_note_storage: &mut Vec<Note>) {
-    local_note_storage.push(inserting_object);
 }
