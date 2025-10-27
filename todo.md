@@ -1,5 +1,4 @@
 1. zrobić funkcje z połączeniem i z retry bo jest podobna moze w parametrze ilość łączeń
-2. Dodać id do struct note, aby ułatwić wyszukiwanie, dodawanie na podstawie ostatnia dodana +1 
 3. dodać pozostałe CRUD, wyświetlenie, update i delete
 4. zrobić menu wyboru.
 5. próba łączenia co 30 sekund (zapytać o częstotliwość) jesli nie połączone to save_locally a jeśli połączy insert wszystko z save locally

@@ -17,19 +17,28 @@ pub async fn connecting_to_db() -> mongodb::error::Result<Collection<Note>> {
 
 pub async fn inserting_note(
     my_coll: Collection<Note>,
-    inserting_object: &Note,
+    inserting_object: &mut Note,
 ) -> Result<InsertOneResult, mongodb::error::Error> {
+    let last_note_id = my_coll
+        .estimated_document_count()
+        .await
+        .map(|id| id + 1)
+        .ok();
+    inserting_object.note_id = last_note_id;
     let insert_note: InsertOneResult = my_coll.insert_one(inserting_object).await?;
     Ok(insert_note)
 }
 ///try recconecting to database 3 times if its not possible
 /// try readding to database 3 times if failed
-pub async fn reconnect_and_add_note(local_note_storage: &mut Vec<Note>, inserting_object: Note) {
+pub async fn reconnect_and_add_note(
+    local_note_storage: &mut Vec<Note>,
+    mut inserting_object: Note,
+) {
     for i in 0..3 {
         let my_coll = crate::db::connecting_to_db().await;
         match my_coll {
             // online saving
-            Ok(my_coll) => match crate::db::inserting_note(my_coll, &inserting_object).await {
+            Ok(my_coll) => match crate::db::inserting_note(my_coll, &mut inserting_object).await {
                 Ok(inserted_id) => {
                     let result = inserted_id
                         .inserted_id

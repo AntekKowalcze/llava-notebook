@@ -11,9 +11,9 @@ use chrono;
 async fn main() {
     let my_coll = crate::db::connecting_to_db().await; //connecting to database
     let mut local_note_storage: Vec<Note> = Vec::new(); // creatign local storage 
-    let new_note = create_note(); //creating note
+    let mut new_note = create_note(); //creating note
     match my_coll {
-        Ok(my_coll) => match inserting_note(my_coll, &new_note).await {
+        Ok(my_coll) => match inserting_note(my_coll, &mut new_note).await {
             //if connected successfully insert else try to reconnect
             Ok(inserted_id) => {
                 // insert or try to reconnect and reinsert
@@ -49,6 +49,7 @@ fn create_note() -> Note {
         }
     }
     Note {
+        note_id: None,
         created_at: created_at,
         title: title,
         summary: summary_string,
