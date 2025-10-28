@@ -1,4 +1,5 @@
-1. zrobić funkcje z połączeniem i z retry bo jest podobna moze w parametrze ilość łączeń
+0. przy łączeniu bez internetu sie zatrzymuje w awaicie, dodać jakoś timeout i handling
+1. zrobić funkcje z połączeniem i z retry bo jest podobna moze w parametrze ilość łączeń //odpuścić na razie, zrobi sie to w faktycznej wesji kodu
 3. dodać pozostałe CRUD, wyświetlenie, update i delete
 4. zrobić menu wyboru.
 5. próba łączenia co 30 sekund (zapytać o częstotliwość) jesli nie połączone to save_locally a jeśli połączy insert wszystko z save locally

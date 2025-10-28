@@ -4,15 +4,21 @@ use mongodb::{Client, Collection, results::InsertOneResult};
 use std::env;
 
 use crate::Note;
-
-pub async fn connecting_to_db() -> mongodb::error::Result<Collection<Note>> {
-    //connecting to database
+/// connecting to database with 2 seconds timeout
+pub async fn connecting_to_db() -> Result<Collection<Note>, crate::errors::ConnectionError> {
+    //getting env file ready
     dotenv().ok();
+    //reading uri from env file
     let uri = env::var("MONGODB_URI").expect("uri should be accessible");
-    let client = Client::with_uri_str(uri).await?;
-    let database = client.database("notebook");
-    let my_coll: Collection<Note> = database.collection("notebook");
-    Ok(my_coll)
+    //connecting with timeout
+    let client = tokio::time::timeout(
+        std::time::Duration::from_secs(3),
+        Client::with_uri_str(&uri),
+    )
+    .await??;
+
+    let db = client.database("notebook");
+    Ok(db.collection::<Note>("notebook"))
 }
 
 pub async fn inserting_note(
@@ -62,13 +68,12 @@ pub async fn reconnect_and_add_note(
             //offline saving
             Err(err) => {
                 if i < 3 {
-                    println!("failed to connect {}, {err}", i + 1);
+                    println!("failed to connect {}, {err :?}", i + 1);
                     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
                     continue;
                 } else {
-                    println!("failed to connect {}, {err}", i + 1);
+                    println!("failed to connect {}, {err :?}", i + 1);
                     crate::save_locally(inserting_object, local_note_storage);
-
                     break;
                 }
             }

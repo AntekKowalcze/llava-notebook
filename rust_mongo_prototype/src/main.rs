@@ -1,4 +1,5 @@
 mod db;
+mod errors;
 mod models;
 mod save_locally;
 use crate::db::inserting_note;
@@ -28,11 +29,17 @@ async fn main() {
                 crate::db::reconnect_and_add_note(&mut local_note_storage, new_note).await;
             }
         },
-        Err(err) => {
-            eprintln!("{err}");
+        Err(crate::errors::ConnectionError::ConnectionTimeout(e)) => {
+            eprintln!("Connection timeout: {e:?}");
+            crate::save_locally(new_note, &mut local_note_storage);
+        }
+
+        Err(crate::errors::ConnectionError::UnableToConnect(e)) => {
+            eprintln!("Unable to connect: {e:?}");
             crate::save_locally(new_note, &mut local_note_storage);
         }
     }
+    println!("{local_note_storage :?}")
 }
 
 fn create_note() -> Note {
