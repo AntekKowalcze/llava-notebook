@@ -1,47 +1,91 @@
 mod db;
 mod errors;
+mod helpers;
 mod models;
 mod save_locally;
-use crate::db::inserting_note;
 use crate::models::Note;
 use crate::save_locally::save_locally;
 use chrono;
+use mongodb::Collection;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::RwLock;
 
-//na początku połączyć się z bazą danych tryb offline
 #[tokio::main]
 async fn main() {
-    let my_coll = crate::db::connecting_to_db().await; //connecting to database
-    let mut local_note_storage: Vec<Note> = Vec::new(); // creatign local storage 
-    let mut new_note = create_note(); //creating note
-    match my_coll {
-        Ok(my_coll) => match inserting_note(my_coll, &mut new_note).await {
-            //if connected successfully insert else try to reconnect
-            Ok(inserted_id) => {
-                // insert or try to reconnect and reinsert
-                let result = inserted_id
-                    .inserted_id
-                    .as_object_id()
-                    .expect("InsertOneResult conversion faild in recconect and add note fn");
-                println!("added note id: {}", result);
+    let mut local_note_storage: Vec<Note> = Vec::new();
+    let my_coll: Arc<RwLock<Option<Collection<Note>>>> = Arc::new(RwLock::new(None));
+    let coll_clone = my_coll.clone();
+    let new_note = create_note();
+    let cloned_note = new_note.clone();
+    tokio::spawn(async move {
+        loop {
+            let is_connected = {
+                let read = my_coll.read().await;
+                read.is_some()
+            };
+            if is_connected {
+                println!("db connected");
+            } else {
+                println!("Attempting to connect...");
+                let connection = db::connecting_to_db().await;
+                let mut write = my_coll.write().await;
+                match connection {
+                    Ok(coll) => {
+                        println!("Connected successfully");
+                        *write = Some(coll);
+                    }
+                    Err(err) => {
+                        println!("{err:?}, values will be saved locally until internet connection");
+                        *write = None;
+                    }
+                }
             }
-            Err(err) => {
-                eprintln!("{err}");
-                crate::db::reconnect_and_add_note(&mut local_note_storage, new_note).await;
-            }
-        },
-        Err(crate::errors::ConnectionError::ConnectionTimeout(e)) => {
-            eprintln!("Connection timeout: {e:?}");
-            crate::save_locally(new_note, &mut local_note_storage);
+            tokio::time::sleep(Duration::from_secs(30)).await;
         }
+    });
 
-        Err(crate::errors::ConnectionError::UnableToConnect(e)) => {
-            eprintln!("Unable to connect: {e:?}");
-            crate::save_locally(new_note, &mut local_note_storage);
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    let result =
+        crate::helpers::check_connection_and_execute_action(coll_clone.clone(), |c| async move {
+            crate::db::inserting_note(&c, new_note).await
+        })
+        .await;
+    match result {
+        Ok(result) => {
+            println!("{result :?}")
+        }
+        Err(error) => {
+            println!("{error}");
+            save_locally(cloned_note, &mut local_note_storage)
         }
     }
+    //todo make this working by updateing helper
+    tokio::time::sleep(Duration::from_secs(60)).await;
+    // loop {
+    //     println!("choose option:");
+    //     println!("1. new note\n2. update note\n3. delete note\n4.read note\n5. exit ");
+    //     let mut option = String::new();
+    //     stdin()
+    //         .read_line(&mut option)
+    //         .expect("there is no option like this exitting");
+    //     let option: i32 = option
+    //         .trim()
+    //         .parse::<i32>()
+    //         .expect("no koption like this, exitting");
+    //     match option {
+    //         1 => {}
+    //         2 => {}
+    //         3 => {}
+    //         4 => {}
+    //         5 => std::process::exit(1),
+    //         _ => panic!("no option like this exitting",),
+    //     }
+    // }
     println!("{local_note_storage :?}")
-}
-
+} //po polączeniu dodać wszystkie notatki z vectora
+///creating note by getting values from other functions
 fn create_note() -> Note {
     let created_at = getting_created_at();
     let title = String::from(get_title().trim());
@@ -56,14 +100,13 @@ fn create_note() -> Note {
         }
     }
     Note {
-        note_id: None,
         created_at: created_at,
         title: title,
         summary: summary_string,
         content: content,
     }
 }
-
+///getting date and time
 fn getting_created_at() -> String {
     println!("{:?}", chrono::offset::Utc::now().time());
     let day = chrono::offset::Utc::now().date_naive().to_string();
