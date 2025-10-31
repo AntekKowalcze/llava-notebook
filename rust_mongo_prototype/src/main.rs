@@ -3,12 +3,12 @@ mod errors;
 mod helpers;
 mod models;
 mod save_locally;
+mod test;
 use crate::db::inserting_from_vec_after_reconnection;
 use crate::models::Note;
 use crate::save_locally::save_locally;
 use chrono;
 use mongodb::Collection;
-use std::io::Read;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
@@ -86,17 +86,21 @@ async fn main() {
                     }
                 }
             }
-            2 => {}
-            3 => {}
-            4 => {}
-            5 => std::process::exit(1),
+            2 => {} //read prompt note title to find note check first in locally cuz its faster, then check into database by title and if the same title exist show both summaries and tell to pick, show it
+            3 => {} //update gprompt note title to find note check first in locally cuz its faster, then check into database by title and if the same title exist show both summaries and tell to pick, and edit
+            4 => {} //prompt note title to find note check first in locally cuz its faster, then check into database by title and if the same title exist show both summaries and tell to pick, show delete it
+            //wykonywać to w helperze który sprawdza połączenie w zależności od tego, dać w result error sprawdzanie lokalne i osobną funkcje do wybierania
+            // helper, musi brać arc rwlock dla połaczenia, musi prac arc rwlock vector obie rzeczy zklonowane, robić read i odrazu drop, jeśli połączenie sprawdzić i lokalnie w vec i w połączeniu jeśl nie komunikat że bedzie tylko z lokalnych notatek
+            //jeśli identyczne tytułu pobrać dla wszystich summary i wyświetlić z numerami, przypiasć numery do summary żeby się to jakoś dało odróżnić od siebie
+            // musi robić deserializacje do structa lub jakoś inaczej to wyświetlać (sprawdzić)
+            5 => {
+                let local_note_to_read = { cloned_note_storage.read().await.clone() };
+                println!("{local_note_to_read :?}");
+                std::process::exit(1)
+            }
             _ => panic!("no option like this exitting",),
         }
     }
-
-    tokio::time::sleep(Duration::from_secs(60)).await;
-    let local_note_to_read = { cloned_note_storage.read().await.clone() };
-    println!("{local_note_to_read :?}")
 } //po polączeniu dodać wszystkie notatki z vectora
 ///creating note by getting values from other functions
 fn create_note() -> Note {

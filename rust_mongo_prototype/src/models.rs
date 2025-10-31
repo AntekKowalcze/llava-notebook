@@ -1,8 +1,8 @@
 //! module for saving data models
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-///data model of Note
 
-#[derive(Clone)]
+use serde::{Deserialize, Serialize};
+///data model of Note
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Note {
     pub created_at: String,
     pub title: String,
