@@ -1,9 +1,10 @@
 //! module for database operations
+use crate::Note;
 use dotenv::dotenv;
 use mongodb::{Client, Collection, results::InsertOneResult};
 use std::env;
-
-use crate::Note;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 /// connecting to database with 2 seconds timeout
 pub async fn connecting_to_db() -> Result<Collection<Note>, crate::errors::ConnectionError> {
     //getting env file ready
@@ -29,8 +30,31 @@ pub async fn connecting_to_db() -> Result<Collection<Note>, crate::errors::Conne
 ///  * `inserting_object` - Note
 pub async fn inserting_note(
     my_coll: &Collection<Note>,
-    inserting_object: Note,
+    inserting_object: &Note,
 ) -> Result<InsertOneResult, mongodb::error::Error> {
     let insert_note: InsertOneResult = my_coll.insert_one(inserting_object).await?;
     Ok(insert_note)
+}
+
+pub async fn inserting_from_vec_after_reconnection(
+    local_vec: Arc<RwLock<Vec<Note>>>,
+    my_coll: &Collection<Note>,
+) {
+    println!("inserting notes to database");
+    let mut write_vec = local_vec.write().await;
+    if write_vec.len() > 0 {
+        let mut i = 0;
+        while i < write_vec.len() {
+            if let Ok(id) = inserting_note(my_coll, &write_vec[i]).await {
+                println!("inserted {id :?}");
+                let _v = write_vec.remove(i);
+            } else {
+                println!("couldnt add note");
+                i += 1;
+            }
+            println!("vec: {write_vec :?}")
+        }
+    } else {
+        println!("notes are up to date");
+    }
 }

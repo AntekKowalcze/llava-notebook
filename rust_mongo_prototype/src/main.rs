@@ -3,6 +3,7 @@ mod errors;
 mod helpers;
 mod models;
 mod save_locally;
+use crate::db::inserting_from_vec_after_reconnection;
 use crate::models::Note;
 use crate::save_locally::save_locally;
 use chrono;
@@ -13,11 +14,12 @@ use tokio::sync::RwLock;
 
 #[tokio::main]
 async fn main() {
-    let mut local_note_storage: Vec<Note> = Vec::new();
+    let local_note_storage: Arc<RwLock<Vec<Note>>> = Arc::new(RwLock::new(Vec::new()));
     let my_coll: Arc<RwLock<Option<Collection<Note>>>> = Arc::new(RwLock::new(None));
     let coll_clone = my_coll.clone();
     let new_note = create_note();
     let cloned_note = new_note.clone();
+    let cloned_note_storage = local_note_storage.clone();
     tokio::spawn(async move {
         loop {
             let is_connected = {
@@ -33,7 +35,13 @@ async fn main() {
                 match connection {
                     Ok(coll) => {
                         println!("Connected successfully");
+                        let cloned_colll = coll.clone();
                         *write = Some(coll);
+                        inserting_from_vec_after_reconnection(
+                            local_note_storage.clone(),
+                            &cloned_colll,
+                        )
+                        .await //add
                     }
                     Err(err) => {
                         println!("{err:?}, values will be saved locally until internet connection");
@@ -49,19 +57,19 @@ async fn main() {
 
     let result =
         crate::helpers::check_connection_and_execute_action(coll_clone.clone(), |c| async move {
-            crate::db::inserting_note(&c, new_note).await
+            crate::db::inserting_note(&c, &new_note).await
         })
         .await;
+
     match result {
         Ok(result) => {
             println!("{result :?}")
         }
         Err(error) => {
             println!("{error}");
-            save_locally(cloned_note, &mut local_note_storage)
+            save_locally(cloned_note, cloned_note_storage.clone()).await //todo przepisać to tak aby vec to było arc::mutex, i żeby przyjmowało czytało i odrazu kill z outofscope, to samo przy sychronizacji notatek z serverem
         }
     }
-    //todo make this working by updateing helper
     tokio::time::sleep(Duration::from_secs(60)).await;
     // loop {
     //     println!("choose option:");
@@ -83,7 +91,8 @@ async fn main() {
     //         _ => panic!("no option like this exitting",),
     //     }
     // }
-    println!("{local_note_storage :?}")
+    let local_note_to_read = { cloned_note_storage.read().await.clone() };
+    println!("{local_note_to_read :?}")
 } //po polączeniu dodać wszystkie notatki z vectora
 ///creating note by getting values from other functions
 fn create_note() -> Note {
