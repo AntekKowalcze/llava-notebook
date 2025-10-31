@@ -8,6 +8,7 @@ use crate::models::Note;
 use crate::save_locally::save_locally;
 use chrono;
 use mongodb::Collection;
+use std::io::Read;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
@@ -17,8 +18,7 @@ async fn main() {
     let local_note_storage: Arc<RwLock<Vec<Note>>> = Arc::new(RwLock::new(Vec::new()));
     let my_coll: Arc<RwLock<Option<Collection<Note>>>> = Arc::new(RwLock::new(None));
     let coll_clone = my_coll.clone();
-    let new_note = create_note();
-    let cloned_note = new_note.clone();
+
     let cloned_note_storage = local_note_storage.clone();
     tokio::spawn(async move {
         loop {
@@ -55,42 +55,46 @@ async fn main() {
 
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    let result =
-        crate::helpers::check_connection_and_execute_action(coll_clone.clone(), |c| async move {
-            crate::db::inserting_note(&c, &new_note).await
-        })
-        .await;
+    loop {
+        println!("choose option:");
+        println!("1. new note\n2. update note\n3. delete note\n4.read note\n5. exit ");
+        let mut option = String::new();
+        std::io::stdin()
+            .read_line(&mut option)
+            .expect("couldnt get user input exiting");
+        let option: i32 = option
+            .trim()
+            .parse::<i32>()
+            .expect("no option like this, exitting");
+        match option {
+            1 => {
+                let new_note = create_note();
+                let cloned_note = new_note.clone();
+                let result = crate::helpers::check_connection_and_execute_action(
+                    coll_clone.clone(),
+                    |c| async move { crate::db::inserting_note(&c, &new_note).await },
+                )
+                .await;
 
-    match result {
-        Ok(result) => {
-            println!("{result :?}")
-        }
-        Err(error) => {
-            println!("{error}");
-            save_locally(cloned_note, cloned_note_storage.clone()).await //todo przepisać to tak aby vec to było arc::mutex, i żeby przyjmowało czytało i odrazu kill z outofscope, to samo przy sychronizacji notatek z serverem
+                match result {
+                    Ok(result) => {
+                        println!("{result :?}")
+                    }
+                    Err(error) => {
+                        println!("{error}");
+                        save_locally(cloned_note, cloned_note_storage.clone()).await
+                    }
+                }
+            }
+            2 => {}
+            3 => {}
+            4 => {}
+            5 => std::process::exit(1),
+            _ => panic!("no option like this exitting",),
         }
     }
+
     tokio::time::sleep(Duration::from_secs(60)).await;
-    // loop {
-    //     println!("choose option:");
-    //     println!("1. new note\n2. update note\n3. delete note\n4.read note\n5. exit ");
-    //     let mut option = String::new();
-    //     stdin()
-    //         .read_line(&mut option)
-    //         .expect("there is no option like this exitting");
-    //     let option: i32 = option
-    //         .trim()
-    //         .parse::<i32>()
-    //         .expect("no koption like this, exitting");
-    //     match option {
-    //         1 => {}
-    //         2 => {}
-    //         3 => {}
-    //         4 => {}
-    //         5 => std::process::exit(1),
-    //         _ => panic!("no option like this exitting",),
-    //     }
-    // }
     let local_note_to_read = { cloned_note_storage.read().await.clone() };
     println!("{local_note_to_read :?}")
 } //po polączeniu dodać wszystkie notatki z vectora
