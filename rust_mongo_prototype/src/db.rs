@@ -30,9 +30,15 @@ pub async fn connecting_to_db() -> Result<Collection<Note>, crate::errors::Conne
 ///  * `inserting_object` - Note
 pub async fn inserting_note(
     my_coll: &Collection<Note>,
-    inserting_object: &Note,
+    mut inserting_object: Note,
 ) -> Result<InsertOneResult, mongodb::error::Error> {
-    let insert_note: InsertOneResult = my_coll.insert_one(inserting_object).await?;
+    let insert_note: InsertOneResult = my_coll.insert_one(&inserting_object).await?;
+    let note_id = insert_note
+        .inserted_id
+        .as_object_id()
+        .expect("couldnt convert object id");
+    inserting_object.note_id = Some(note_id);
+    println!("note_with_id: {inserting_object :?}");
     Ok(insert_note)
 }
 
@@ -43,17 +49,24 @@ pub async fn inserting_from_vec_after_reconnection(
     println!("inserting notes to database");
     let mut write_vec = local_vec.write().await;
     if write_vec.len() > 0 {
-        let mut i = 0;
-        while i < write_vec.len() {
-            if let Ok(id) = inserting_note(my_coll, &write_vec[i]).await {
-                println!("inserted {id :?}");
-                let _v = write_vec.remove(i);
-            } else {
-                println!("couldnt add note");
-                i += 1;
+        while let Some(note) = write_vec.pop() {
+            match inserting_note(my_coll, note).await {
+                Ok(id) => println!("inserted {id:?}"),
+                Err(_) => println!("couldn’t insert note"),
             }
-            println!("vec: {write_vec :?}")
         }
+        println!("vec: {write_vec :?}");
+        // let mut i = 0;
+        // while i < write_vec.len() {
+        //     if let Ok(id) = inserting_note(my_coll, &write_vec[i]).await {
+        //         println!("inserted {id :?}");
+        //         let _v = write_vec.remove(i);
+        //     } else {
+        //         println!("couldnt add note");
+        //         i += 1;
+        //     }
+        //     println!("vec: {write_vec :?}")
+        // }
     } else {
         println!("notes are up to date");
     }

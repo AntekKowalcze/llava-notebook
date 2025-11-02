@@ -1,3 +1,4 @@
+mod crud;
 mod db;
 mod errors;
 mod helpers;
@@ -57,7 +58,7 @@ async fn main() {
 
     loop {
         println!("choose option:");
-        println!("1. new note\n2. update note\n3. delete note\n4.read note\n5. exit ");
+        println!("1. new note\n2. read note\n3. update note\n4.delete note\n5. exit ");
         let mut option = String::new();
         std::io::stdin()
             .read_line(&mut option)
@@ -72,7 +73,7 @@ async fn main() {
                 let cloned_note = new_note.clone();
                 let result = crate::helpers::check_connection_and_execute_action(
                     coll_clone.clone(),
-                    |c| async move { crate::db::inserting_note(&c, &new_note).await },
+                    |c| async move { crate::db::inserting_note(&c, new_note).await },
                 )
                 .await;
 
@@ -86,13 +87,18 @@ async fn main() {
                     }
                 }
             }
-            2 => {} //read prompt note title to find note check first in locally cuz its faster, then check into database by title and if the same title exist show both summaries and tell to pick, show it
+            2 => {
+                crate::helpers::read_delete_update(
+                    coll_clone.clone(),
+                    cloned_note_storage.clone(),
+                    |note, _| async move {
+                        println!("{note :?}");
+                    },
+                )
+                .await;
+            }
             3 => {} //update gprompt note title to find note check first in locally cuz its faster, then check into database by title and if the same title exist show both summaries and tell to pick, and edit
-            4 => {} //prompt note title to find note check first in locally cuz its faster, then check into database by title and if the same title exist show both summaries and tell to pick, show delete it
-            //wykonywać to w helperze który sprawdza połączenie w zależności od tego, dać w result error sprawdzanie lokalne i osobną funkcje do wybierania
-            // helper, musi brać arc rwlock dla połaczenia, musi prac arc rwlock vector obie rzeczy zklonowane, robić read i odrazu drop, jeśli połączenie sprawdzić i lokalnie w vec i w połączeniu jeśl nie komunikat że bedzie tylko z lokalnych notatek
-            //jeśli identyczne tytułu pobrać dla wszystich summary i wyświetlić z numerami, przypiasć numery do summary żeby się to jakoś dało odróżnić od siebie
-            // musi robić deserializacje do structa lub jakoś inaczej to wyświetlać (sprawdzić)
+            4 => crate::crud::delete(coll_clone.clone(), cloned_note_storage.clone()).await,
             5 => {
                 let local_note_to_read = { cloned_note_storage.read().await.clone() };
                 println!("{local_note_to_read :?}");
@@ -117,6 +123,7 @@ fn create_note() -> Note {
         }
     }
     Note {
+        note_id: None,
         created_at: created_at,
         title: title,
         summary: summary_string,
