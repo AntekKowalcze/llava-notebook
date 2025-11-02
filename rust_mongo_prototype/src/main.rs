@@ -13,7 +13,8 @@ use mongodb::Collection;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
-
+//TODO bug: when going offline while beign online and creating a note note is added nowhere
+//TODO discuss code with ai and get to work over a normal version not prototype
 #[tokio::main]
 async fn main() {
     let local_note_storage: Arc<RwLock<Vec<Note>>> = Arc::new(RwLock::new(Vec::new()));
@@ -97,7 +98,7 @@ async fn main() {
                 )
                 .await;
             }
-            3 => {} //update gprompt note title to find note check first in locally cuz its faster, then check into database by title and if the same title exist show both summaries and tell to pick, and edit
+            3 => crate::crud::update(coll_clone.clone(), cloned_note_storage.clone()).await, //update gprompt note title to find note check first in locally cuz its faster, then check into database by title and if the same title exist show both summaries and tell to pick, and edit
             4 => crate::crud::delete(coll_clone.clone(), cloned_note_storage.clone()).await,
             5 => {
                 let local_note_to_read = { cloned_note_storage.read().await.clone() };

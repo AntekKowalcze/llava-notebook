@@ -1,5 +1,6 @@
 // //! module with helper functions
 use crate::models::Note;
+use dialoguer::Input;
 use futures::stream::TryStreamExt;
 use mongodb::Collection;
 use std::sync::Arc;
@@ -135,8 +136,25 @@ pub async fn read_delete_update<F, Fut>(
     }
 }
 
-//read prompt note title to find note check first in locally cuz its faster, then check into database by title and if the same title exist show both summaries and tell to pick, show it
-//wykonywać to w helperze który sprawdza połączenie w zależności od tego, dać w result error sprawdzanie lokalne i osobną funkcje do wybierania
-// helper, musi brać arc rwlock dla połaczenia, musi prac arc rwlock vector obie rzeczy zklonowane, robić read i odrazu drop, jeśli połączenie sprawdzić i lokalnie w vec i w połączeniu jeśl nie komunikat że bedzie tylko z lokalnych notatek
-//jeśli identyczne tytułu pobrać dla wszystich summary i wyświetlić z numerami, przypiasć numery do summary żeby się to jakoś dało odróżnić od siebie
-// musi robić deserializacje do structa lub jakoś inaczej to wyświetlać (sprawdzić)
+pub fn get_note_field() -> i64 {
+    println!("Choose a field to update");
+    println!("1. Title\n2. Summary\n3. Content\n ");
+    let mut field = String::new();
+    std::io::stdin()
+        .read_line(&mut field)
+        .expect("no field like this");
+    let field = field
+        .trim()
+        .parse::<i64>()
+        .expect("couldnt parse intpu, expected a number from 1 to 3");
+    field
+}
+
+pub fn edit_note(field_value: String) -> anyhow::Result<String> {
+    let edited: String = Input::new()
+        .with_prompt("Edit field")
+        .with_initial_text(field_value.clone()) // pre-filled text the user can edit
+        .default(field_value) // if user submits empty, keep original
+        .interact_text()?; // reads edited content on Enter 
+    Ok(edited)
+}
