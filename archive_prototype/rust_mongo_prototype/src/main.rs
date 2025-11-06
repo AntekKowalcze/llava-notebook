@@ -13,8 +13,6 @@ use mongodb::Collection;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
-//TODO bug: when going offline while beign online and creating a note note is added nowhere
-//TODO discuss code with ai and get to work over a normal version not prototype
 #[tokio::main]
 async fn main() {
     let local_note_storage: Arc<RwLock<Vec<Note>>> = Arc::new(RwLock::new(Vec::new()));

@@ -75,6 +75,7 @@ pub async fn find_note_by_title(
             println!("no internet connection, finding only in notes saved locally")
         }
     }
+
     if found_notes.is_empty() {
         eprintln!("There are no notes with this title");
         return Ok(None);
