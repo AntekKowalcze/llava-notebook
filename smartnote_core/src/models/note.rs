@@ -1,0 +1,28 @@
+use std::path::PathBuf;
+
+//TODO dodać konieczne implementacje
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct Note {
+    #[serde(with = "uuid::serde::simple")]
+    pub local_id: uuid::Uuid,
+    pub mongo_id: Option<String>,
+    #[serde(with = "uuid::serde::simple")]
+    pub owner_id: uuid::Uuid,
+
+    pub name: String,
+    pub title: String,
+    pub summary: String,
+    pub content_path: PathBuf,
+
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub deleted_at: Option<i64>,
+
+    pub version: i64,
+    pub cloud_version: i64,
+    pub sync_state: crate::services::storage::SyncState,
+    pub is_deleted: bool,
+
+    pub encrypted: bool,
+    pub crypto_meta: Option<serde_json::Value>,
+}

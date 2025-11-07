@@ -64,45 +64,10 @@ src/
 
 ## 📄 Model danych
 
-### Note
-* `local_id: UUID` – unikalny identyfikator lokalny
-* `mongo_id: Option<ObjectId>` – ID w chmurze
-* `owner_id: UUID` – identyfikator użytkownika
-* `name: String` – unikalna nazwa (jak nazwa pliku)
-* `title: String` – tytuł wyświetlany w UI
-* `content_path: String` – ścieżka do pliku `.md`
-* `attachments: Vec<AttachmentRef>`
-* `created_at`, `updated_at`, `version`
-* `encrypted: bool`, `crypto_meta: Option<...>`
-
-### AttachmentRef
-* `attachment_id: UUID`
-* `filename`, `mime`, `size`
-* `local_path: Option<PathBuf>`
-* `cloud_key: Option<String>` (S3 path)
-* `checksum_encrypted: String` (SHA-256 zaszyfrowanego pliku)
-* `sync_state: LocalOnly / Uploaded / PendingUpload / Error / MarkedForDeletion`
-* `encrypted: bool`, `meta: Option<JSON>`
-
----
 
 ### ☁️ MongoDB (chmurowa baza) 
 
-Zawiera:
-
-owner_id (email / user_id)
-
-note_id (UUID lub ObjectId)
-
-name, title, tags
-
-content — zaszyfrowany blob (lub base64)
-
-attachments: [{ cloud_key, checksum, encrypted }]
-
-created_at, updated_at, version
-
-opcjonalnie is_deleted, encrypted: bool
+W pliku data models
 ## 🔐 Bezpieczeństwo
 
 * Szyfrowanie end-to-end (E2E): notatki i pliki szyfrowane lokalnie.
