@@ -20,7 +20,7 @@ pub struct Note {
 
     pub version: i64,
     pub cloud_version: i64,
-    pub sync_state: crate::services::storage::SyncState,
+    pub sync_state: crate::services::storage::db_creation::SyncState,
     pub is_deleted: bool,
 
     pub encrypted: bool,

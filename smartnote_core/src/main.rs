@@ -5,5 +5,6 @@ mod utils;
 
 fn main() {
     let program_files_paths = crate::config::ProgramFiles::init();
-    let sqlite_connection = crate::services::storage::get_connection(&program_files_paths);
+    let sqlite_connection =
+        crate::services::storage::db_creation::get_connection(&program_files_paths);
 }

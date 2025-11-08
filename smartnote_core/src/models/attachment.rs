@@ -17,7 +17,7 @@ pub struct Attachment {
     pub encrypted: bool,
     pub crypto_meta: Option<serde_json::Value>,
 
-    pub sync_state: crate::services::storage::SyncState,
+    pub sync_state: crate::services::storage::db_creation::SyncState,
 
     pub created_at: i64,
     pub updated_at: i64,
