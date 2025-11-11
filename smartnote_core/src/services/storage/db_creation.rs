@@ -1,10 +1,13 @@
+//! Module used for creating and checking database settings, this module also gives connection to db
+
 use rusqlite::{Connection, Result};
+///This function gives connection to or returns db error and log it to user
 pub fn get_connection(paths: &crate::config::ProgramFiles) -> Connection {
     match creating_tables(paths) {
         Ok(conn) => conn,
         Err(err) => {
             crate::services::logger::log_error("error while creating tables", err);
-            std::process::exit(1);
+            std::process::exit(1); //TODO When adding tauri part just change it to Result<Connection, AppError> propagate to tauri error handler (catch) and display popup with options chnage permissions or leave program
         }
     }
 }
@@ -42,7 +45,7 @@ fn creating_tables(paths: &crate::config::ProgramFiles) -> Result<Connection> {
         deleted_at INTEGER,
         
         version INTEGER NOT NULL DEFAULT 1,
-        cloud_version INTEGER NOT NULL DEFAULT 0,
+        cloud_version INTEGER DEFAULT NULL,
         
         sync_state TEXT NOT NULL DEFAULT 'LocalOnly',
         is_deleted INTEGER NOT NULL DEFAULT 0,
@@ -125,11 +128,37 @@ fn test_of_db() {
     println!("{:?}", connection);
 }
 
-#[derive(serde::Serialize, serde::Deserialize)] //TODO sprawdzić jak to sie zserializuje, i czy musi tu byc jakiś string
+#[derive(serde::Serialize, serde::Deserialize)]
 pub enum SyncState {
     LocalOnly,
     PendingUpload,
     Synced,
     Conflict,
     Error,
+}
+
+impl rusqlite::ToSql for SyncState {
+    fn to_sql(&self) -> Result<rusqlite::types::ToSqlOutput<'_>> {
+        let s = match self {
+            Self::LocalOnly => "LocalOnly",
+            Self::PendingUpload => "PendingUpload",
+            Self::Synced => "Synced",
+            Self::Conflict => "Conflict",
+            Self::Error => "Error",
+        };
+        Ok(rusqlite::types::ToSqlOutput::from(s))
+    }
+}
+
+impl rusqlite::types::FromSql for SyncState {
+    fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
+        match value.as_str()? {
+            "LocalOnly" => Ok(SyncState::LocalOnly),
+            "PendingUpload" => Ok(SyncState::PendingUpload),
+            "Synced" => Ok(SyncState::Synced),
+            "Conflict" => Ok(SyncState::Conflict),
+            "Error" => Ok(SyncState::Error),
+            _ => Err(rusqlite::types::FromSqlError::InvalidType),
+        }
+    }
 }

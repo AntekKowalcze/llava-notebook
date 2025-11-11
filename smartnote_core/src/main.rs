@@ -1,4 +1,6 @@
+//! Just for tests, wont be needed after taurii added
 mod config;
+mod errors;
 mod models;
 mod services;
 mod utils;

@@ -1,3 +1,4 @@
+//! Module for application logger, temporarry holds terminal logging
 use std::fmt::Debug;
 
 pub fn log_success(log_content: &str) {

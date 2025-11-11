@@ -1,3 +1,4 @@
+//! Module with backend services for taurii aplication
 pub mod attachment;
 pub mod auth;
 pub mod cleaner;

@@ -1,7 +1,10 @@
+//! This module is responsible for configuring paths for applications do it by calling ProgramFiles::init()
+
 use dirs_next::data_local_dir;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 #[derive(Debug)]
+/// Struct with important paths
 pub struct ProgramFiles {
     pub base: PathBuf,
     pub data_base_path: PathBuf,
@@ -12,11 +15,13 @@ pub struct ProgramFiles {
     pub config_path: PathBuf,
 }
 #[derive(Serialize, Deserialize)]
+
+/// ConfigData contains states of aplication
 pub struct ConfigData {
     pub fallback: bool,
     pub data_dir: PathBuf,
 }
-
+//creating paths
 impl ProgramFiles {
     pub fn init() -> ProgramFiles {
         let mut fallback = false;
@@ -40,7 +45,8 @@ impl ProgramFiles {
         }
     }
 }
-pub fn get_paths(mut program_home_path: PathBuf) -> ProgramFiles {
+
+fn get_paths(mut program_home_path: PathBuf) -> ProgramFiles {
     let user = String::from("user1");
     let app_string = format!("smartnote/users/{}/", user); //in the future add here custom username gettn from login
     program_home_path.push(app_string);

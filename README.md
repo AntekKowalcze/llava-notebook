@@ -140,7 +140,7 @@ W pliku data models
 * Kod i logika przygotowane pod **multi-device sync**.
 
         ┌────────────────────────────┐
-        │        🖥️  Frontend         │
+        │        🖥️  Frontend        │
         │  Vue / Svelte (Tauri UI)   │
         │                            │
         │  • Edycja Markdown         │

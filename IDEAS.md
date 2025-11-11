@@ -3,3 +3,4 @@
 
 2. dawać komunikat dla usera w taurii przy każdej rzeczy która powoduje exit z programu
 
+3.  generate summary after note is leaved
