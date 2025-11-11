@@ -4,3 +4,5 @@
 2. dawać komunikat dla usera w taurii przy każdej rzeczy która powoduje exit z programu
 
 3.  generate summary after note is leaved
+
+4. create backup for note, because note is saved automaticly user might want to create backup with actual state of note so after unwanted changes it could get old version back

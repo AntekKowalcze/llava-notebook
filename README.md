@@ -175,6 +175,7 @@ W pliku data models
 │ ├── db.sqlite   Metadane i historia       │
 │ ├── keys/master.key zyfrowany klucz główny│
 | └── logs/app.log   Dziennik operacji      │
+│ |__ tmp/        Pliki w trakcie zapisu    │
 │                                           │
 │  → Zapis offline-first                    │
 │  → Szyfrowanie E2E                        │
