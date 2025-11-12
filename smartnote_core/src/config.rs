@@ -14,6 +14,7 @@ pub struct ProgramFiles {
     pub keys_path: PathBuf,
     pub config_path: PathBuf,
     pub tmp_path: PathBuf,
+    pub delete_tmp_path: PathBuf,
 }
 #[derive(Serialize, Deserialize)]
 
@@ -65,7 +66,7 @@ fn get_paths(mut program_home_path: PathBuf) -> ProgramFiles {
             crate::services::logger::log_error("couldnt create program directory", &err);
         }
     } else {
-        for path in ["notes", "assets", "keys", "logs", "tmp"] {
+        for path in ["notes", "assets", "keys", "logs", "tmp", "tmp_delete"] {
             let path_to_create = program_home_path.join(path);
             println!("{:?}", path_to_create);
             match std::fs::create_dir_all(path_to_create) {
@@ -99,6 +100,7 @@ fn get_paths(mut program_home_path: PathBuf) -> ProgramFiles {
         keys_path: program_home_path.join("keys/master.key"),
         config_path: program_home_path.join("config.json"),
         tmp_path: program_home_path.join("tmp"),
+        delete_tmp_path: program_home_path.join("tmp_delete"),
     }
 }
 fn write_config(fallback: bool, program_paths: &ProgramFiles) {

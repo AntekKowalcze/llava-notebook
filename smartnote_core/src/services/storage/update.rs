@@ -7,8 +7,6 @@ use std::{
     str::FromStr,
 };
 
-use uuid::fmt::Hyphenated;
-
 use crate::{config::ProgramFiles, services::storage::update};
 
 ///function responsible for updating .md file contents
@@ -29,13 +27,37 @@ fn update_md(
     let note_path = program_paths.notes_path.join(note_name);
     fs::rename(&tmp_filepath, note_path)?;
     let value = conn.execute(
-        "UPDATE notes SET updated_at = :updated_time WHERE local_id = :id",
+        "UPDATE notes SET updated_at = :updated_time , version = version + 1 WHERE local_id = :id",
         rusqlite::named_params! {
             ":updated_time": crate::utils::get_time(),
             ":id": note_id,
         },
     )?;
     println!("{value}");
+    crate::services::logger::log_success("successfully updated a note");
+
+    Ok(())
+}
+
+fn delete_note(
+    conn: &rusqlite::Connection,
+    name: String,
+    note_id: &str,
+    paths: &crate::config::ProgramFiles,
+) -> Result<(), crate::errors::Error> {
+    //create some fancy view in tauri and confirmation to delete note
+    std::fs::rename(
+        paths.notes_path.join(format!("{name}.md")),
+        paths.delete_tmp_path.join(format!("{name}.md")),
+    )?;
+    let stmt = conn.execute(
+        "UPDATE NOTES SET is_deleted = true, deleted_at = :deletation_time WHERE local_id = :note_id ",
+        rusqlite::named_params! {
+            ":deletation_time": crate::utils::get_time(),
+            ":note_id": note_id},
+    )?;
+    println!("{stmt}");
+    crate::services::logger::log_success("note successfully deleted");
 
     Ok(())
 }
@@ -59,3 +81,22 @@ fn update_test() {
 }
 
 //add deletation of note
+
+#[test]
+fn test_delte_note() {
+    let paths = ProgramFiles::init();
+    let name = "testtt".to_string();
+    let sqlite_connection = crate::services::storage::db_creation::get_connection(&paths);
+    delete_note(
+        &sqlite_connection,
+        name.clone(),
+        "de8dfc04-1b31-4599-8fca-22facbf25948",
+        &paths,
+    )
+    .unwrap();
+    std::fs::rename(
+        paths.delete_tmp_path.join(format!("{name}.md")),
+        paths.notes_path.join(format!("{name}.md")),
+    )
+    .unwrap();
+}

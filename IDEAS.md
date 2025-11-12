@@ -6,3 +6,5 @@
 3.  generate summary after note is leaved
 
 4. create backup for note, because note is saved automaticly user might want to create backup with actual state of note so after unwanted changes it could get old version back
+
+5. change sync states in crud after adding mongodb

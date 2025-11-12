@@ -176,6 +176,7 @@ W pliku data models
 │ ├── keys/master.key zyfrowany klucz główny│
 | └── logs/app.log   Dziennik operacji      │
 │ |__ tmp/        Pliki w trakcie zapisu    │
+│ |__ delete_tmp/ notatki po soft delete    │
 │                                           │
 │  → Zapis offline-first                    │
 │  → Szyfrowanie E2E                        │
