@@ -19,7 +19,7 @@
 * **Backend:** Rust (tokio, serde, rusqlite, mongodb, aws-sdk-s3)
 * **Lokalna baza:** SQLite (z feature `bundled`)
 * **Chmurowa baza:** MongoDB Atlas
-* **Przechowywanie plików:** AWS S3 (zaszyfrowane)
+* **Przechowywanie plików AWS S3 (zaszyfrowane)
 * **Szyfrowanie:** ChaCha20-Poly1305 + Argon2id (E2E)
 * **Parser Markdown:** pulldown_cmark / comrak
 

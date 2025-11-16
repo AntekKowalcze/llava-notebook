@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-//TODO dodać konieczne implementacje
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Note {
     #[serde(with = "uuid::serde::simple")]

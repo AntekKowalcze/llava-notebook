@@ -34,7 +34,7 @@ fn creating_tables(paths: &crate::config::ProgramFiles) -> Result<Connection> {
         local_id TEXT PRIMARY KEY,
         mongo_id TEXT,
         owner_id TEXT NOT NULL,
-        
+    
         name TEXT NOT NULL,
         title TEXT NOT NULL,
         summary TEXT NOT NULL,
@@ -121,13 +121,6 @@ fn creating_tables(paths: &crate::config::ProgramFiles) -> Result<Connection> {
     Ok(conn)
 }
 
-#[test]
-fn test_of_db() {
-    let paths = crate::config::ProgramFiles::init();
-    let connection = get_connection(&paths);
-    println!("{:?}", connection);
-}
-
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum SyncState {
     LocalOnly,
@@ -161,4 +154,11 @@ impl rusqlite::types::FromSql for SyncState {
             _ => Err(rusqlite::types::FromSqlError::InvalidType),
         }
     }
+}
+
+#[test]
+fn test_of_db() {
+    let paths = crate::config::ProgramFiles::init().unwrap();
+    let connection = get_connection(&paths);
+    println!("{:?}", connection);
 }

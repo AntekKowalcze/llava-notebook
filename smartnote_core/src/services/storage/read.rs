@@ -1,4 +1,3 @@
-use crate::{config::ProgramFiles, services::storage::update};
 use std::fs;
 
 fn read_note_content(
@@ -11,7 +10,7 @@ fn read_note_content(
 
 #[test]
 fn read_test() {
-    let paths = ProgramFiles::init();
+    let paths = crate::config::ProgramFiles::init().unwrap();
     let name = "testtt".to_string();
     let sqlite_connection = crate::services::storage::db_creation::get_connection(&paths);
     let content = read_note_content(&paths, name).unwrap();

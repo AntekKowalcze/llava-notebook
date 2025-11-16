@@ -86,7 +86,7 @@ pub fn add_note_to_database(
 
 #[test]
 fn chceck_if_file_is_created() {
-    let path = crate::config::ProgramFiles::init();
+    let path = crate::config::ProgramFiles::init().unwrap();
     let name = "tesg".to_owned();
     init_note(&path.notes_path, name.clone()).unwrap();
     let mut new_note_path = path.notes_path;
@@ -96,7 +96,7 @@ fn chceck_if_file_is_created() {
 } //TODO add name validation and whitespace deletation if needed
 #[test]
 fn add_to_db() {
-    let path = crate::config::ProgramFiles::init();
+    let path = crate::config::ProgramFiles::init().unwrap();
     let mut conn = crate::services::storage::db_creation::get_connection(&path);
     let name = "tebsttt".to_owned();
     add_note_to_database(&mut conn, &path.notes_path, name).unwrap();

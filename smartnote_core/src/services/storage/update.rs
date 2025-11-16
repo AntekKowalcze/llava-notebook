@@ -1,11 +1,7 @@
 //! this module is responsible for updating .md file but also important fields in databases
 
-use std::{
-    fs::{self, OpenOptions},
-    io::Write,
-    path::PathBuf,
-    str::FromStr,
-};
+use std::fs::{self};
+//TODO add creating summary first from first 10 words then chatgpt
 
 use crate::{config::ProgramFiles, services::storage::update};
 
@@ -43,16 +39,17 @@ fn update_md(
 
 fn update_test() {
     let paths = ProgramFiles::init();
-    let name = "testtt".to_string();
+    let name = "tebsttt".to_string();
     let written_string =
         "this is test string which have to be written and now it will not overwrite".to_string();
-    let sqlite_connection = crate::services::storage::db_creation::get_connection(&paths);
+    let sqlite_connection =
+        crate::services::storage::db_creation::get_connection(&paths.as_ref().unwrap());
     update_md(
         &sqlite_connection,
         name,
-        "de8dfc04-1b31-4599-8fca-22facbf25948",
+        "3cbf6abc-830c-473b-8330-4ff6051ee28e",
         written_string,
-        &paths,
+        &paths.unwrap(),
     )
     .unwrap();
 }

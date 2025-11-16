@@ -25,13 +25,13 @@ fn delete_note(
 
 #[test]
 fn test_delte_note() {
-    let paths = ProgramFiles::init();
-    let name = "testtt".to_string();
+    let paths = ProgramFiles::init().unwrap();
+    let name: String = "tebsttt".to_string();
     let sqlite_connection = crate::services::storage::db_creation::get_connection(&paths);
     delete_note(
         &sqlite_connection,
         name.clone(),
-        "de8dfc04-1b31-4599-8fca-22facbf25948",
+        "3cbf6abc-830c-473b-8330-4ff6051ee28e",
         &paths,
     )
     .unwrap();
@@ -41,3 +41,5 @@ fn test_delte_note() {
     )
     .unwrap();
 }
+
+//deletation not visible because its cleaning
