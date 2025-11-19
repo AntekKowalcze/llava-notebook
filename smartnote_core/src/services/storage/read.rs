@@ -1,5 +1,5 @@
 use std::fs;
-
+///function responsible for reading notes content
 fn read_note_content(
     paths: &crate::config::ProgramFiles,
     name: String,

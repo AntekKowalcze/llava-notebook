@@ -1,3 +1,4 @@
+///data model of local user
 pub struct LocalUser {
     pub user_id: uuid::Uuid,
     pub username: String,

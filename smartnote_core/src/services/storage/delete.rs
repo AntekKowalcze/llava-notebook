@@ -1,5 +1,6 @@
+//! this module containt function for soft deleting notes locally
 use crate::{config::ProgramFiles, services::storage::update};
-
+/// soft delete note
 fn delete_note(
     conn: &rusqlite::Connection,
     name: String,

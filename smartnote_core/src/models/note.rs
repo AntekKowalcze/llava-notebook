@@ -1,3 +1,4 @@
+//! Module contains Note struct
 use std::path::PathBuf;
 
 #[derive(serde::Serialize, serde::Deserialize)]

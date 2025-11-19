@@ -71,7 +71,7 @@ fn creating_tables(paths: &crate::config::ProgramFiles) -> Result<Connection> {
         
         local_path TEXT,
         cloud_key TEXT,
-        
+       
         checksum_encrypted TEXT NOT NULL,
         
         encrypted INTEGER NOT NULL DEFAULT 1,

@@ -1,3 +1,4 @@
+///Online user struct for mongo
 pub struct OnlineUser {
     email: String,
     localusernames: Vec<(String, uuid::Uuid)>, //username, device id
@@ -6,7 +7,7 @@ pub struct OnlineUser {
     created_at: i64,
     last_login: i64,
 }
-
+// todo when adding online but to consider earlier, is s3 data needed here?
 //mongo ONLINE
 // mongo id
 // email

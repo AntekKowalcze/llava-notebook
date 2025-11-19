@@ -1,3 +1,6 @@
+//! Module responsible for registering user
+//! in this modules important data is encrypted, and keys for notes encryption are also created
+
 use argon2::{
     Argon2,
     password_hash::{PasswordHasher, SaltString, rand_core::OsRng},
@@ -9,7 +12,7 @@ use chacha20poly1305::{
 use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::config::ProgramFiles;
-
+///function responsible for registering user offilne and adding it encrypted to local db
 fn register_user_offline(
     username: String,
     password: String,
@@ -40,7 +43,8 @@ fn register_user_offline(
 
     tx.execute(
         r#"INSERT INTO users_data (
-        user_id, username,
+        user_id,
+        username,
         password_hash,
         password_salt,
         notes_key,
@@ -62,7 +66,7 @@ fn register_user_offline(
        :created_at, 
        :last_login)"#,
         rusqlite::named_params! {
-        ":user_id": &new_user.user_id,
+        ":user_id": new_user.user_id.to_string(),
          ":username":new_user.username ,
          ":password_hash":new_user.password_hash,
          ":password_salt":new_user.password_salt,
@@ -70,7 +74,7 @@ fn register_user_offline(
          ":nonce_notes_key":new_user.nonce_notes_key,
          ":is_online_linked": new_user.is_online_linked,
          ":online_account_email":new_user.online_account_email,
-         ":device_id": new_user.device_id,
+         ":device_id": new_user.device_id.to_string(),
          ":created_at":new_user.created_at,
          ":last_login":new_user.last_login,
           },
@@ -82,7 +86,7 @@ fn register_user_offline(
 }
 
 fn register_user_online() {}
-
+///this function generates encrypted keys
 fn generate_enctypted_keys(
     //reuse on password change
     password: String,
@@ -115,8 +119,7 @@ fn generate_enctypted_keys(
     ))
 }
 
-//TODO validate note name ?mayby write helper
-
+///this function validates password on backend side
 fn password_validation(password: &str) -> Result<(), crate::errors::Error> {
     if password.len() < 8
         || !password.chars().any(|c| c.is_ascii_punctuation())
@@ -134,7 +137,7 @@ fn password_validation(password: &str) -> Result<(), crate::errors::Error> {
 
     Ok(())
 }
-
+///this function validate username on backend side
 fn validate_username(username: &str, conn: &Connection) -> Result<(), crate::errors::Error> {
     let exists = conn
         .query_row(
@@ -165,13 +168,7 @@ fn test_password_validation() {
 #[test]
 fn register_test() {
     let paths = ProgramFiles::init().unwrap();
-    let mut conn =
+    let conn =
         crate::services::auth::database_creation::connect_or_create_local_login_db(&paths).unwrap();
-    register_user_offline(
-        "second_user".to_string(),
-        "Tewst!@#".to_string(),
-        &paths,
-        conn,
-    )
-    .unwrap();
+    register_user_offline("fourth".to_string(), "Tewst!@#".to_string(), &paths, conn).unwrap();
 }

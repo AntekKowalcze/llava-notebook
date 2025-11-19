@@ -43,7 +43,7 @@ pub struct ConfigData {
     pub data_dir: PathBuf,
 }
 
-//creating paths
+///determining fallback and creating paths and ProgramFiles struct
 impl ProgramFiles {
     pub fn init() -> Result<ProgramFiles, crate::errors::Error> {
         let mut fallback = false;
@@ -70,7 +70,8 @@ impl ProgramFiles {
         }
     }
 }
-fn get_paths(mut program_home_path: PathBuf, user_uuid: uuid::Uuid) -> ProgramFiles {
+///function which creates paths and create them in sense of getting current user
+fn get_paths(program_home_path: PathBuf, user_uuid: uuid::Uuid) -> ProgramFiles {
     let app_string = format!("smartnote/users/{}/", user_uuid); //in the future add uuid got from login
     let mut user_home_path = program_home_path.clone();
     user_home_path.push(app_string);
@@ -128,6 +129,8 @@ fn get_paths(mut program_home_path: PathBuf, user_uuid: uuid::Uuid) -> ProgramFi
         active_user_path: program_home_path.join("smartnote/active_user.json"),
     }
 }
+
+///function responsible for writeing config data, current directory and if is it fallback
 fn write_config(fallback: bool, program_paths: &ProgramFiles) {
     let config_content = ConfigData {
         fallback: fallback,
@@ -160,6 +163,8 @@ fn write_config(fallback: bool, program_paths: &ProgramFiles) {
         }
     }
 }
+
+/// function for getting device id, or creating new if not exists
 pub fn get_device_id(paths: &ProgramFiles) -> Result<uuid::Uuid, crate::errors::Error> {
     if paths.device_id_path.exists() {
         let file_content = std::fs::read_to_string(&paths.device_id_path)?;
@@ -181,7 +186,7 @@ pub fn get_device_id(paths: &ProgramFiles) -> Result<uuid::Uuid, crate::errors::
         Ok(device_id)
     }
 }
-
+/// function to change or set actie user after registering/login/changing account
 pub fn change_active_user(
     user_uuid: uuid::Uuid,
     paths: &ProgramFiles,

@@ -36,6 +36,11 @@ pub enum Error {
 
     #[error("Note name already exists")]
     NoteNameExistsError,
+    #[error("Title to long")]
+    TitleToLong,
+
+    #[error("User dont exist")]
+    UserNotExists,
 }
 
 // Manual Serialize - uses the Display from thiserror

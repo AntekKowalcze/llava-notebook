@@ -1,3 +1,4 @@
+///creation of user_data local database
 pub fn connect_or_create_local_login_db(
     paths: &crate::config::ProgramFiles,
 ) -> Result<rusqlite::Connection, crate::errors::Error> {

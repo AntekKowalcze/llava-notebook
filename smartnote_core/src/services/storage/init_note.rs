@@ -1,14 +1,14 @@
 //! This module is responsible for creating database record and .md file
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
 
 use rusqlite::{Connection, OptionalExtension};
 
 use crate::{config::ProgramFiles, services::logger};
 //init note after new note clicked and name sumbited
-
+///this note init note struct and creates md file
 fn init_note(
-    //TODO add here owner id after added
-    path: &PathBuf, //path of notes
+    owner_id: uuid::Uuid, //get it from current user file
+    path: &PathBuf,       //path of notes
     name: String,
 ) -> Result<crate::models::note::Note, crate::errors::Error> {
     let mut new_note_path = path.clone();
@@ -20,7 +20,7 @@ fn init_note(
             Ok(crate::models::note::Note {
                 local_id: uuid::Uuid::new_v4(),
                 mongo_id: None,
-                owner_id: uuid::Uuid::new_v4(),
+                owner_id: owner_id,
 
                 name: name,
                 title: "".to_owned(),
@@ -51,12 +51,17 @@ fn init_note(
 ///function responsible for all operations needed to initialize note, creating struct and inserting it to sqlite
 pub fn add_note_to_database(
     conn: &mut rusqlite::Connection,
-    path: &PathBuf,
+    paths: &ProgramFiles,
     name: String,
 ) -> Result<(), crate::errors::Error> {
     let name = name.trim().to_string();
     validate_note_name(&name, &conn)?;
-    if let Ok(note) = init_note(path, name) {
+    //getting current user
+    let file_content = fs::read_to_string(&paths.active_user_path)?;
+    let json: serde_json::Value = serde_json::from_str(&file_content)?;
+    let owner_id: uuid::Uuid = serde_json::from_value(json["user_uuid"].clone())?;
+
+    if let Ok(note) = init_note(owner_id, &paths.notes_path, name) {
         let tx = conn.transaction()?;
         tx.execute("INSERT INTO notes (local_id, mongo_id, owner_id, name, title, summary, content_path, created_at, updated_at, deleted_at, version, cloud_version, sync_state, is_deleted, encrypted, crypto_meta) VALUES (:local_id, :mongo_id, :owner_id, :name, :title, :summary, :content_path, :created_at, :updated_at, :deleted_at, :version, :cloud_version, :sync_state, :is_deleted, :encrypted, :crypto_meta); "
         , rusqlite::named_params!{
@@ -87,7 +92,7 @@ pub fn add_note_to_database(
         todo!() //tutaj będzie poprostu powrót do strony frontendowej + dodanie structu do to_save.json
     }
 }
-
+///function which valiates note name, it should be distinct
 fn validate_note_name(note_name: &str, conn: &Connection) -> Result<(), crate::errors::Error> {
     let exists = conn
         .query_row(
@@ -114,25 +119,29 @@ fn validate_note_name(note_name: &str, conn: &Connection) -> Result<(), crate::e
 fn chceck_if_file_is_created() {
     let path = crate::config::ProgramFiles::init().unwrap();
     let name = "tesg".to_owned();
-    init_note(&path.notes_path, name.clone()).unwrap();
+    let file_content = fs::read_to_string(&path.active_user_path).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&file_content).unwrap();
+    let owner_id: uuid::Uuid = serde_json::from_value(json["user_uuid"].clone()).unwrap();
+
+    init_note(owner_id, &path.notes_path, name.clone()).unwrap();
     let mut new_note_path = path.notes_path;
     new_note_path.push(name);
     new_note_path.set_extension("md");
     assert!(std::path::Path::exists(&new_note_path));
-} //TODO add name validation and whitespace deletation if needed
+}
 #[test]
 fn add_to_db() {
     let path = crate::config::ProgramFiles::init().unwrap();
     let mut conn = crate::services::storage::db_creation::get_connection(&path);
-    let name = "test".to_owned();
-    add_note_to_database(&mut conn, &path.notes_path, name).unwrap();
+    let name = "tstbs".to_owned();
+    add_note_to_database(&mut conn, &path, name).unwrap();
 }
 
 #[test]
 fn note_validator_test() {
     let path = crate::config::ProgramFiles::init().unwrap();
     let conn = crate::services::storage::db_creation::get_connection(&path);
-    let note_name = "test";
+    let note_name = "tests";
     validate_note_name(note_name, &conn).unwrap();
 }
 //TODO add logs in appropriate places

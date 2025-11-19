@@ -1,3 +1,4 @@
+//! Modul containing Attachement struct
 use std::path::PathBuf;
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Attachment {
