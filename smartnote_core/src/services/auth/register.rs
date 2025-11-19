@@ -6,7 +6,7 @@ use chacha20poly1305::{
     ChaCha20Poly1305,
     aead::{Aead, AeadCore, KeyInit},
 };
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::config::ProgramFiles;
 
@@ -16,6 +16,10 @@ fn register_user_offline(
     paths: &crate::config::ProgramFiles,
     mut conn: Connection,
 ) -> Result<(), crate::errors::Error> {
+    let username = username.trim().to_string();
+    validate_username(&username, &conn)?;
+    let password = password.trim().to_string();
+    password_validation(&password)?;
     let notes_key: chacha20poly1305::Key = ChaCha20Poly1305::generate_key(&mut OsRng);
     let (password_hash, salt, encrypted_notes_key, nonce_for_key_wrap) =
         generate_enctypted_keys(password, notes_key)?;
@@ -111,10 +115,63 @@ fn generate_enctypted_keys(
     ))
 }
 
+//TODO validate note name ?mayby write helper
+
+fn password_validation(password: &str) -> Result<(), crate::errors::Error> {
+    if password.len() < 8
+        || !password.chars().any(|c| c.is_ascii_punctuation())
+        || !password.chars().any(|c| c.is_ascii_uppercase())
+        || !password.chars().any(|c| c.is_ascii_lowercase())
+    {
+        crate::services::logger::log_error(
+            "password not validated",
+            crate::errors::Error::PasswordValidation,
+        );
+
+        return Err(crate::errors::Error::PasswordValidation);
+    }
+    crate::services::logger::log_success("Password validated successfully");
+
+    Ok(())
+}
+
+fn validate_username(username: &str, conn: &Connection) -> Result<(), crate::errors::Error> {
+    let exists = conn
+        .query_row(
+            "SELECT username FROM users_data WHERE username = :name",
+            params![username],
+            |_row| Ok(()),
+        )
+        .optional()?
+        .is_some();
+    if exists {
+        crate::services::logger::log_error(
+            "username validation failed",
+            crate::errors::Error::UsernameExistsError,
+        );
+        return Err(crate::errors::Error::UsernameExistsError);
+    } else {
+        crate::services::logger::log_success("passed username validation");
+        return Ok(());
+    }
+}
+
+#[test]
+fn test_password_validation() {
+    let password = "aA#$#$#@";
+    password_validation(password).unwrap();
+}
+
 #[test]
 fn register_test() {
     let paths = ProgramFiles::init().unwrap();
     let mut conn =
         crate::services::auth::database_creation::connect_or_create_local_login_db(&paths).unwrap();
-    register_user_offline("second_user".to_string(), "test".to_string(), &paths, conn).unwrap();
+    register_user_offline(
+        "second_user".to_string(),
+        "Tewst!@#".to_string(),
+        &paths,
+        conn,
+    )
+    .unwrap();
 }

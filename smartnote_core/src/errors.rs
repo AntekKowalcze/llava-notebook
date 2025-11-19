@@ -27,6 +27,15 @@ pub enum Error {
 
     #[error("Error while encrypting main key for user: {0}")]
     ChaChaEncyptionError(#[from] chacha20poly1305::Error),
+
+    #[error("Password didnt pass validation")]
+    PasswordValidation,
+
+    #[error("Username already exists")]
+    UsernameExistsError,
+
+    #[error("Note name already exists")]
+    NoteNameExistsError,
 }
 
 // Manual Serialize - uses the Display from thiserror

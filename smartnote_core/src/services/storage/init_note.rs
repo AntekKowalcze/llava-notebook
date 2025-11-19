@@ -1,11 +1,13 @@
 //! This module is responsible for creating database record and .md file
 use std::path::PathBuf;
 
-use crate::config::ProgramFiles;
+use rusqlite::{Connection, OptionalExtension};
+
+use crate::{config::ProgramFiles, services::logger};
 //init note after new note clicked and name sumbited
 
 fn init_note(
-    // add here owner id after added
+    //TODO add here owner id after added
     path: &PathBuf, //path of notes
     name: String,
 ) -> Result<crate::models::note::Note, crate::errors::Error> {
@@ -52,6 +54,8 @@ pub fn add_note_to_database(
     path: &PathBuf,
     name: String,
 ) -> Result<(), crate::errors::Error> {
+    let name = name.trim().to_string();
+    validate_note_name(&name, &conn)?;
     if let Ok(note) = init_note(path, name) {
         let tx = conn.transaction()?;
         tx.execute("INSERT INTO notes (local_id, mongo_id, owner_id, name, title, summary, content_path, created_at, updated_at, deleted_at, version, cloud_version, sync_state, is_deleted, encrypted, crypto_meta) VALUES (:local_id, :mongo_id, :owner_id, :name, :title, :summary, :content_path, :created_at, :updated_at, :deleted_at, :version, :cloud_version, :sync_state, :is_deleted, :encrypted, :crypto_meta); "
@@ -84,6 +88,28 @@ pub fn add_note_to_database(
     }
 }
 
+fn validate_note_name(note_name: &str, conn: &Connection) -> Result<(), crate::errors::Error> {
+    let exists = conn
+        .query_row(
+            "SELECT 1 FROM notes WHERE name = :note_name",
+            rusqlite::params![note_name],
+            |_row| Ok(()),
+        )
+        .optional()?
+        .is_some();
+
+    if exists {
+        crate::services::logger::log_error(
+            "Note name exists",
+            crate::errors::Error::NoteNameExistsError,
+        );
+        return Err(crate::errors::Error::NoteNameExistsError);
+    } else {
+        crate::services::logger::log_success("note name validated successfully");
+        Ok(())
+    }
+}
+
 #[test]
 fn chceck_if_file_is_created() {
     let path = crate::config::ProgramFiles::init().unwrap();
@@ -98,6 +124,15 @@ fn chceck_if_file_is_created() {
 fn add_to_db() {
     let path = crate::config::ProgramFiles::init().unwrap();
     let mut conn = crate::services::storage::db_creation::get_connection(&path);
-    let name = "tebsttt".to_owned();
+    let name = "test".to_owned();
     add_note_to_database(&mut conn, &path.notes_path, name).unwrap();
 }
+
+#[test]
+fn note_validator_test() {
+    let path = crate::config::ProgramFiles::init().unwrap();
+    let conn = crate::services::storage::db_creation::get_connection(&path);
+    let note_name = "test";
+    validate_note_name(note_name, &conn).unwrap();
+}
+//TODO add logs in appropriate places
