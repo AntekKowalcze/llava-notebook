@@ -2,14 +2,13 @@
 
 use rusqlite::{Connection, Result};
 ///This function gives connection to or returns db error and log it to user
-pub fn get_connection(paths: &crate::config::ProgramFiles) -> Connection {
-    match creating_tables(paths) {
-        Ok(conn) => conn,
-        Err(err) => {
-            crate::services::logger::log_error("error while creating tables", err);
-            std::process::exit(1); //TODO When adding tauri part just change it to Result<Connection, AppError> propagate to tauri error handler (catch) and display popup with options chnage permissions or leave program
-        }
-    }
+pub fn get_connection(
+    paths: &crate::config::ProgramFiles,
+) -> Result<Connection, crate::errors::Error> {
+    let conn = creating_tables(paths).inspect_err(|err| {
+        crate::services::logger::log_error("error while creating tables", &err)
+    })?;
+    Ok(conn)
 }
 
 fn creating_tables(paths: &crate::config::ProgramFiles) -> Result<Connection> {

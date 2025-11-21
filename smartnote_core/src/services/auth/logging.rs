@@ -77,4 +77,3 @@ fn login_test() {
     local_log_in(username, password, &conn).unwrap();
 }
 //TODO add one test which tests everything
-//TODO ZEROIZE notes_key.as_mut_slice().zeroize();  perplexity check

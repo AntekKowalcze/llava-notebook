@@ -55,7 +55,7 @@ fn update_test() {
     let written_string =
         "this is test string which have to be written and now it will not overwrite".to_string();
     let sqlite_connection =
-        crate::services::storage::db_creation::get_connection(&paths.as_ref().unwrap());
+        crate::services::storage::db_creation::get_connection(&paths.as_ref().unwrap()).unwrap();
     let title = "new title".to_string();
     update_md(
         &sqlite_connection,
@@ -68,4 +68,3 @@ fn update_test() {
     .unwrap();
 }
 //TODO dodać anyhow, super obsługa błędów
-//TODO dodać sanitize_filename żeby filename opuszczało / \ itd

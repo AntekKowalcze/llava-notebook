@@ -28,7 +28,7 @@ fn delete_note(
 fn test_delte_note() {
     let paths = ProgramFiles::init().unwrap();
     let name: String = "tebsttt".to_string();
-    let sqlite_connection = crate::services::storage::db_creation::get_connection(&paths);
+    let sqlite_connection = crate::services::storage::db_creation::get_connection(&paths).unwrap();
     delete_note(
         &sqlite_connection,
         name.clone(),

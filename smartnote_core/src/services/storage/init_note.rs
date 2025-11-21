@@ -102,8 +102,7 @@ fn validate_note_name(
 ) -> Result<(), crate::errors::Error> {
     if note_name.chars().count() >= 255 {
         //longest unix filename
-        println!("name to long"); //TODO !zmienić to żeby działało !!
-        crate::services::logger::log_error("name to long", crate::errors::Error::NoteNameToLong);
+        crate::services::logger::log_error("name too long", crate::errors::Error::NoteNameToLong);
         return Err(crate::errors::Error::NoteNameToLong);
     }
     let exists = conn
@@ -147,7 +146,7 @@ fn chceck_if_file_is_created() {
 #[test]
 fn add_to_db() {
     let path = crate::config::ProgramFiles::init().unwrap();
-    let mut conn = crate::services::storage::db_creation::get_connection(&path);
+    let mut conn = crate::services::storage::db_creation::get_connection(&path).unwrap();
     let name = "".to_owned();
 
     add_note_to_database(&mut conn, &path, name).unwrap();
@@ -156,7 +155,7 @@ fn add_to_db() {
 #[test]
 fn note_validator_test() {
     let path = crate::config::ProgramFiles::init().unwrap();
-    let conn = crate::services::storage::db_creation::get_connection(&path);
+    let conn = crate::services::storage::db_creation::get_connection(&path).unwrap();
     let note_name = "kl;";
     let file_content = fs::read_to_string(&path.active_user_path).unwrap();
     let json: serde_json::Value = serde_json::from_str(&file_content).unwrap();

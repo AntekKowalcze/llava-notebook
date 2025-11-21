@@ -109,7 +109,6 @@ fn generate_enctypted_keys(
     let password_hash = argon2
         .hash_password(password.as_bytes(), &salt)?
         .to_string(); //hasing password 
-    //TODO sprawdzic typy w bazach , zrobić spójne
 
     //generate random key
     let kek = ChaCha20Poly1305::new(&kek_bytes.into());

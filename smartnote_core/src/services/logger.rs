@@ -11,6 +11,5 @@ where
 {
     eprintln!("❌ {:?}, {}", error, log_content)
 }
-//TODO Dodać zeroizacje (przeczytaj perplexity) kluczy w szyfrowaniu,
 //TODO dodać opóźnienie po iluś źle wpisanych hasłach
 //TODO Brak synchronizacji między FS i DB - w delete_note() robisz fs::rename() PRZED UPDATE, więc jeśli DB update zawiedzie, plik będzie już przeniesiony. Odwróć kolejność lub użyj two-phase commit pattern

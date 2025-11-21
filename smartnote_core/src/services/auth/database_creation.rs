@@ -14,11 +14,11 @@ pub fn connect_or_create_local_login_db(
                         password_salt TEXT NOT NULL,
                         notes_key BLOB NOT NULL,
                         nonce_notes_key BLOB NOT NULL,
-                        is_online_linked INT NOT NULL DEFAULT 0, 
+                        is_online_linked INTEGER NOT NULL DEFAULT 0, 
                         online_account_email TEXT DEFAULT NULL, 
                         device_id TEXT NOT NULL,
-                        created_at int NOT NULL,  
-                        last_login int NOT NULL, 
+                        created_at INTEGER NOT NULL,  
+                        last_login INTEGER NOT NULL, 
                         UNIQUE(username)
                         );
                         

@@ -27,11 +27,12 @@ pub struct CommonMetaInformation {
 
 impl CommonMetaInformation {
     //call it after paths init and getting ids and current user to after logging in
-    fn init(device_id: uuid::Uuid, current_user: uuid::Uuid) -> CommonMetaInformation {
-        CommonMetaInformation {
-            device_id: device_id,
-            current_user: current_user, //login will return current user
-        }
+    fn init(paths: &ProgramFiles) -> Result<CommonMetaInformation, crate::errors::Error> {
+        Ok(CommonMetaInformation {
+            device_id: get_device_id(&paths)?,
+
+            current_user: read_current_user(paths.active_user_path.clone())?, //login will return current user
+        })
     }
 }
 
