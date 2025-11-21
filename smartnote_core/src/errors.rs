@@ -47,6 +47,10 @@ pub enum Error {
 
     #[error("name too long")]
     NoteNameToLong,
+    #[error("Current user not found in active user file")]
+    CurrentUserNotFound,
+    #[error("Device ID can't be red from file")]
+    DeviceIdErorr,
 }
 
 // Manual Serialize - uses the Display from thiserror

@@ -70,7 +70,7 @@ fn check_if_user_exists(
 #[test]
 fn login_test() {
     let paths = crate::config::ProgramFiles::init().unwrap();
-    let username = "seventh".to_string();
+    let username = "eight".to_string();
     let password = zeroize::Zeroizing::from("ToJestTest!".to_string());
     let conn =
         crate::services::auth::database_creation::connect_or_create_local_login_db(&paths).unwrap();

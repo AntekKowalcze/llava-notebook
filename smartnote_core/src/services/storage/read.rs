@@ -11,8 +11,7 @@ fn read_note_content(
 #[test]
 fn read_test() {
     let paths = crate::config::ProgramFiles::init().unwrap();
-    let name = "testtt".to_string();
-    let sqlite_connection = crate::services::storage::db_creation::get_connection(&paths);
+    let name = "this_is_tets_note".to_string();
     let content = read_note_content(&paths, name).unwrap();
     println!("{content}")
 }

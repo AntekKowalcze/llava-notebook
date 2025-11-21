@@ -11,7 +11,6 @@ pub struct ProgramFiles {
     pub notes_path: PathBuf,
     pub assets_path: PathBuf,
     pub logs_path: PathBuf,
-    pub keys_path: PathBuf,
     pub config_path: PathBuf,
     pub tmp_path: PathBuf,
     pub delete_tmp_path: PathBuf,
@@ -52,11 +51,23 @@ impl ProgramFiles {
 
         match base {
             Some(program_home_path) => {
+                let active_user_path = program_home_path.join("smartnote/active_user.json");
+                let user_uuid = match read_current_user(active_user_path) {
+                    //temp uuid on first run
+                    Ok(uuid) => uuid,
+                    Err(_) => {
+                        crate::services::logger::log_success(
+                            "No active user found (first run?), using temp UUID",
+                        );
+                        uuid::Uuid::new_v4()
+                    }
+                };
+
                 let program_paths = get_paths(
                     program_home_path.clone(),
-                    read_current_user(program_home_path.join("smartnote/active_user.json"))?,
-                ); //function users uuid also, its to add
-                write_config(fallback, &program_paths);
+                    user_uuid, //tu zmiana
+                )?; //function users uuid also, its to add
+                write_config(fallback, &program_paths)?;
                 Ok(program_paths)
             }
             None => {
@@ -64,106 +75,69 @@ impl ProgramFiles {
                 let log_content = "Couldnt get directory, trying to fallback";
                 crate::services::logger::log_error(log_content, "");
                 let first_fallback = std::env::temp_dir(); //cleaner logic needed when it will be added
-                let program_paths = get_paths(first_fallback, uuid::Uuid::new_v4());
-                write_config(fallback, &program_paths);
+                let program_paths = get_paths(first_fallback, uuid::Uuid::new_v4())?;
+                write_config(fallback, &program_paths)?;
                 Ok(program_paths)
             }
         }
     }
 }
 ///function which creates paths and create them in sense of getting current user
-fn get_paths(program_home_path: PathBuf, user_uuid: uuid::Uuid) -> ProgramFiles {
+fn get_paths(
+    program_home_path: PathBuf,
+    user_uuid: uuid::Uuid,
+) -> Result<ProgramFiles, crate::errors::Error> {
     let app_string = format!("smartnote/users/{}/", user_uuid); //in the future add uuid got from login
     let mut user_home_path = program_home_path.clone();
     user_home_path.push(app_string);
-    if let Err(err) = std::fs::create_dir_all(&user_home_path) {
-        if err.kind() == std::io::ErrorKind::PermissionDenied {
-            crate::services::logger::log_error(
-                "permission denied for creating program directories",
-                &err,
-            );
-        } else if err.kind() == std::io::ErrorKind::AlreadyExists {
-            crate::services::logger::log_success("Program directory already exists");
-        } else if err.kind() == std::io::ErrorKind::NotFound {
-            crate::services::logger::log_error("Parent directory not found", &err);
-        } else {
-            crate::services::logger::log_error("couldnt create program directory", &err);
-        }
-    } else {
-        for path in ["notes", "assets", "keys", "logs", "tmp", "tmp_delete"] {
-            //TODO check if keys should be stored in files
-            let path_to_create = user_home_path.join(path);
-            println!("{:?}", path_to_create);
-            match std::fs::create_dir_all(path_to_create) {
-                Ok(_) => {
-                    crate::services::logger::log_success("created subdirectories successfully");
-                }
-                Err(err) => {
-                    if err.kind() == std::io::ErrorKind::PermissionDenied {
-                        crate::services::logger::log_error(
-                            "permission denied for creating subdirectories",
-                            &err,
-                        );
-                    } else if err.kind() == std::io::ErrorKind::AlreadyExists {
-                        crate::services::logger::log_success("Subdirectories already exists");
-                    } else if err.kind() == std::io::ErrorKind::NotFound {
-                        crate::services::logger::log_error("Parent directory not found", &err);
-                    } else {
-                        crate::services::logger::log_error("couldnt create subdirectory", &err);
-                    }
-                }
-            };
-        }
-        crate::services::logger::log_success("file paths created, app directory created");
+    std::fs::create_dir_all(&user_home_path)?;
+
+    for path in ["notes", "assets", "logs", "tmp", "tmp_delete"] {
+        //TODO check if keys should be stored in files
+        let path_to_create = user_home_path.join(path);
+
+        let log_content = format!("file paths created, app directory: {}", path);
+        crate::services::logger::log_success(&log_content);
+        std::fs::create_dir_all(path_to_create)?;
     }
-    ProgramFiles {
+    crate::services::logger::log_success("created subdirectories successfully");
+    Ok(ProgramFiles {
         base: user_home_path.clone(),
         data_base_path: user_home_path.join("note.sqlite"),
         notes_path: user_home_path.join("notes"),
         assets_path: user_home_path.join("assets"),
         logs_path: user_home_path.join("logs/app.log"),
-        keys_path: user_home_path.join("keys/master.key"),
         config_path: user_home_path.join("config.json"),
         tmp_path: user_home_path.join("tmp"),
         delete_tmp_path: user_home_path.join("tmp_delete"),
         local_login_database_path: program_home_path.join("smartnote/users/local_login_db.sqlite"),
         device_id_path: program_home_path.join("smartnote/device_id.json"),
         active_user_path: program_home_path.join("smartnote/active_user.json"),
-    }
+    })
 }
 
 ///function responsible for writeing config data, current directory and if is it fallback
-fn write_config(fallback: bool, program_paths: &ProgramFiles) {
+fn write_config(fallback: bool, program_paths: &ProgramFiles) -> Result<(), crate::errors::Error> {
     let config_content = ConfigData {
         fallback: fallback,
         data_dir: program_paths.base.to_path_buf(),
     };
-    let serialized_config_content = serde_json::to_string_pretty(&config_content); //pretty
-    let content: String = match serialized_config_content {
-        Ok(ser_config_content) => {
-            crate::services::logger::log_success("serialized config content");
-            ser_config_content
-        }
-        Err(err) => {
-            crate::services::logger::log_error(
-                "serializing error config will be empty string, error",
-                err,
-            );
-            "{}".to_string()
-        }
-    };
-    match fs::write(&program_paths.config_path, &content) {
-        Ok(_) => {
-            crate::services::logger::log_success("written content to config.json");
-        }
-        Err(err) => {
-            fs::write(program_paths.config_path.clone(), "{}").ok(); //it can
-            crate::services::logger::log_error(
-                "couldnt write to config.json, it will try again to write only braccets or if it fail it will have no content or not existing",
-                err,
-            );
-        }
-    }
+    let content = serde_json::to_string_pretty(&config_content).inspect_err(|err| {
+        crate::services::logger::log_error(
+            "serializing error config will be empty string, error",
+            err,
+        )
+    })?; //pretty
+    crate::services::logger::log_success("serialized config content");
+
+    fs::write(&program_paths.config_path, &content).inspect_err(|err| crate::services::logger::log_error(
+            "couldnt write to config.json, it will try again to write only braccets or if it fail it will have no content or not existing",
+            err,
+        ))?;
+
+    crate::services::logger::log_success("written content to config.json");
+
+    Ok(())
 }
 
 /// function for getting device id, or creating new if not exists
@@ -174,7 +148,7 @@ pub fn get_device_id(paths: &ProgramFiles) -> Result<uuid::Uuid, crate::errors::
         let device_id = uuid::Uuid::parse_str(
             parsed_file["device_id"]
                 .as_str()
-                .expect("device_id must be a string UUID in config file"),
+                .ok_or(crate::errors::Error::DeviceIdErorr)?,
         )?;
         Ok(device_id)
     } else {
@@ -208,7 +182,7 @@ fn read_current_user(path: PathBuf) -> Result<uuid::Uuid, crate::errors::Error> 
     let user_uuid = uuid::Uuid::parse_str(
         contents_json["user_uuid"]
             .as_str()
-            .expect("device_id must be a string UUID in config file"),
+            .ok_or(crate::errors::Error::CurrentUserNotFound)?,
     )?;
     crate::services::logger::log_success("got current user uuid");
     Ok(user_uuid)

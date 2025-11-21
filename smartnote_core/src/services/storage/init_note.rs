@@ -63,9 +63,9 @@ pub fn add_note_to_database(
     validate_note_name(&name, &conn, &owner_id)?;
     //getting current user
 
-    if let Ok(note) = init_note(owner_id, &paths.notes_path, name) {
-        let tx = conn.transaction()?;
-        tx.execute("INSERT INTO notes (local_id, mongo_id, owner_id, name, title, summary, content_path, created_at, updated_at, deleted_at, version, cloud_version, sync_state, is_deleted, encrypted, crypto_meta) VALUES (:local_id, :mongo_id, :owner_id, :name, :title, :summary, :content_path, :created_at, :updated_at, :deleted_at, :version, :cloud_version, :sync_state, :is_deleted, :encrypted, :crypto_meta); "
+    let note = init_note(owner_id, &paths.notes_path, name)?;
+    let tx = conn.transaction()?;
+    tx.execute("INSERT INTO notes (local_id, mongo_id, owner_id, name, title, summary, content_path, created_at, updated_at, deleted_at, version, cloud_version, sync_state, is_deleted, encrypted, crypto_meta) VALUES (:local_id, :mongo_id, :owner_id, :name, :title, :summary, :content_path, :created_at, :updated_at, :deleted_at, :version, :cloud_version, :sync_state, :is_deleted, :encrypted, :crypto_meta); "
         , rusqlite::named_params!{
             ":local_id": note.local_id.to_string(),
             ":mongo_id": note.mongo_id,
@@ -84,15 +84,11 @@ pub fn add_note_to_database(
             ":encrypted": note.encrypted ,
             ":crypto_meta": note.crypto_meta,
     })?;
-        tx.commit()?;
-        crate::services::logger::log_success(
-            "successfully initialized note and created record in notes table",
-        );
-        Ok(())
-    } else {
-        //TODO add error handling when tauri added
-        todo!() //tutaj będzie poprostu powrót do strony frontendowej + dodanie structu do to_save.json
-    }
+    tx.commit()?;
+    crate::services::logger::log_success(
+        "successfully initialized note and created record in notes table",
+    );
+    Ok(())
 }
 ///function which valiates note name, it should be distinct
 fn validate_note_name(
@@ -147,7 +143,7 @@ fn chceck_if_file_is_created() {
 fn add_to_db() {
     let path = crate::config::ProgramFiles::init().unwrap();
     let mut conn = crate::services::storage::db_creation::get_connection(&path).unwrap();
-    let name = "".to_owned();
+    let name = "this_is_tets/note".to_owned();
 
     add_note_to_database(&mut conn, &path, name).unwrap();
 }

@@ -27,7 +27,7 @@ fn register_user_offline(
     let notes_key: chacha20poly1305::Key = ChaCha20Poly1305::generate_key(&mut OsRng);
     let (password_hash, salt, encrypted_notes_key, nonce_for_key_wrap) =
         generate_enctypted_keys(password, notes_key)?;
-    let mut new_user = crate::services::auth::auth_data_models::local_user::LocalUser {
+    let new_user = crate::services::auth::auth_data_models::local_user::LocalUser {
         user_id: uuid::Uuid::new_v4(),
         username: username,
         password_hash: password_hash,
@@ -87,6 +87,7 @@ fn register_user_offline(
     crate::services::logger::log_success("Successfully added a user to a database");
 
     Ok(())
+    //TODO add function after login/register which changes paths current user etc.
 }
 
 fn register_user_online() {}
@@ -177,7 +178,7 @@ fn register_test() {
     let mut conn =
         crate::services::auth::database_creation::connect_or_create_local_login_db(&paths).unwrap();
     register_user_offline(
-        "seventh".to_string(),
+        "eight".to_string(),
         zeroize::Zeroizing::from("ToJestTest!".to_string()),
         &paths,
         &mut conn,
