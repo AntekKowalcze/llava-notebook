@@ -17,7 +17,7 @@ pub enum Error {
     SerdeError(#[from] serde_json::Error),
 
     #[error("Uuid Parsing error: {0}")]
-    UuidParsingEror(#[from] uuid::Error),
+    UuidParsingError(#[from] uuid::Error),
 
     #[error("Error while hashing password: {0}")]
     ArgonHashError(#[from] argon2::password_hash::Error),
@@ -34,13 +34,19 @@ pub enum Error {
     #[error("Username already exists")]
     UsernameExistsError,
 
-    #[error("Note name already exists")]
-    NoteNameExistsError,
-    #[error("Title to long")]
-    TitleToLong,
-
     #[error("User dont exist")]
     UserNotExists,
+    #[error("Passwords dont match")]
+    WrongPassword,
+
+    #[error("Note name already exists")]
+    NoteNameExistsError,
+
+    #[error("Title too long")]
+    TitleTooLong,
+
+    #[error("name too long")]
+    NoteNameToLong,
 }
 
 // Manual Serialize - uses the Display from thiserror
@@ -52,3 +58,4 @@ impl Serialize for Error {
         serializer.serialize_str(&self.to_string())
     }
 }
+//TODO dodać usuwanie pliku device id przy jakim kolwiek błędzie, pobieranie go z lokalnej bazy danych aby zapisać ponownie

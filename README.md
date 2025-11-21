@@ -210,3 +210,19 @@ W pliku data models
   │  4. Historia i snapshoty         │  
   │  5. Eventy do UI (progress, err) │  
   └──────────────────────────────────┘
+
+
+Summary made by local AI hosted on own server with privacy politics, and more ai features
+
+
+3. recall na atomic write przy rename pliku przy usuwaniu i przy update
+4. usunięcie process::exit i rzeczy bez resultów
+5. dodanie anyhow do wewnętrznych błędów (np błąd bazy danych itd dla błędów widocznych dla usera, po enumie z thiss error)
+6. zrobić connectino reuse przez connection struct jakoś i implementacje
+8. zaimplementować checksum_ecrypted w bazie danych
+9. dodać input validation helper sprawdzanie długosci, znaków typu /\ itd
+10. dodać logger
+11. Hardcoded Magic Values (MAINTAINABILITY) (popros perplexity o wypisanie z kodu)
+12. limit prób w hasłach4
+13. testy integracyjne
+ myśle że 1-2 punkty dziennie średnio to dobry wynik, jedne są krótsze, drugie dużo dłuższea

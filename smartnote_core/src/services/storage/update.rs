@@ -23,7 +23,7 @@ fn update_md(
         .collect::<Vec<&str>>()
         .join(" ");
     if title.split_whitespace().collect::<Vec<&str>>().len() > 30 {
-        return Err(crate::errors::Error::TitleToLong);
+        return Err(crate::errors::Error::TitleTooLong);
     }
     println!("{summary}");
     fs::write(&tmp_filepath, written_string)?; //some permission error
@@ -39,7 +39,7 @@ fn update_md(
             ":title" : title,
             ":id": note_id,
         },
-    )?; //todo update summary
+    )?;
     println!("{value}");
     crate::services::logger::log_success("successfully updated a note");
 
@@ -67,3 +67,5 @@ fn update_test() {
     )
     .unwrap();
 }
+//TODO dodać anyhow, super obsługa błędów
+//TODO dodać sanitize_filename żeby filename opuszczało / \ itd

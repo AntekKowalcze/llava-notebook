@@ -1,5 +1,9 @@
 ///data model of local user
+use zeroize::{Zeroize, ZeroizeOnDrop};
+
+#[derive(Zeroize, ZeroizeOnDrop)]
 pub struct LocalUser {
+    #[zeroize(skip)]
     pub user_id: uuid::Uuid,
     pub username: String,
     pub password_hash: String, //hashed
@@ -8,6 +12,7 @@ pub struct LocalUser {
     pub nonce_notes_key: Vec<u8>,
     pub is_online_linked: bool,
     pub online_account_email: Option<String>,
+    #[zeroize(skip)]
     pub device_id: uuid::Uuid,
     pub created_at: i64,
     pub last_login: i64,

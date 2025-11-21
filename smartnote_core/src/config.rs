@@ -90,6 +90,7 @@ fn get_paths(program_home_path: PathBuf, user_uuid: uuid::Uuid) -> ProgramFiles 
         }
     } else {
         for path in ["notes", "assets", "keys", "logs", "tmp", "tmp_delete"] {
+            //TODO check if keys should be stored in files
             let path_to_create = user_home_path.join(path);
             println!("{:?}", path_to_create);
             match std::fs::create_dir_all(path_to_create) {

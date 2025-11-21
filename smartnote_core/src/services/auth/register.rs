@@ -10,23 +10,24 @@ use chacha20poly1305::{
     aead::{Aead, AeadCore, KeyInit},
 };
 use rusqlite::{Connection, OptionalExtension, params};
+use zeroize::Zeroize;
 
 use crate::config::ProgramFiles;
 ///function responsible for registering user offilne and adding it encrypted to local db
 fn register_user_offline(
     username: String,
-    password: String,
+    password: zeroize::Zeroizing<String>,
     paths: &crate::config::ProgramFiles,
-    mut conn: Connection,
+    conn: &mut Connection,
 ) -> Result<(), crate::errors::Error> {
     let username = username.trim().to_string();
     validate_username(&username, &conn)?;
-    let password = password.trim().to_string();
-    password_validation(&password)?;
+    let password = password.as_str().trim();
+    password_validation(password)?;
     let notes_key: chacha20poly1305::Key = ChaCha20Poly1305::generate_key(&mut OsRng);
     let (password_hash, salt, encrypted_notes_key, nonce_for_key_wrap) =
         generate_enctypted_keys(password, notes_key)?;
-    let new_user = crate::services::auth::auth_data_models::local_user::LocalUser {
+    let mut new_user = crate::services::auth::auth_data_models::local_user::LocalUser {
         user_id: uuid::Uuid::new_v4(),
         username: username,
         password_hash: password_hash,
@@ -39,6 +40,7 @@ fn register_user_offline(
         created_at: crate::utils::get_time(),
         last_login: crate::utils::get_time(),
     };
+
     let tx = conn.transaction()?;
 
     tx.execute(
@@ -80,8 +82,10 @@ fn register_user_offline(
           },
     )?;
     tx.commit()?;
-    crate::services::logger::log_success("Successfully added a user to a database");
     crate::config::change_active_user(new_user.user_id, &paths)?; //narazie tutaj, moze po logowaniu damy to wszystko do jednej funkcji
+
+    crate::services::logger::log_success("Successfully added a user to a database");
+
     Ok(())
 }
 
@@ -89,10 +93,10 @@ fn register_user_online() {}
 ///this function generates encrypted keys
 fn generate_enctypted_keys(
     //reuse on password change
-    password: String,
-    notes_key: chacha20poly1305::Key,
+    password: &str,
+    mut notes_key: chacha20poly1305::Key,
 ) -> Result<(String, String, Vec<u8>, Vec<u8>), crate::errors::Error> {
-    let salt = SaltString::generate(&mut OsRng); //generating salt for password
+    let salt: SaltString = SaltString::generate(&mut OsRng); //generating salt for password
     let argon2 = Argon2::default(); //creating argon2 instance
     let mut kek_bytes = [0u8; 32]; // Can be any desired size
     argon2.hash_password_into(
@@ -105,12 +109,15 @@ fn generate_enctypted_keys(
     let password_hash = argon2
         .hash_password(password.as_bytes(), &salt)?
         .to_string(); //hasing password 
+    //TODO sprawdzic typy w bazach , zrobić spójne
 
     //generate random key
     let kek = ChaCha20Poly1305::new(&kek_bytes.into());
     let nonce_for_key_wrap = ChaCha20Poly1305::generate_nonce(&mut OsRng);
     let encrypted_notes_key = kek.encrypt(&nonce_for_key_wrap, notes_key.as_ref())?;
 
+    kek_bytes.zeroize();
+    notes_key.as_mut_slice().zeroize();
     Ok((
         password_hash,
         salt.to_string(),
@@ -168,7 +175,16 @@ fn test_password_validation() {
 #[test]
 fn register_test() {
     let paths = ProgramFiles::init().unwrap();
-    let conn =
+    let mut conn =
         crate::services::auth::database_creation::connect_or_create_local_login_db(&paths).unwrap();
-    register_user_offline("fourth".to_string(), "Tewst!@#".to_string(), &paths, conn).unwrap();
+    register_user_offline(
+        "seventh".to_string(),
+        zeroize::Zeroizing::from("ToJestTest!".to_string()),
+        &paths,
+        &mut conn,
+    )
+    .unwrap();
 }
+
+//TODO kiedyś dodać rollback przy usuwaniu:
+//delete_note wykonuje rename file i update DB; ale jeśli fs::rename się uda a DB update fails, masz niespójność — zapakuj te operacje w transakcję logiczną (najpierw db update, potem fs op). Lepsza sekwencja: przygotuj plik tmp, update db to PendingDeleted, potem rename, potem final commit. Przy błędach — rollback.
