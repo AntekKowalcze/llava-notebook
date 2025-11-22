@@ -215,8 +215,6 @@ W pliku data models
 Summary made by local AI hosted on own server with privacy politics, and more ai features
 
 
-3. recall na atomic write przy rename pliku przy usuwaniu i przy update
-4. usunięcie process::exit i rzeczy bez resultów
 5. dodanie anyhow do wewnętrznych błędów (np błąd bazy danych itd dla błędów widocznych dla usera, po enumie z thiss error)
 6. zrobić connectino reuse przez connection struct jakoś i implementacje
 8. zaimplementować checksum_ecrypted w bazie danych

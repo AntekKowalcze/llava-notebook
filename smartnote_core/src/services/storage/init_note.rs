@@ -143,7 +143,7 @@ fn chceck_if_file_is_created() {
 fn add_to_db() {
     let path = crate::config::ProgramFiles::init().unwrap();
     let mut conn = crate::services::storage::db_creation::get_connection(&path).unwrap();
-    let name = "this_is_tets/note".to_owned();
+    let name = "tttsss".to_owned();
 
     add_note_to_database(&mut conn, &path, name).unwrap();
 }
@@ -152,7 +152,7 @@ fn add_to_db() {
 fn note_validator_test() {
     let path = crate::config::ProgramFiles::init().unwrap();
     let conn = crate::services::storage::db_creation::get_connection(&path).unwrap();
-    let note_name = "kl;";
+    let note_name = "ttt";
     let file_content = fs::read_to_string(&path.active_user_path).unwrap();
     let json: serde_json::Value = serde_json::from_str(&file_content).unwrap();
     let owner_id: uuid::Uuid = serde_json::from_value(json["user_uuid"].clone()).unwrap();

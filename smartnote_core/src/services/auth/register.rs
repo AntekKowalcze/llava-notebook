@@ -178,13 +178,10 @@ fn register_test() {
     let mut conn =
         crate::services::auth::database_creation::connect_or_create_local_login_db(&paths).unwrap();
     register_user_offline(
-        "eight".to_string(),
+        "nein".to_string(),
         zeroize::Zeroizing::from("ToJestTest!".to_string()),
         &paths,
         &mut conn,
     )
     .unwrap();
 }
-
-//TODO kiedyś dodać rollback przy usuwaniu:
-//delete_note wykonuje rename file i update DB; ale jeśli fs::rename się uda a DB update fails, masz niespójność — zapakuj te operacje w transakcję logiczną (najpierw db update, potem fs op). Lepsza sekwencja: przygotuj plik tmp, update db to PendingDeleted, potem rename, potem final commit. Przy błędach — rollback.

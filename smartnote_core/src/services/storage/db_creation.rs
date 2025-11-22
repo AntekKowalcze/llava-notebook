@@ -53,7 +53,7 @@ fn creating_tables(paths: &crate::config::ProgramFiles) -> Result<Connection> {
         crypto_meta TEXT,
         
         UNIQUE(owner_id, name),
-        CHECK(sync_state IN ('LocalOnly', 'PendingUpload', 'Synced', 'Conflict', 'Error'))
+        CHECK(sync_state IN ('LocalOnly', 'PendingUpload', 'Synced', 'Conflict', 'Error', 'PendingDeleted'))
     );
 
     CREATE INDEX IF NOT EXISTS idx_notes_owner_updated ON notes(owner_id, updated_at DESC);
@@ -127,6 +127,7 @@ pub enum SyncState {
     Synced,
     Conflict,
     Error,
+    PendingDeleted,
 }
 
 impl rusqlite::ToSql for SyncState {
@@ -137,6 +138,7 @@ impl rusqlite::ToSql for SyncState {
             Self::Synced => "Synced",
             Self::Conflict => "Conflict",
             Self::Error => "Error",
+            Self::PendingDeleted => "PendingDeleted",
         };
         Ok(rusqlite::types::ToSqlOutput::from(s))
     }
@@ -150,6 +152,7 @@ impl rusqlite::types::FromSql for SyncState {
             "Synced" => Ok(SyncState::Synced),
             "Conflict" => Ok(SyncState::Conflict),
             "Error" => Ok(SyncState::Error),
+            "PendingDeleted" => Ok(SyncState::PendingDeleted),
             _ => Err(rusqlite::types::FromSqlError::InvalidType),
         }
     }

@@ -6,6 +6,7 @@ use crate::{config::ProgramFiles, services::storage::update};
 
 ///function responsible for updating .md file contents
 fn update_md(
+    //remember about changin state to pending upload when update when adding sync
     conn: &rusqlite::Connection,
     name: String,
     note_id: &str,
@@ -50,19 +51,18 @@ fn update_md(
 #[test]
 
 fn update_test() {
-    let paths = ProgramFiles::init();
-    let name = "tstbs".to_string();
+    let paths = ProgramFiles::init().unwrap();
+    let name = "tttsss".to_string();
     let written_string =
         "this is test string which have to be written and now it will not overwrite".to_string();
-    let sqlite_connection =
-        crate::services::storage::db_creation::get_connection(&paths.as_ref().unwrap()).unwrap();
-    let title = "new title".to_string();
+    let sqlite_connection = crate::services::storage::db_creation::get_connection(&paths).unwrap();
+    let title = "tttsss".to_string();
     update_md(
         &sqlite_connection,
         name,
-        "6320e48a-1b44-4b3a-b5f8-175f12af9f54",
+        "b486a877-21d9-4d28-abd7-451dd965fe50",
         written_string,
-        &paths.unwrap(),
+        &paths,
         title,
     )
     .unwrap();
