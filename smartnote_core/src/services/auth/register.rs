@@ -37,7 +37,7 @@ fn register_user_offline(
         nonce_notes_key: nonce_for_key_wrap,
         is_online_linked: false,
         online_account_email: None,
-        device_id: crate::config::get_device_id(paths)?,
+        device_id: crate::config::get_device_id()?,
         created_at: crate::utils::get_time(),
         last_login: crate::utils::get_time(),
     };
@@ -166,9 +166,9 @@ fn test_password_validation() {
 fn register_test() {
     let paths = ProgramFiles::init().unwrap();
     let mut conn =
-        crate::services::auth::database_creation::connect_or_create_local_login_db(&paths).unwrap();
+        crate::services::auth::database_creation::connect_or_create_local_login_db().unwrap();
     register_user_offline(
-        "eleventh connection: ".to_string(),
+        "julus".to_string(),
         zeroize::Zeroizing::from("ToJestTest!".to_string()),
         &paths,
         &mut conn,

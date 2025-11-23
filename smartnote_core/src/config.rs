@@ -2,8 +2,13 @@
 use crate::constans::*;
 use anyhow::Context;
 use dirs_next::data_local_dir;
+use rusqlite::{Connection, named_params};
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf};
+use std::{
+    fs::{self, create_dir_all},
+    path::PathBuf,
+    sync::Mutex,
+};
 #[derive(Debug)]
 /// Struct with important paths
 pub struct ProgramFiles {
@@ -20,27 +25,31 @@ pub struct ProgramFiles {
     pub active_user_path: PathBuf,
 }
 
-pub struct CommonMetaInformation {
+pub struct AppState {
     device_id: uuid::Uuid,
-    current_user: uuid::Uuid,
+    current_user: Mutex<Option<uuid::Uuid>>,
+    connection: Mutex<Option<Connection>>,
+    username: Mutex<Option<String>>,
+    paths: Mutex<Option<ProgramFiles>>,
 }
 
-impl CommonMetaInformation {
-    //call it after paths init and getting ids and current user to after logging in
-    fn init(paths: &ProgramFiles) -> Result<CommonMetaInformation, crate::errors::Error> {
-        Ok(CommonMetaInformation {
-            device_id: get_device_id(&paths)?,
-
-            current_user: read_current_user(paths.active_user_path.clone())?, //login will return current user
+impl AppState {
+    fn init() -> Result<AppState, crate::errors::Error> {
+        Ok(AppState {
+            device_id: get_device_id()?,
+            current_user: Mutex::new(None),
+            connection: Mutex::new(None),
+            username: Mutex::new(None),
+            paths: Mutex::new(None), //login will return current user
         })
     }
+    //mayby add updating currentuser to change current user, and updating connection go get connection and only get username here, or even in register
 }
 
 #[derive(Serialize, Deserialize)]
 
 /// ConfigData contains states of aplication
 pub struct ConfigData {
-    pub fallback: bool,
     pub data_dir: PathBuf,
 }
 
@@ -48,41 +57,29 @@ pub struct ConfigData {
 impl ProgramFiles {
     pub fn init() -> Result<ProgramFiles, crate::errors::Error> {
         let mut fallback = false;
-        let base = data_local_dir();
+        let program_home_path = data_local_dir().ok_or(crate::errors::Error::FatalError)?;
 
-        match base {
-            Some(program_home_path) => {
-                let active_user_path = program_home_path.join(ACTIVE_USER_JSON_PATH);
-                let user_uuid = match read_current_user(active_user_path) {
-                    //temp uuid on first run
-                    Ok(uuid) => uuid,
-                    Err(_) => {
-                        crate::services::logger::log_success(
-                            "No active user found (first run?), using temp UUID",
-                        );
-                        uuid::Uuid::new_v4()
-                    }
-                };
+        let active_user_path = program_home_path.join(ACTIVE_USER_JSON_PATH);
+        let user_uuid = match read_current_user(&active_user_path) {
+            //temp uuid on first run
+            Ok(uuid) => uuid,
+            Err(_) => {
+                crate::services::logger::log_success(
+                    "No active user found (first run?), using temp UUID",
+                );
+                uuid::Uuid::new_v4()
+            }
+        };
 
-                let program_paths = get_paths(
-                    program_home_path.clone(),
-                    user_uuid, //tu zmiana
-                )?; //function users uuid also, its to add
-                write_config(fallback, &program_paths)?;
-                Ok(program_paths)
-            }
-            None => {
-                fallback = true;
-                let log_content = "Couldnt get directory, trying to fallback";
-                crate::services::logger::log_error(log_content, "");
-                let first_fallback = std::env::temp_dir(); //cleaner logic needed when it will be added
-                let program_paths = get_paths(first_fallback, uuid::Uuid::new_v4())?; //new uuid which is temp userid so after comming back to normal path everything may by converted
-                write_config(fallback, &program_paths)?;
-                Ok(program_paths)
-            }
-        }
+        let program_paths = get_paths(
+            program_home_path.clone(),
+            user_uuid, //tu zmiana
+        )?; //function users uuid also, its to add
+        write_config(fallback, &program_paths)?;
+        Ok(program_paths)
     }
 }
+
 ///function which creates paths and create them in sense of getting current user
 fn get_paths(
     program_home_path: PathBuf,
@@ -120,7 +117,6 @@ fn get_paths(
 ///function responsible for writeing config data, current directory and if is it fallback
 fn write_config(fallback: bool, program_paths: &ProgramFiles) -> Result<(), crate::errors::Error> {
     let config_content = ConfigData {
-        fallback: fallback,
         data_dir: program_paths.base.to_path_buf(),
     };
     let content = serde_json::to_string_pretty(&config_content)
@@ -143,9 +139,14 @@ fn write_config(fallback: bool, program_paths: &ProgramFiles) -> Result<(), crat
 }
 
 /// function for getting device id, or creating new if not exists
-pub fn get_device_id(paths: &ProgramFiles) -> Result<uuid::Uuid, crate::errors::Error> {
-    if paths.device_id_path.exists() {
-        let file_content = std::fs::read_to_string(&paths.device_id_path)?;
+pub fn get_device_id() -> Result<uuid::Uuid, crate::errors::Error> {
+    let home_path = data_local_dir().ok_or(crate::errors::Error::FatalError)?;
+    let mut device_id_path = home_path.join("smartnote");
+    create_dir_all(&device_id_path)?;
+    device_id_path = home_path.join("smartnote/device_id.json");
+
+    if device_id_path.exists() {
+        let file_content = std::fs::read_to_string(&device_id_path)?;
         let parsed_file: serde_json::Value = serde_json::from_str(&file_content)
             .context("couldnt parse device id file content with serde")?;
         let device_id = uuid::Uuid::parse_str(
@@ -164,7 +165,7 @@ pub fn get_device_id(paths: &ProgramFiles) -> Result<uuid::Uuid, crate::errors::
         });
         let file_content = serde_json::to_string_pretty(&file_content)
             .context("couldnt parse device uuid to json ")?;
-        std::fs::write(&paths.device_id_path, file_content)?;
+        std::fs::write(&device_id_path, file_content)?;
         Ok(device_id)
     }
 }
@@ -183,7 +184,7 @@ pub fn change_active_user(
     Ok(())
 }
 
-fn read_current_user(path: PathBuf) -> Result<uuid::Uuid, crate::errors::Error> {
+fn read_current_user(path: &PathBuf) -> Result<uuid::Uuid, crate::errors::Error> {
     let file_content = std::fs::read_to_string(&path)?;
     let contents_json: serde_json::Value =
         serde_json::from_str(&file_content).context("failed to parse active_user.json file")?;
@@ -214,6 +215,7 @@ fn test_changing_user() {
 #[test]
 fn test_creating_device_id() {
     let paths = ProgramFiles::init().unwrap();
-    let device_id = get_device_id(&paths).unwrap();
+
+    let device_id = get_device_id().unwrap();
     println!("{}", device_id);
 }

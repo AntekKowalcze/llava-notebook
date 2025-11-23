@@ -40,6 +40,8 @@ pub enum Error {
     DeviceIdErorr,
     #[error(transparent)]
     InternalError(#[from] anyhow::Error),
+    #[error("Fatal error couldnt find home directory for app")]
+    FatalError, //komunikat panic i wyjście
 }
 
 // Manual Serialize - uses the Display from thiserror

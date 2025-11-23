@@ -1,15 +1,17 @@
 use anyhow::Context;
 
 use crate::constans::LOCAL_LOGIN_DB_SCHEMA;
-
+//smartnote/users/local_login_db.sqlite
 ///creation of user_data local database
-pub fn connect_or_create_local_login_db(
-    paths: &crate::config::ProgramFiles,
-) -> Result<rusqlite::Connection, crate::errors::Error> {
-    let mut local_login_conn = rusqlite::Connection::open(&paths.local_login_database_path)
-        .context(
-            "Couldnt create, read or find local_login database, couldnt establish connection.",
-        )?;
+pub fn connect_or_create_local_login_db() -> Result<rusqlite::Connection, crate::errors::Error> {
+    let home_path = dirs_next::data_local_dir().ok_or(crate::errors::Error::FatalError)?;
+    let mut local_login_db_path = home_path.join("smartnote/users");
+    std::fs::create_dir_all(&local_login_db_path)?;
+    local_login_db_path = home_path.join("smartnote/users/local_login_db.sqlite");
+
+    let mut local_login_conn = rusqlite::Connection::open(local_login_db_path).context(
+        "Couldnt create, read or find local_login database, couldnt establish connection.",
+    )?;
     local_login_conn
         .pragma_update(None, "synchronous", &"NORMAL")
         .context("Pragma error while creating local users db, synchronous")?;

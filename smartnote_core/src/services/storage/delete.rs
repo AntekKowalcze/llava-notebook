@@ -56,7 +56,7 @@ fn test_delte_note() {
     delete_note(
         &sqlite_connection,
         name.clone(),
-        "a65cb44f-22df-4950-a38d-33e41a9ba98e",
+        "45943af4-6163-4816-8108-06330841e1ea",
         &paths,
     )
     .unwrap();

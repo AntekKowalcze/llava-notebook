@@ -215,7 +215,6 @@ W pliku data models
 Summary made by local AI hosted on own server with privacy politics, and more ai features
 
 
-6. zrobić connection reuse przez connection struct jakoś i implementacje + active user żeby nie deserializować
 10. dodać logger
 12. limit prób w hasłach
 13. testy integracyjne
