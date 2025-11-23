@@ -2,6 +2,8 @@
 
 use std::fs::{self};
 
+use anyhow::Context;
+
 use crate::{config::ProgramFiles, services::storage::update};
 
 ///function responsible for updating .md file contents
@@ -23,7 +25,7 @@ fn update_md(
         .take(10)
         .collect::<Vec<&str>>()
         .join(" ");
-    if title.split_whitespace().collect::<Vec<&str>>().len() > 30 {
+    if title.split_whitespace().count() > 30 {
         return Err(crate::errors::Error::TitleTooLong);
     }
     println!("{summary}");
@@ -40,13 +42,12 @@ fn update_md(
             ":title" : title,
             ":id": note_id,
         },
-    )?;
+    ).context("Couldnt get needed info about note from SQL while updating")?;
     println!("{value}");
     crate::services::logger::log_success("successfully updated a note");
 
     Ok(())
 }
-///create summary now its first 10 words, then ai
 
 #[test]
 

@@ -1,5 +1,6 @@
 //! This module is responsible for configuring paths for applications do it by calling ProgramFiles::init()
 
+use anyhow::Context;
 use dirs_next::data_local_dir;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
@@ -122,18 +123,19 @@ fn write_config(fallback: bool, program_paths: &ProgramFiles) -> Result<(), crat
         fallback: fallback,
         data_dir: program_paths.base.to_path_buf(),
     };
-    let content = serde_json::to_string_pretty(&config_content).inspect_err(|err| {
-        crate::services::logger::log_error(
-            "serializing error config will be empty string, error",
-            err,
-        )
-    })?; //pretty
+    let content = serde_json::to_string_pretty(&config_content)
+        .inspect_err(|err| {
+            crate::services::logger::log_error(
+                "serializing error config will be empty string, error",
+                err,
+            )
+        })
+        .context("couldnt parse config content into json")?; //pretty
     crate::services::logger::log_success("serialized config content");
 
-    fs::write(&program_paths.config_path, &content).inspect_err(|err| crate::services::logger::log_error(
-            "couldnt write to config.json, it will try again to write only braccets or if it fail it will have no content or not existing",
-            err,
-        ))?;
+    fs::write(&program_paths.config_path, &content).inspect_err(|err| {
+        crate::services::logger::log_error("couldnt write to config.json, it ", err)
+    })?;
 
     crate::services::logger::log_success("written content to config.json");
 
@@ -144,12 +146,15 @@ fn write_config(fallback: bool, program_paths: &ProgramFiles) -> Result<(), crat
 pub fn get_device_id(paths: &ProgramFiles) -> Result<uuid::Uuid, crate::errors::Error> {
     if paths.device_id_path.exists() {
         let file_content = std::fs::read_to_string(&paths.device_id_path)?;
-        let parsed_file: serde_json::Value = serde_json::from_str(&file_content)?;
+        let parsed_file: serde_json::Value = serde_json::from_str(&file_content)
+            .context("couldnt parse device id file content with serde")?;
         let device_id = uuid::Uuid::parse_str(
             parsed_file["device_id"]
                 .as_str()
-                .ok_or(crate::errors::Error::DeviceIdErorr)?,
-        )?;
+                .ok_or(crate::errors::Error::DeviceIdErorr)
+                .context("device id not found in device id file")?,
+        )
+        .context("couldnt get device id from device id file ")?;
         Ok(device_id)
     } else {
         let device_id = uuid::Uuid::new_v4();
@@ -157,7 +162,8 @@ pub fn get_device_id(paths: &ProgramFiles) -> Result<uuid::Uuid, crate::errors::
         let file_content = serde_json::json!({
                 "device_id": device_id,
         });
-        let file_content = serde_json::to_string_pretty(&file_content)?;
+        let file_content = serde_json::to_string_pretty(&file_content)
+            .context("couldnt parse device uuid to json ")?;
         std::fs::write(&paths.device_id_path, file_content)?;
         Ok(device_id)
     }
@@ -170,20 +176,24 @@ pub fn change_active_user(
     let data = serde_json::json!({
         "user_uuid": user_uuid
     });
-    let file_content = serde_json::to_string_pretty(&data)?;
+    let file_content = serde_json::to_string_pretty(&data)
+        .context("failed to parse user uuid to json when changin active user")?;
     std::fs::write(&paths.active_user_path, file_content)?;
     crate::services::logger::log_success("changed current user");
     Ok(())
-} //cos tutaj sie wypierdala
+}
 
 fn read_current_user(path: PathBuf) -> Result<uuid::Uuid, crate::errors::Error> {
     let file_content = std::fs::read_to_string(&path)?;
-    let contents_json: serde_json::Value = serde_json::from_str(&file_content)?;
+    let contents_json: serde_json::Value =
+        serde_json::from_str(&file_content).context("failed to parse active_user.json file")?;
     let user_uuid = uuid::Uuid::parse_str(
         contents_json["user_uuid"]
             .as_str()
-            .ok_or(crate::errors::Error::CurrentUserNotFound)?,
-    )?;
+            .ok_or(crate::errors::Error::CurrentUserNotFound)
+            .context("There was no current user written in active_user.json file")?,
+    )
+    .context("couldnt get current user from active_user.json file")?;
     crate::services::logger::log_success("got current user uuid");
     Ok(user_uuid)
 }

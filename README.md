@@ -183,7 +183,7 @@ W pliku data models
 └───────────────────┬───────────────────────┘
                     |
                     │
-                   Sync (co 30s / Ctrl+S)
+                   Sync (co 30s / Ctrl + S )
                     │
                     ▼
 ┌───────────────────────────────────────────┐
@@ -215,12 +215,10 @@ W pliku data models
 Summary made by local AI hosted on own server with privacy politics, and more ai features
 
 
-5. dodanie anyhow do wewnętrznych błędów (np błąd bazy danych itd dla błędów widocznych dla usera, po enumie z thiss error)
-6. zrobić connectino reuse przez connection struct jakoś i implementacje
+6. zrobić connection reuse przez connection struct jakoś i implementacje + active user żeby nie deserializować
 8. zaimplementować checksum_ecrypted w bazie danych
-9. dodać input validation helper sprawdzanie długosci, znaków typu /\ itd
 10. dodać logger
 11. Hardcoded Magic Values (MAINTAINABILITY) (popros perplexity o wypisanie z kodu)
-12. limit prób w hasłach4
+12. limit prób w hasłach
 13. testy integracyjne
- myśle że 1-2 punkty dziennie średnio to dobry wynik, jedne są krótsze, drugie dużo dłuższea
+ myśle że 1-2 punkty dziennie średnio to dobry wynik, jedne są krótsze, drugie dużo dłuższe

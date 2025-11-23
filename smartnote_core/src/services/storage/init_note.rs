@@ -1,7 +1,7 @@
 //! This module is responsible for creating database record and .md file
-use std::{fs, path::PathBuf};
-
+use anyhow::Context;
 use rusqlite::{Connection, OptionalExtension};
+use std::{fs, path::PathBuf};
 
 use crate::{config::ProgramFiles, services::logger};
 //init note after new note clicked and name sumbited
@@ -14,7 +14,11 @@ fn init_note(
     let mut new_note_path = path.clone();
     new_note_path.push(&name);
     new_note_path.set_extension("md");
-    match std::fs::File::create(&new_note_path) {
+    match std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&new_note_path)
+    {
         Ok(_) => {
             crate::services::logger::log_success("created note file succesfullly");
             Ok(crate::models::note::Note {
@@ -40,6 +44,9 @@ fn init_note(
                 crypto_meta: None, //change it after adding encription
             })
         }
+        Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
+            return Err(crate::errors::Error::FileAlreadyExists);
+        }
         Err(err) => {
             crate::services::logger::log_error("couldnt create a file {}", &err);
             //dodać obsługe, poprostu nie moge utworzyć pliku, popup z tym komunikatem żeby zmienić uprawnienia i wróć do działania programu
@@ -56,16 +63,23 @@ pub fn add_note_to_database(
 ) -> Result<(), crate::errors::Error> {
     let name = name.trim().to_string();
     let name = sanitise_file_name::sanitise(&name);
-
+    if name.chars().count() == 0 {
+        return Err(crate::errors::Error::NoteNameError);
+    }
     let file_content = fs::read_to_string(&paths.active_user_path)?;
-    let json: serde_json::Value = serde_json::from_str(&file_content)?;
-    let owner_id: uuid::Uuid = serde_json::from_value(json["user_uuid"].clone())?;
+    let json: serde_json::Value = serde_json::from_str(&file_content)
+        .context("failed to parse json of active_user.json file")?;
+    let owner_id: uuid::Uuid = serde_json::from_value(json["user_uuid"].clone())
+        .context("Couldnt convert user_uuid red from active_user.json to uuid")?;
     validate_note_name(&name, &conn, &owner_id)?;
     //getting current user
 
     let note = init_note(owner_id, &paths.notes_path, name)?;
-    let tx = conn.transaction()?;
-    tx.execute("INSERT INTO notes (local_id, mongo_id, owner_id, name, title, summary, content_path, created_at, updated_at, deleted_at, version, cloud_version, sync_state, is_deleted, encrypted, crypto_meta) VALUES (:local_id, :mongo_id, :owner_id, :name, :title, :summary, :content_path, :created_at, :updated_at, :deleted_at, :version, :cloud_version, :sync_state, :is_deleted, :encrypted, :crypto_meta); "
+    let transaction_result = {
+        let tx = conn
+            .transaction()
+            .context("Couldnt commit transaction while inserting a note, sql error")?;
+        tx.execute("INSERT INTO notes (local_id, mongo_id, owner_id, name, title, summary, content_path, created_at, updated_at, deleted_at, version, cloud_version, sync_state, is_deleted, encrypted, crypto_meta) VALUES (:local_id, :mongo_id, :owner_id, :name, :title, :summary, :content_path, :created_at, :updated_at, :deleted_at, :version, :cloud_version, :sync_state, :is_deleted, :encrypted, :crypto_meta); "
         , rusqlite::named_params!{
             ":local_id": note.local_id.to_string(),
             ":mongo_id": note.mongo_id,
@@ -83,12 +97,28 @@ pub fn add_note_to_database(
             ":is_deleted": note.is_deleted,
             ":encrypted": note.encrypted ,
             ":crypto_meta": note.crypto_meta,
-    })?;
-    tx.commit()?;
-    crate::services::logger::log_success(
-        "successfully initialized note and created record in notes table",
-    );
-    Ok(())
+    }).context("Couldnt insert into database")?;
+        tx.commit()
+    };
+
+    match transaction_result {
+        Ok(_) => {
+            crate::services::logger::log_success(
+                "successfully initialized note and created record in notes table",
+            );
+            Ok(())
+        }
+        Err(err) => {
+            crate::services::logger::log_error(
+                "Database transaction failed, deleting orphaned file",
+                &err,
+            );
+            if let Err(fs_err) = std::fs::remove_file(&note.content_path) {
+                crate::services::logger::log_error("Failed to cleanup orphaned file!", &fs_err);
+            }
+            Err(crate::errors::Error::InternalError(err.into()))
+        }
+    }
 }
 ///function which valiates note name, it should be distinct
 fn validate_note_name(
@@ -110,7 +140,8 @@ fn validate_note_name(
             },
             |_row| Ok(()),
         )
-        .optional()?
+        .optional()
+        .context("SQL query failed while validating note name")?
         .is_some();
 
     if exists {

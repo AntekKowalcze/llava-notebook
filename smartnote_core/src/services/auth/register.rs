@@ -1,6 +1,7 @@
 //! Module responsible for registering user
 //! in this modules important data is encrypted, and keys for notes encryption are also created
 
+use anyhow::Context;
 use argon2::{
     Argon2,
     password_hash::{PasswordHasher, SaltString, rand_core::OsRng},
@@ -41,7 +42,9 @@ fn register_user_offline(
         last_login: crate::utils::get_time(),
     };
 
-    let tx = conn.transaction()?;
+    let tx = conn.transaction().context(
+        "Couldnt insert user into database, transaction failed while registering a user",
+    )?;
 
     tx.execute(
         r#"INSERT INTO users_data (
@@ -80,8 +83,11 @@ fn register_user_offline(
          ":created_at":new_user.created_at,
          ":last_login":new_user.last_login,
           },
+    )
+    .context("Couldnt insert user into database, transaction failed while registering a user")?;
+    tx.commit().context(
+        "Couldnt insert user into database, transaction failed while registering a user",
     )?;
-    tx.commit()?;
     crate::config::change_active_user(new_user.user_id, &paths)?; //narazie tutaj, moze po logowaniu damy to wszystko do jednej funkcji
 
     crate::services::logger::log_success("Successfully added a user to a database");
@@ -100,21 +106,26 @@ fn generate_enctypted_keys(
     let salt: SaltString = SaltString::generate(&mut OsRng); //generating salt for password
     let argon2 = Argon2::default(); //creating argon2 instance
     let mut kek_bytes = [0u8; 32]; // Can be any desired size
-    argon2.hash_password_into(
-        password.as_bytes(),
-        salt.as_str().as_bytes(),
-        &mut kek_bytes,
-    )?; //creating derived key from password, which will be used to encrypt notes_key 
+    argon2
+        .hash_password_into(
+            password.as_bytes(),
+            salt.as_str().as_bytes(),
+            &mut kek_bytes,
+        )
+        .context("couldnt hash password into key encrypted key in registering ")?; //creating derived key from password, which will be used to encrypt notes_key 
 
     // Hash password to PHC string ($argon2id$v=19$...)
     let password_hash = argon2
-        .hash_password(password.as_bytes(), &salt)?
+        .hash_password(password.as_bytes(), &salt)
+        .context("Couldnt hash a password in registering a user")?
         .to_string(); //hasing password 
 
     //generate random key
     let kek = ChaCha20Poly1305::new(&kek_bytes.into());
     let nonce_for_key_wrap = ChaCha20Poly1305::generate_nonce(&mut OsRng);
-    let encrypted_notes_key = kek.encrypt(&nonce_for_key_wrap, notes_key.as_ref())?;
+    let encrypted_notes_key = kek
+        .encrypt(&nonce_for_key_wrap, notes_key.as_ref())
+        .context("Couldnt encrypt key encrypted key while registering a user")?;
 
     kek_bytes.zeroize();
     notes_key.as_mut_slice().zeroize();
@@ -152,7 +163,8 @@ fn validate_username(username: &str, conn: &Connection) -> Result<(), crate::err
             params![username],
             |_row| Ok(()),
         )
-        .optional()?
+        .optional()
+        .context("couldnt check if username exist in username validation SQL Error")?
         .is_some();
     if exists {
         crate::services::logger::log_error(
@@ -178,7 +190,7 @@ fn register_test() {
     let mut conn =
         crate::services::auth::database_creation::connect_or_create_local_login_db(&paths).unwrap();
     register_user_offline(
-        "nein".to_string(),
+        "tenth".to_string(),
         zeroize::Zeroizing::from("ToJestTest!".to_string()),
         &paths,
         &mut conn,

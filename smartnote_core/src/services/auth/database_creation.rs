@@ -1,12 +1,24 @@
+use anyhow::Context;
+
 ///creation of user_data local database
 pub fn connect_or_create_local_login_db(
     paths: &crate::config::ProgramFiles,
 ) -> Result<rusqlite::Connection, crate::errors::Error> {
-    let local_login_conn = rusqlite::Connection::open(&paths.local_login_database_path)?;
-    local_login_conn.pragma_update(None, "synchronous", &"NORMAL")?;
-    local_login_conn.pragma_update(None, "cache_size", &"-2000")?;
-    local_login_conn.pragma_update(None, "temp_store", &"MEMORY")?;
-    local_login_conn.pragma_update(None, "journal_mode", &"WAL")?;
+    let local_login_conn = rusqlite::Connection::open(&paths.local_login_database_path).context(
+        "Couldnt create, read or find local_login database, couldnt establish connection.",
+    )?;
+    local_login_conn
+        .pragma_update(None, "synchronous", &"NORMAL")
+        .context("Pragma error while creating local users db, synchronous")?;
+    local_login_conn
+        .pragma_update(None, "cache_size", &"-2000")
+        .context("Pragma error while creating local users db, cache_size")?;
+    local_login_conn
+        .pragma_update(None, "temp_store", &"MEMORY")
+        .context("Pragma error while creating local users db, temp_store")?;
+    local_login_conn
+        .pragma_update(None, "journal_mode", &"WAL")
+        .context("Pragma error while creating local users db, journal_mode")?;
     let schema = r#"BEGIN; CREATE TABLE IF NOT EXISTS users_data (
                         user_id TEXT PRIMARY KEY,
                         username TEXT NOT NULL,
@@ -25,6 +37,8 @@ pub fn connect_or_create_local_login_db(
                         CREATE INDEX IF NOT EXISTS idx_users_data_username ON users_data(username);
                         COMMIT;
                         "#;
-    local_login_conn.execute_batch(schema)?;
+    local_login_conn
+        .execute_batch(schema)
+        .context("Couldnt create database of local users in database creation")?;
     Ok(local_login_conn)
 }
