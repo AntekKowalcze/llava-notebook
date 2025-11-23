@@ -1,5 +1,5 @@
 //! this module is responsible for updating .md file but also important fields in databases
-
+use crate::constans::*;
 use std::fs::{self};
 
 use anyhow::Context;
@@ -17,33 +17,33 @@ fn update_md(
     title: String,
 ) -> Result<(), crate::errors::Error> {
     //see tauri notes 1
-    let tmp_filename = name.clone() + ".md.tmp";
+    let tmp_filename = name.clone() + TEMP_NOTE_EXTENSION;
 
     let tmp_filepath = program_paths.tmp_path.join(tmp_filename);
     let summary: String = written_string
-        .split(" ")
-        .take(10)
+        .split_whitespace()
+        .take(SUMMARY_LENGTH)
         .collect::<Vec<&str>>()
         .join(" ");
-    if title.split_whitespace().count() > 30 {
+    if title.split_whitespace().count() > MAX_TITLE_LENGTH {
         return Err(crate::errors::Error::TitleTooLong);
     }
-    println!("{summary}");
     fs::write(&tmp_filepath, written_string)?; //some permission error
 
-    let note_name = name.clone() + ".md";
+    let note_name = name.clone() + "." + NOTE_EXTENSION;
     let note_path = program_paths.notes_path.join(note_name);
     fs::rename(&tmp_filepath, note_path)?;
-    let value = conn.execute(
-        "UPDATE notes SET updated_at = :updated_time , summary = :summary ,version = version + 1, title = :title WHERE local_id = :id",
-        rusqlite::named_params! {
-            ":updated_time": crate::utils::get_time(),
-            ":summary": summary,
-            ":title" : title,
-            ":id": note_id,
-        },
-    ).context("Couldnt get needed info about note from SQL while updating")?;
-    println!("{value}");
+    let value = conn
+        .execute(
+            UPDATE_NOTE_SQL_QUERY,
+            rusqlite::named_params! {
+                ":updated_time": crate::utils::get_time(),
+                ":summary": summary,
+                ":title" : title,
+                ":id": note_id,
+            },
+        )
+        .context("Couldnt get needed info about note from SQL while updating")?;
     crate::services::logger::log_success("successfully updated a note");
 
     Ok(())
@@ -61,7 +61,7 @@ fn update_test() {
     update_md(
         &sqlite_connection,
         name,
-        "b486a877-21d9-4d28-abd7-451dd965fe50",
+        "a65cb44f-22df-4950-a38d-33e41a9ba98e",
         written_string,
         &paths,
         title,

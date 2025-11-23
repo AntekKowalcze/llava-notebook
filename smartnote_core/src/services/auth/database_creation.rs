@@ -1,12 +1,15 @@
 use anyhow::Context;
 
+use crate::constans::LOCAL_LOGIN_DB_SCHEMA;
+
 ///creation of user_data local database
 pub fn connect_or_create_local_login_db(
     paths: &crate::config::ProgramFiles,
 ) -> Result<rusqlite::Connection, crate::errors::Error> {
-    let local_login_conn = rusqlite::Connection::open(&paths.local_login_database_path).context(
-        "Couldnt create, read or find local_login database, couldnt establish connection.",
-    )?;
+    let mut local_login_conn = rusqlite::Connection::open(&paths.local_login_database_path)
+        .context(
+            "Couldnt create, read or find local_login database, couldnt establish connection.",
+        )?;
     local_login_conn
         .pragma_update(None, "synchronous", &"NORMAL")
         .context("Pragma error while creating local users db, synchronous")?;
@@ -19,26 +22,13 @@ pub fn connect_or_create_local_login_db(
     local_login_conn
         .pragma_update(None, "journal_mode", &"WAL")
         .context("Pragma error while creating local users db, journal_mode")?;
-    let schema = r#"BEGIN; CREATE TABLE IF NOT EXISTS users_data (
-                        user_id TEXT PRIMARY KEY,
-                        username TEXT NOT NULL,
-                        password_hash TEXT NOT NULL, 
-                        password_salt TEXT NOT NULL,
-                        notes_key BLOB NOT NULL,
-                        nonce_notes_key BLOB NOT NULL,
-                        is_online_linked INTEGER NOT NULL DEFAULT 0, 
-                        online_account_email TEXT DEFAULT NULL, 
-                        device_id TEXT NOT NULL,
-                        created_at INTEGER NOT NULL,  
-                        last_login INTEGER NOT NULL, 
-                        UNIQUE(username)
-                        );
-                        
-                        CREATE INDEX IF NOT EXISTS idx_users_data_username ON users_data(username);
-                        COMMIT;
-                        "#;
-    local_login_conn
-        .execute_batch(schema)
+    let tx = local_login_conn
+        .transaction()
+        .context("Couldnt create local login database, couldnt create transaction")?;
+    tx.execute_batch(LOCAL_LOGIN_DB_SCHEMA)
         .context("Couldnt create database of local users in database creation")?;
+    tx.commit()
+        .context("Couldnt create local login db, couldnt commit transaction")?;
+
     Ok(local_login_conn)
 }

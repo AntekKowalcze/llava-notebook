@@ -3,7 +3,11 @@ use anyhow::Context;
 use rusqlite::{Connection, OptionalExtension};
 use std::{fs, path::PathBuf};
 
-use crate::{config::ProgramFiles, services::logger};
+use crate::{
+    config::ProgramFiles,
+    constans::{INSERT_NOTE_SQL_SCHEMA, MAX_NOTE_NAME_LENGTH, NOTE_EXTENSION},
+    services::logger,
+};
 //init note after new note clicked and name sumbited
 ///this note init note struct and creates md file
 fn init_note(
@@ -13,7 +17,7 @@ fn init_note(
 ) -> Result<crate::models::note::Note, crate::errors::Error> {
     let mut new_note_path = path.clone();
     new_note_path.push(&name);
-    new_note_path.set_extension("md");
+    new_note_path.set_extension(NOTE_EXTENSION);
     match std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -79,25 +83,28 @@ pub fn add_note_to_database(
         let tx = conn
             .transaction()
             .context("Couldnt commit transaction while inserting a note, sql error")?;
-        tx.execute("INSERT INTO notes (local_id, mongo_id, owner_id, name, title, summary, content_path, created_at, updated_at, deleted_at, version, cloud_version, sync_state, is_deleted, encrypted, crypto_meta) VALUES (:local_id, :mongo_id, :owner_id, :name, :title, :summary, :content_path, :created_at, :updated_at, :deleted_at, :version, :cloud_version, :sync_state, :is_deleted, :encrypted, :crypto_meta); "
-        , rusqlite::named_params!{
-            ":local_id": note.local_id.to_string(),
-            ":mongo_id": note.mongo_id,
-            ":owner_id": note.owner_id.to_string(),
-            ":name": note.name,
-            ":title": note.title,
-            ":summary": note.summary,
-            ":content_path": note.content_path.to_string_lossy().to_string(),
-            ":created_at": note.created_at,
-            ":updated_at": note.updated_at,
-            ":deleted_at": note.deleted_at,
-            ":version": note.version ,
-            ":cloud_version": note.cloud_version ,
-            ":sync_state": note.sync_state,
-            ":is_deleted": note.is_deleted,
-            ":encrypted": note.encrypted ,
-            ":crypto_meta": note.crypto_meta,
-    }).context("Couldnt insert into database")?;
+        tx.execute(
+            INSERT_NOTE_SQL_SCHEMA,
+            rusqlite::named_params! {
+                    ":local_id": note.local_id.to_string(),
+                    ":mongo_id": note.mongo_id,
+                    ":owner_id": note.owner_id.to_string(),
+                    ":name": note.name,
+                    ":title": note.title,
+                    ":summary": note.summary,
+                    ":content_path": note.content_path.to_string_lossy().to_string(),
+                    ":created_at": note.created_at,
+                    ":updated_at": note.updated_at,
+                    ":deleted_at": note.deleted_at,
+                    ":version": note.version ,
+                    ":cloud_version": note.cloud_version ,
+                    ":sync_state": note.sync_state,
+                    ":is_deleted": note.is_deleted,
+                    ":encrypted": note.encrypted ,
+                    ":crypto_meta": note.crypto_meta,
+            },
+        )
+        .context("Couldnt insert into database")?;
         tx.commit()
     };
 
@@ -126,7 +133,7 @@ fn validate_note_name(
     conn: &Connection,
     owner_id: &uuid::Uuid,
 ) -> Result<(), crate::errors::Error> {
-    if note_name.chars().count() >= 255 {
+    if note_name.chars().count() >= MAX_NOTE_NAME_LENGTH {
         //longest unix filename
         crate::services::logger::log_error("name too long", crate::errors::Error::NoteNameToLong);
         return Err(crate::errors::Error::NoteNameToLong);
@@ -187,7 +194,6 @@ fn note_validator_test() {
     let file_content = fs::read_to_string(&path.active_user_path).unwrap();
     let json: serde_json::Value = serde_json::from_str(&file_content).unwrap();
     let owner_id: uuid::Uuid = serde_json::from_value(json["user_uuid"].clone()).unwrap();
-    println!("owner_id {owner_id :?}");
     validate_note_name(note_name, &conn, &owner_id).unwrap();
 }
 //TODO add delete user, with folder deletation and password confirmation, all notes will be deleted

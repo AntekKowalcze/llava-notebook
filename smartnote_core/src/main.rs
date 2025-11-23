@@ -1,10 +1,10 @@
 //! Just for tests, wont be needed after taurii added
 mod config;
+mod constans;
 mod errors;
 mod models;
 mod services;
 mod utils;
-
 fn main() {
     //1. logowanie albo rejestracja
     //tworzenie ścieżek i baz

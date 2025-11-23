@@ -51,12 +51,12 @@ fn delete_note(
 #[test]
 fn test_delte_note() {
     let paths = ProgramFiles::init().unwrap();
-    let name: String = "tttss".to_string();
+    let name: String = "tttsss".to_string();
     let sqlite_connection = crate::services::storage::db_creation::get_connection(&paths).unwrap();
     delete_note(
         &sqlite_connection,
         name.clone(),
-        "8932db9d-4686-4722-a130-a09c729b53ae",
+        "a65cb44f-22df-4950-a38d-33e41a9ba98e",
         &paths,
     )
     .unwrap();

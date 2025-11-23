@@ -11,7 +11,7 @@ fn read_note_content(
 #[test]
 fn read_test() {
     let paths = crate::config::ProgramFiles::init().unwrap();
-    let name = "this_is_tets_note".to_string();
+    let name = "tttsss".to_string();
     let content = read_note_content(&paths, name).unwrap();
     println!("{content}")
 }

@@ -1,6 +1,6 @@
 //! Module responsible for registering user
 //! in this modules important data is encrypted, and keys for notes encryption are also created
-
+use crate::constans::*;
 use anyhow::Context;
 use argon2::{
     Argon2,
@@ -47,29 +47,7 @@ fn register_user_offline(
     )?;
 
     tx.execute(
-        r#"INSERT INTO users_data (
-        user_id,
-        username,
-        password_hash,
-        password_salt,
-        notes_key,
-        nonce_notes_key,
-        is_online_linked,
-        online_account_email, 
-        device_id, created_at, 
-        last_login
-        ) VALUES (
-       :user_id,
-       :username, 
-       :password_hash, 
-       :password_salt, 
-       :notes_key, 
-       :nonce_notes_key, 
-       :is_online_linked, 
-       :online_account_email, 
-       :device_id, 
-       :created_at, 
-       :last_login)"#,
+        LOCAL_USER_DB_INSERT_SQL_SCHEMA,
         rusqlite::named_params! {
         ":user_id": new_user.user_id.to_string(),
          ":username":new_user.username ,
@@ -105,7 +83,7 @@ fn generate_enctypted_keys(
 ) -> Result<(String, String, Vec<u8>, Vec<u8>), crate::errors::Error> {
     let salt: SaltString = SaltString::generate(&mut OsRng); //generating salt for password
     let argon2 = Argon2::default(); //creating argon2 instance
-    let mut kek_bytes = [0u8; 32]; // Can be any desired size
+    let mut kek_bytes = [0u8; KEY_ENCRYPTED_KEY_LENGTH]; // Can be any desired size
     argon2
         .hash_password_into(
             password.as_bytes(),
@@ -139,7 +117,7 @@ fn generate_enctypted_keys(
 
 ///this function validates password on backend side
 fn password_validation(password: &str) -> Result<(), crate::errors::Error> {
-    if password.len() < 8
+    if password.len() < MINIMAL_PASSWORD_LENGTH
         || !password.chars().any(|c| c.is_ascii_punctuation())
         || !password.chars().any(|c| c.is_ascii_uppercase())
         || !password.chars().any(|c| c.is_ascii_lowercase())
@@ -190,7 +168,7 @@ fn register_test() {
     let mut conn =
         crate::services::auth::database_creation::connect_or_create_local_login_db(&paths).unwrap();
     register_user_offline(
-        "tenth".to_string(),
+        "eleventh connection: ".to_string(),
         zeroize::Zeroizing::from("ToJestTest!".to_string()),
         &paths,
         &mut conn,

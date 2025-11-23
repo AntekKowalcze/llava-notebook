@@ -1,5 +1,5 @@
 //! This module is responsible for configuring paths for applications do it by calling ProgramFiles::init()
-
+use crate::constans::*;
 use anyhow::Context;
 use dirs_next::data_local_dir;
 use serde::{Deserialize, Serialize};
@@ -52,7 +52,7 @@ impl ProgramFiles {
 
         match base {
             Some(program_home_path) => {
-                let active_user_path = program_home_path.join("smartnote/active_user.json");
+                let active_user_path = program_home_path.join(ACTIVE_USER_JSON_PATH);
                 let user_uuid = match read_current_user(active_user_path) {
                     //temp uuid on first run
                     Ok(uuid) => uuid,
@@ -76,7 +76,7 @@ impl ProgramFiles {
                 let log_content = "Couldnt get directory, trying to fallback";
                 crate::services::logger::log_error(log_content, "");
                 let first_fallback = std::env::temp_dir(); //cleaner logic needed when it will be added
-                let program_paths = get_paths(first_fallback, uuid::Uuid::new_v4())?;
+                let program_paths = get_paths(first_fallback, uuid::Uuid::new_v4())?; //new uuid which is temp userid so after comming back to normal path everything may by converted
                 write_config(fallback, &program_paths)?;
                 Ok(program_paths)
             }
@@ -88,12 +88,12 @@ fn get_paths(
     program_home_path: PathBuf,
     user_uuid: uuid::Uuid,
 ) -> Result<ProgramFiles, crate::errors::Error> {
-    let app_string = format!("smartnote/users/{}/", user_uuid); //in the future add uuid got from login
+    let app_string = format!("{}/{}/", USER_DIR_PATTERN, user_uuid); //in the future add uuid got from login
     let mut user_home_path = program_home_path.clone();
     user_home_path.push(app_string);
     std::fs::create_dir_all(&user_home_path)?;
 
-    for path in ["notes", "assets", "logs", "tmp", "tmp_delete"] {
+    for path in SUBDIRS {
         //TODO check if keys should be stored in files
         let path_to_create = user_home_path.join(path);
 
@@ -104,16 +104,16 @@ fn get_paths(
     crate::services::logger::log_success("created subdirectories successfully");
     Ok(ProgramFiles {
         base: user_home_path.clone(),
-        data_base_path: user_home_path.join("note.sqlite"),
+        data_base_path: user_home_path.join(NOTES_DB),
         notes_path: user_home_path.join("notes"),
         assets_path: user_home_path.join("assets"),
-        logs_path: user_home_path.join("logs/app.log"),
-        config_path: user_home_path.join("config.json"),
+        logs_path: user_home_path.join(LOGS_PATH),
+        config_path: user_home_path.join(CONFIG_FILE),
         tmp_path: user_home_path.join("tmp"),
         delete_tmp_path: user_home_path.join("tmp_delete"),
-        local_login_database_path: program_home_path.join("smartnote/users/local_login_db.sqlite"),
-        device_id_path: program_home_path.join("smartnote/device_id.json"),
-        active_user_path: program_home_path.join("smartnote/active_user.json"),
+        local_login_database_path: program_home_path.join(LOCAL_USERS_DB),
+        device_id_path: program_home_path.join(DEVICE_ID_FILE),
+        active_user_path: program_home_path.join(ACTIVE_USER_JSON_PATH),
     })
 }
 
@@ -149,7 +149,7 @@ pub fn get_device_id(paths: &ProgramFiles) -> Result<uuid::Uuid, crate::errors::
         let parsed_file: serde_json::Value = serde_json::from_str(&file_content)
             .context("couldnt parse device id file content with serde")?;
         let device_id = uuid::Uuid::parse_str(
-            parsed_file["device_id"]
+            parsed_file[DEVICE_ID_JSON_KEY]
                 .as_str()
                 .ok_or(crate::errors::Error::DeviceIdErorr)
                 .context("device id not found in device id file")?,
@@ -160,7 +160,7 @@ pub fn get_device_id(paths: &ProgramFiles) -> Result<uuid::Uuid, crate::errors::
         let device_id = uuid::Uuid::new_v4();
 
         let file_content = serde_json::json!({
-                "device_id": device_id,
+                DEVICE_ID_JSON_KEY: device_id,
         });
         let file_content = serde_json::to_string_pretty(&file_content)
             .context("couldnt parse device uuid to json ")?;
@@ -174,7 +174,7 @@ pub fn change_active_user(
     paths: &ProgramFiles,
 ) -> Result<(), crate::errors::Error> {
     let data = serde_json::json!({
-        "user_uuid": user_uuid
+        ACTIVE_USER_JSON_KEY: user_uuid
     });
     let file_content = serde_json::to_string_pretty(&data)
         .context("failed to parse user uuid to json when changin active user")?;
@@ -188,7 +188,7 @@ fn read_current_user(path: PathBuf) -> Result<uuid::Uuid, crate::errors::Error> 
     let contents_json: serde_json::Value =
         serde_json::from_str(&file_content).context("failed to parse active_user.json file")?;
     let user_uuid = uuid::Uuid::parse_str(
-        contents_json["user_uuid"]
+        contents_json[ACTIVE_USER_JSON_KEY]
             .as_str()
             .ok_or(crate::errors::Error::CurrentUserNotFound)
             .context("There was no current user written in active_user.json file")?,

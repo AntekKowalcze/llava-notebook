@@ -216,9 +216,7 @@ Summary made by local AI hosted on own server with privacy politics, and more ai
 
 
 6. zrobić connection reuse przez connection struct jakoś i implementacje + active user żeby nie deserializować
-8. zaimplementować checksum_ecrypted w bazie danych
 10. dodać logger
-11. Hardcoded Magic Values (MAINTAINABILITY) (popros perplexity o wypisanie z kodu)
 12. limit prób w hasłach
 13. testy integracyjne
  myśle że 1-2 punkty dziennie średnio to dobry wynik, jedne są krótsze, drugie dużo dłuższe
