@@ -1,6 +1,6 @@
 //! Just for tests, wont be needed after taurii added
 mod config;
-mod constans;
+mod constants;
 mod errors;
 mod models;
 mod services;

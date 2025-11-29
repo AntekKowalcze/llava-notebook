@@ -1,17 +1,19 @@
+use std::str::FromStr;
+
 use crate::utils::{Format, log_helper};
 use anyhow::Context;
 use argon2::{
     Argon2, PasswordHash, PasswordVerifier,
     password_hash::{self, SaltString},
 };
-use rusqlite::OptionalExtension;
+use rusqlite::{OptionalExtension, named_params};
 use zeroize::Zeroize;
 
 pub fn local_log_in(
     username: String,
     mut password: zeroize::Zeroizing<String>,
     conn: &rusqlite::Connection,
-) -> Result<(), crate::errors::Error> {
+) -> Result<uuid::Uuid, crate::errors::Error> {
     check_if_user_exists(&username, conn)?;
     //get hash and salt from db for this username, then hash given password again and check if hashes are the same if yes log in
     //if no return error wrong password,
@@ -54,7 +56,17 @@ pub fn local_log_in(
         Some(Format::Display(&username)),
         "user logged in succesfully",
     );
-    Ok(())
+    let user_uuid: String = conn
+        .query_row(
+            "SELECT user_id FROM users_data WHERE username = :name",
+            named_params! {
+                ":name": &username,
+            },
+            |row| row.get("user_id"),
+        )
+        .context("no user with this id")?;
+    let user_uuid = uuid::Uuid::parse_str(&user_uuid).context("failed to parse uuid")?;
+    Ok(user_uuid)
 }
 
 fn check_if_user_exists(
@@ -88,11 +100,12 @@ fn check_if_user_exists(
 
 #[test]
 fn login_test() {
-    let paths = crate::config::ProgramFiles::init().unwrap();
     let username = "twelth".to_string();
     let password = zeroize::Zeroizing::from("ToJestTest!".to_string());
+    let home_path = std::env::temp_dir();
     let conn =
-        crate::services::auth::database_creation::connect_or_create_local_login_db().unwrap();
+        crate::services::auth::database_creation::connect_or_create_local_login_db(&home_path)
+            .unwrap();
     local_log_in(username, password, &conn).unwrap();
 }
 //TODO add one test which tests everything

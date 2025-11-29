@@ -3,7 +3,7 @@ use crate::utils::{Format, log_helper};
 use anyhow::Context;
 use rusqlite::{Connection, Result};
 
-use crate::constans::NOTE_DB_SCHEMA;
+use crate::constants::NOTE_DB_SCHEMA;
 ///This function gives connection to or returns db error and log it to user
 pub fn get_connection(
     paths: &crate::config::ProgramFiles,

@@ -2,7 +2,7 @@
 use crate::utils::{Format, log_helper};
 use crate::{
     config::ProgramFiles,
-    constans::{INSERT_NOTE_SQL_SCHEMA, MAX_NOTE_NAME_LENGTH, NOTE_EXTENSION},
+    constants::{INSERT_NOTE_SQL_SCHEMA, MAX_NOTE_NAME_LENGTH, NOTE_EXTENSION},
 };
 use anyhow::Context;
 use rusqlite::{Connection, OptionalExtension};
@@ -78,17 +78,18 @@ pub fn add_note_to_database(
     conn: &mut rusqlite::Connection,
     paths: &ProgramFiles,
     name: String,
+    owner_id: uuid::Uuid,
 ) -> Result<(), crate::errors::Error> {
     let name = name.trim().to_string();
     let name = sanitise_file_name::sanitise(&name);
     if name.chars().count() == 0 {
         return Err(crate::errors::Error::NoteNameError);
     }
-    let file_content = fs::read_to_string(&paths.active_user_path)?;
-    let json: serde_json::Value = serde_json::from_str(&file_content)
-        .context("failed to parse json of active_user.json file")?;
-    let owner_id: uuid::Uuid = serde_json::from_value(json["user_uuid"].clone())
-        .context("Couldnt convert user_uuid red from active_user.json to uuid")?;
+    //  let file_content = fs::read_to_string(&paths.active_user_path)?;
+    // let json: serde_json::Value = serde_json::from_str(&file_content)
+    //     .context("failed to parse json of active_user.json file")?;
+    // let owner_id: uuid::Uuid = serde_json::from_value(json["user_uuid"].clone())
+    //     .context("Couldnt convert user_uuid red from active_user.json to uuid")?;
     validate_note_name(&name, &conn, &owner_id)?;
     //getting current user
 
@@ -199,8 +200,8 @@ fn validate_note_name(
 }
 
 #[test]
-fn chceck_if_file_is_created() {
-    let path = crate::config::ProgramFiles::init().unwrap();
+fn check_if_file_is_created() {
+    let path = crate::config::ProgramFiles::init_in_base().unwrap();
     let name = "test".to_owned();
     let file_content = fs::read_to_string(&path.active_user_path).unwrap();
     let json: serde_json::Value = serde_json::from_str(&file_content).unwrap();
@@ -214,16 +215,22 @@ fn chceck_if_file_is_created() {
 }
 #[test]
 fn add_to_db() {
-    let path = crate::config::ProgramFiles::init().unwrap();
+    let path = crate::config::ProgramFiles::init_in_base().unwrap();
     let mut conn = crate::services::storage::db_creation::get_connection(&path).unwrap();
     let name = "tttsss".to_owned();
-
-    add_note_to_database(&mut conn, &path, name).unwrap();
+    let file_content = fs::read_to_string(&path.active_user_path).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&file_content)
+        .context("failed to parse json of active_user.json file")
+        .unwrap();
+    let owner_id: uuid::Uuid = serde_json::from_value(json["user_uuid"].clone())
+        .context("Couldnt convert user_uuid red from active_user.json to uuid")
+        .unwrap();
+    add_note_to_database(&mut conn, &path, name, owner_id).unwrap();
 }
 
 #[test]
 fn note_validator_test() {
-    let path = crate::config::ProgramFiles::init().unwrap();
+    let path = crate::config::ProgramFiles::init_in_base().unwrap();
     let conn = crate::services::storage::db_creation::get_connection(&path).unwrap();
     let note_name = "ttt";
     let file_content = fs::read_to_string(&path.active_user_path).unwrap();

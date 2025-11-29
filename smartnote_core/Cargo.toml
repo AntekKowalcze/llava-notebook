@@ -3,6 +3,11 @@ name = "smartnote_core"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "smartnote_core"  
+path = "src/lib.rs"      
+
+
 [dependencies]
 anyhow = "1.0.100"
 argon2 = { version = "0.5.3", features = ["std"] }

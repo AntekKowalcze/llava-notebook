@@ -1,6 +1,6 @@
 //! Module responsible for registering user
 //! in this modules important data is encrypted, and keys for notes encryption are also created
-use crate::constans::*;
+use crate::constants::*;
 use crate::utils::{Format, log_helper};
 use anyhow::Context;
 use argon2::{
@@ -184,9 +184,12 @@ fn test_password_validation() {
 
 #[test]
 fn register_test() {
-    let paths = ProgramFiles::init().unwrap();
+    let paths = ProgramFiles::init_in_base().unwrap();
+    let home_path = std::env::temp_dir();
+
     let mut conn =
-        crate::services::auth::database_creation::connect_or_create_local_login_db().unwrap();
+        crate::services::auth::database_creation::connect_or_create_local_login_db(&home_path)
+            .unwrap();
     register_user_offline(
         "tescik".to_string(),
         zeroize::Zeroizing::from("ToJestTest!".to_string()),

@@ -1,13 +1,21 @@
 pub mod config;
-pub mod constans;
+pub mod constants;
 pub mod errors;
 pub mod models;
 pub mod services;
 pub mod utils;
 
 pub use config::{AppState, ProgramFiles};
+pub use errors::Error;
+pub use models::note::Note;
+pub use services::auth::database_creation::connect_or_create_local_login_db;
 pub use services::auth::logging::local_log_in;
 pub use services::auth::register::register_user_offline;
 pub use services::logger::configure_logger;
+pub use services::storage::db_creation::{SyncState, get_connection};
+pub use services::storage::delete::delete_note;
+pub use services::storage::init_note::add_note_to_database;
+pub use services::storage::read::read_note_content;
+pub use services::storage::update::update_md;
 //dodać reszte potrzebnych funkcji
 //TODO now pisać test

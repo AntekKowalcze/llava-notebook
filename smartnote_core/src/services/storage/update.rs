@@ -1,17 +1,19 @@
 //! this module is responsible for updating .md file but also important fields in databases
-use crate::constans::*;
+use crate::constants::*;
 use crate::utils::{Format, log_helper};
 use anyhow::Context;
 use std::fs::{self};
+use std::str::FromStr;
 
 use crate::{config::ProgramFiles, services::storage::update};
 
 ///function responsible for updating .md file contents
-fn update_md(
+pub fn update_md(
+    //możę usunąć note_id/name w sensie jedno z tych ale to zobacze jak będzie łatwiej zaimplementować w taurii
     //remember about changin state to pending upload when update when adding sync
     conn: &rusqlite::Connection,
     name: String,
-    note_id: &str,
+    note_id: uuid::Uuid, //możliwa zmiana na uuid
     written_string: String,
     program_paths: &crate::config::ProgramFiles,
     title: String,
@@ -34,10 +36,12 @@ fn update_md(
         return Err(crate::errors::Error::TitleTooLong);
     }
     fs::write(&tmp_filepath, written_string)?; //some permission error
+    fs::File::open(&tmp_filepath)?.sync_all()?;
 
     let note_name = name.clone() + "." + NOTE_EXTENSION;
     let note_path = program_paths.notes_path.join(note_name);
     fs::rename(&tmp_filepath, note_path)?;
+
     let value = conn
         .execute(
             UPDATE_NOTE_SQL_QUERY,
@@ -45,7 +49,7 @@ fn update_md(
                 ":updated_time": crate::utils::get_time(),
                 ":summary": summary,
                 ":title" : title,
-                ":id": note_id,
+                ":id": note_id.to_string(),
             },
         )
         .context("Couldnt get needed info about note from SQL while updating")?;
@@ -62,7 +66,7 @@ fn update_md(
 #[test]
 
 fn update_test() {
-    let paths = ProgramFiles::init().unwrap();
+    let paths = ProgramFiles::init_in_base().unwrap();
     let name = "tttsss".to_string();
     let written_string =
         "this is test string which have to be written and now it will not overwrite".to_string();
@@ -71,7 +75,7 @@ fn update_test() {
     update_md(
         &sqlite_connection,
         name,
-        "45943af4-6163-4816-8108-06330841e1ea",
+        uuid::Uuid::from_str("45943af4-6163-4816-8108-06330841e1ea").unwrap(), // this is why this test might be failing, write fucntion getting note id from name
         written_string,
         &paths,
         title,

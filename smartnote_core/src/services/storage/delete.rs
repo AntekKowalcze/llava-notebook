@@ -1,4 +1,6 @@
 //! this module contains function for soft deleting notes locally
+use std::str::FromStr;
+
 use crate::utils::{Format, log_helper};
 
 use anyhow::Context;
@@ -9,16 +11,16 @@ use crate::{
     services::storage::{db_creation::SyncState, update},
 };
 /// soft delete note
-fn delete_note(
+pub fn delete_note(
     conn: &rusqlite::Connection,
     name: String,
-    note_id: &str,
+    note_id: uuid::Uuid,
     paths: &crate::config::ProgramFiles,
 ) -> Result<(), crate::errors::Error> {
     let current_sync_status: SyncState = conn
         .query_row(
             "SELECT sync_state FROM notes WHERE local_id = :note_id",
-            rusqlite::named_params! { ":note_id": note_id },
+            rusqlite::named_params! { ":note_id": note_id.to_string() },
             |row| row.get("sync_state"),
         )
         .context("couldnt get currenct sync status for rollback in deletation of note SQL ERROR")?;
@@ -27,7 +29,7 @@ fn delete_note(
         "UPDATE notes SET sync_state = 'PendingDeleted', deleted_at = :time WHERE local_id = :note_id",
         rusqlite::named_params! {
             ":time": crate::utils::get_time(),
-            ":note_id": note_id
+            ":note_id": note_id.to_string()
         },
     ).context("couldnt update sync state and deleted time in deletation of note")?;
 
@@ -40,7 +42,7 @@ fn delete_note(
             "UPDATE notes SET sync_state = :status_before, deleted_at = NULL WHERE local_id = :note_id",
             rusqlite::named_params! {
                 ":status_before": current_sync_status,
-                ":note_id": note_id
+                ":note_id": note_id.to_string()
             },
         ).context("Couldnt get sync state, and delte status while rollback in note deletation SQL ERROR")?;
 
@@ -59,13 +61,13 @@ fn delete_note(
 
 #[test]
 fn test_delte_note() {
-    let paths = ProgramFiles::init().unwrap();
+    let paths = ProgramFiles::init_in_base().unwrap();
     let name: String = "tttsss".to_string();
     let sqlite_connection = crate::services::storage::db_creation::get_connection(&paths).unwrap();
     delete_note(
         &sqlite_connection,
         name.clone(),
-        "45943af4-6163-4816-8108-06330841e1ea",
+        uuid::Uuid::from_str("45943af4-6163-4816-8108-06330841e1ea").unwrap(),
         &paths,
     )
     .unwrap();
@@ -75,5 +77,6 @@ fn test_delte_note() {
     )
     .unwrap();
 }
+//("45943af4-6163-4816-8108-06330841e1ea")
 
 //deletation not visible because its cleaning

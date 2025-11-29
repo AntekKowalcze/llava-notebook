@@ -1,5 +1,5 @@
 //! This module is responsible for configuring paths for applications do it by calling ProgramFiles::init()
-use crate::constans::*;
+use crate::constants::*;
 use crate::utils::{Format, log_helper};
 use anyhow::Context;
 use dirs_next::data_local_dir;
@@ -36,7 +36,7 @@ pub struct AppState {
 }
 
 impl AppState {
-    fn init() -> Result<AppState, crate::errors::Error> {
+    pub fn init() -> Result<AppState, crate::errors::Error> {
         Ok(AppState {
             device_id: get_device_id()?,
             current_user: Mutex::new(None),
@@ -100,7 +100,7 @@ impl ProgramFiles {
             Ok(uuid) => uuid,
             Err(err) => {
                 tracing::error!(
-                    task = "initializating note",
+                    task = "paths config note",
                     status = "error",
                     ?err,
                     "Cannot get user uuid, possibly first run"
@@ -110,10 +110,7 @@ impl ProgramFiles {
             }
         };
 
-        let program_paths = get_paths(
-            program_home_path.clone(),
-            user_uuid, //tu zmiana
-        )?; //function users uuid also, its to add
+        let program_paths = get_paths(program_home_path.clone(), user_uuid)?; //function users uuid also, its to add
         write_config(&program_paths)?;
         Ok(program_paths)
     }
@@ -262,7 +259,7 @@ fn read_current_user(path: &PathBuf) -> Result<uuid::Uuid, crate::errors::Error>
 }
 #[test]
 fn init_test() {
-    let paths = ProgramFiles::init().unwrap();
+    let paths = ProgramFiles::init_in_base().unwrap();
     println!("{:#?}", paths);
     assert!(paths.config_path.exists())
 }
@@ -270,13 +267,13 @@ fn init_test() {
 #[test]
 
 fn test_changing_user() {
-    let paths = ProgramFiles::init().unwrap();
+    let paths = ProgramFiles::init_in_base().unwrap();
     change_active_user(uuid::Uuid::new_v4(), &paths).unwrap();
 }
 
 #[test]
 fn test_creating_device_id() {
-    let paths = ProgramFiles::init().unwrap();
+    let paths = ProgramFiles::init_in_base().unwrap();
 
     let device_id = get_device_id().unwrap();
     println!("{}", device_id);
