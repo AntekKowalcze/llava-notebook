@@ -1,3 +1,4 @@
+use crate::utils::{Format, log_helper};
 use anyhow::Context;
 use argon2::{
     Argon2, PasswordHash, PasswordVerifier,
@@ -6,7 +7,7 @@ use argon2::{
 use rusqlite::OptionalExtension;
 use zeroize::Zeroize;
 
-fn local_log_in(
+pub fn local_log_in(
     username: String,
     mut password: zeroize::Zeroizing<String>,
     conn: &rusqlite::Connection,
@@ -33,17 +34,26 @@ fn local_log_in(
     let password_verified = Argon2::default()
         .verify_password(&password.as_bytes(), &password_hash)
         .is_ok();
+    log_helper(
+        "logging",
+        "success",
+        Some(Format::Display(&username)),
+        "password verified succesfully",
+    );
 
-    println!("{password_verified :?} Password");
     if password_verified {
         crate::services::logger::log_success("logged successfully");
     } else {
         crate::services::logger::log_error("Logging failed", crate::errors::Error::WrongPassword);
         return Err(crate::errors::Error::WrongPassword);
     }
-    //TODO reduce error variants and put them in distinct enums, for example, create Login error which will be enum with types of WrongPassword, WrongUserName, PasswordvalidationError Etc.
     //after logging add resetting password for local account, and then start online accounts,
-    crate::services::logger::log_success("logged succesfully");
+    log_helper(
+        "logging",
+        "success",
+        Some(Format::Display(&username)),
+        "user logged in succesfully",
+    );
     Ok(())
 }
 
@@ -62,12 +72,16 @@ fn check_if_user_exists(
         .is_some();
     if exists {
         crate::services::logger::log_success("username exists, all correct");
+        log_helper(
+            "logging",
+            "success",
+            Some(Format::Display(&username)),
+            "user exists, can log in",
+        );
+
         return Ok(());
     } else {
-        crate::services::logger::log_error(
-            "username does not exists failed",
-            crate::errors::Error::UserNotExists,
-        );
+        tracing::error!(task="checking if user exists in db", status="error", %username, "user do not exists in database, cant log in");
         return Err(crate::errors::Error::UserNotExists);
     }
 }

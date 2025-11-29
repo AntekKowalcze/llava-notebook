@@ -1,6 +1,7 @@
 //! Module responsible for registering user
 //! in this modules important data is encrypted, and keys for notes encryption are also created
 use crate::constans::*;
+use crate::utils::{Format, log_helper};
 use anyhow::Context;
 use argon2::{
     Argon2,
@@ -10,12 +11,13 @@ use chacha20poly1305::{
     ChaCha20Poly1305,
     aead::{Aead, AeadCore, KeyInit},
 };
+use core::task;
 use rusqlite::{Connection, OptionalExtension, params};
 use zeroize::Zeroize;
 
 use crate::config::ProgramFiles;
 ///function responsible for registering user offilne and adding it encrypted to local db
-fn register_user_offline(
+pub fn register_user_offline(
     username: String,
     password: zeroize::Zeroizing<String>,
     paths: &crate::config::ProgramFiles,
@@ -67,14 +69,16 @@ fn register_user_offline(
         "Couldnt insert user into database, transaction failed while registering a user",
     )?;
     crate::config::change_active_user(new_user.user_id, &paths)?; //narazie tutaj, moze po logowaniu damy to wszystko do jednej funkcji
-
-    crate::services::logger::log_success("Successfully added a user to a database");
-
+    log_helper(
+        "registering",
+        "success",
+        Some(Format::Display(&new_user.username)),
+        "User successfully registered",
+    );
     Ok(())
     //TODO add function after login/register which changes paths current user etc.
 }
 
-fn register_user_online() {}
 ///this function generates encrypted keys
 fn generate_enctypted_keys(
     //reuse on password change
@@ -97,6 +101,12 @@ fn generate_enctypted_keys(
         .hash_password(password.as_bytes(), &salt)
         .context("Couldnt hash a password in registering a user")?
         .to_string(); //hasing password 
+    log_helper(
+        "password encryption",
+        "success",
+        None::<Format<String>>,
+        "password encrypted successfully",
+    );
 
     //generate random key
     let kek = ChaCha20Poly1305::new(&kek_bytes.into());
@@ -122,14 +132,20 @@ fn password_validation(password: &str) -> Result<(), crate::errors::Error> {
         || !password.chars().any(|c| c.is_ascii_uppercase())
         || !password.chars().any(|c| c.is_ascii_lowercase())
     {
-        crate::services::logger::log_error(
-            "password not validated",
-            crate::errors::Error::PasswordValidation,
+        tracing::error!(
+            task = "password validation",
+            status = "error",
+            "password didnt pass validation"
         );
 
         return Err(crate::errors::Error::PasswordValidation);
     }
-    crate::services::logger::log_success("Password validated successfully");
+    log_helper(
+        "password validation",
+        "success",
+        None::<Format<String>>,
+        "Password validated successfully",
+    );
 
     Ok(())
 }
@@ -145,13 +161,17 @@ fn validate_username(username: &str, conn: &Connection) -> Result<(), crate::err
         .context("couldnt check if username exist in username validation SQL Error")?
         .is_some();
     if exists {
-        crate::services::logger::log_error(
-            "username validation failed",
-            crate::errors::Error::UsernameExistsError,
-        );
+        tracing::error!(task="username validation", status="error", %username, "username didnt pass validation");
+
         return Err(crate::errors::Error::UsernameExistsError);
     } else {
-        crate::services::logger::log_success("passed username validation");
+        log_helper(
+            "username validation",
+            "success",
+            Some(Format::Display(&username)),
+            "username validated successfully",
+        );
+
         return Ok(());
     }
 }
@@ -168,7 +188,7 @@ fn register_test() {
     let mut conn =
         crate::services::auth::database_creation::connect_or_create_local_login_db().unwrap();
     register_user_offline(
-        "julus".to_string(),
+        "tescik".to_string(),
         zeroize::Zeroizing::from("ToJestTest!".to_string()),
         &paths,
         &mut conn,

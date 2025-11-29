@@ -1,9 +1,11 @@
 //! This module is responsible for configuring paths for applications do it by calling ProgramFiles::init()
 use crate::constans::*;
+use crate::utils::{Format, log_helper};
 use anyhow::Context;
 use dirs_next::data_local_dir;
 use rusqlite::{Connection, named_params};
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 use std::{
     fs::{self, create_dir_all},
     path::PathBuf,
@@ -26,11 +28,11 @@ pub struct ProgramFiles {
 }
 
 pub struct AppState {
-    device_id: uuid::Uuid,
-    current_user: Mutex<Option<uuid::Uuid>>,
-    connection: Mutex<Option<Connection>>,
-    username: Mutex<Option<String>>,
-    paths: Mutex<Option<ProgramFiles>>,
+    pub device_id: uuid::Uuid,
+    pub current_user: Mutex<Option<uuid::Uuid>>,
+    pub connection: Mutex<Option<Connection>>,
+    pub username: Mutex<Option<String>>,
+    pub paths: Mutex<Option<ProgramFiles>>,
 }
 
 impl AppState {
@@ -56,17 +58,28 @@ pub struct ConfigData {
 ///determining fallback and creating paths and ProgramFiles struct
 impl ProgramFiles {
     pub fn init() -> Result<ProgramFiles, crate::errors::Error> {
-        let mut fallback = false;
-        let program_home_path = data_local_dir().ok_or(crate::errors::Error::FatalError)?;
+        let program_home_path = data_local_dir()
+            .ok_or(crate::errors::Error::FatalError)
+            .inspect_err(|_| {
+                tracing::error!(
+                    task = "initializating paths",
+                    status = "error",
+                    "Fatal error, couldnt get main path for program",
+                )
+            })?;
 
         let active_user_path = program_home_path.join(ACTIVE_USER_JSON_PATH);
         let user_uuid = match read_current_user(&active_user_path) {
             //temp uuid on first run
             Ok(uuid) => uuid,
-            Err(_) => {
-                crate::services::logger::log_success(
-                    "No active user found (first run?), using temp UUID",
+            Err(err) => {
+                tracing::error!(
+                    task = "initializating note",
+                    status = "error",
+                    ?err,
+                    "Cannot get user uuid, possibly first run"
                 );
+
                 uuid::Uuid::new_v4()
             }
         };
@@ -75,7 +88,33 @@ impl ProgramFiles {
             program_home_path.clone(),
             user_uuid, //tu zmiana
         )?; //function users uuid also, its to add
-        write_config(fallback, &program_paths)?;
+        write_config(&program_paths)?;
+        Ok(program_paths)
+    }
+
+    pub fn init_in_base() -> Result<ProgramFiles, crate::errors::Error> {
+        let program_home_path: PathBuf = std::env::temp_dir().join("smartnote_test");
+        let active_user_path = program_home_path.join(ACTIVE_USER_JSON_PATH);
+        let user_uuid = match read_current_user(&active_user_path) {
+            //temp uuid on first run
+            Ok(uuid) => uuid,
+            Err(err) => {
+                tracing::error!(
+                    task = "initializating note",
+                    status = "error",
+                    ?err,
+                    "Cannot get user uuid, possibly first run"
+                );
+
+                uuid::Uuid::new_v4()
+            }
+        };
+
+        let program_paths = get_paths(
+            program_home_path.clone(),
+            user_uuid, //tu zmiana
+        )?; //function users uuid also, its to add
+        write_config(&program_paths)?;
         Ok(program_paths)
     }
 }
@@ -94,11 +133,21 @@ fn get_paths(
         //TODO check if keys should be stored in files
         let path_to_create = user_home_path.join(path);
 
-        let log_content = format!("file paths created, app directory: {}", path);
-        crate::services::logger::log_success(&log_content);
+        log_helper(
+            "gettign paths",
+            "success",
+            Some(Format::Debug(path)),
+            "file paths created",
+        );
         std::fs::create_dir_all(path_to_create)?;
     }
-    crate::services::logger::log_success("created subdirectories successfully");
+    log_helper(
+        "gettign paths",
+        "success",
+        None::<Format<String>>,
+        "Created subdirs successfully",
+    );
+
     Ok(ProgramFiles {
         base: user_home_path.clone(),
         data_base_path: user_home_path.join(NOTES_DB),
@@ -115,7 +164,7 @@ fn get_paths(
 }
 
 ///function responsible for writeing config data, current directory and if is it fallback
-fn write_config(fallback: bool, program_paths: &ProgramFiles) -> Result<(), crate::errors::Error> {
+fn write_config(program_paths: &ProgramFiles) -> Result<(), crate::errors::Error> {
     let config_content = ConfigData {
         data_dir: program_paths.base.to_path_buf(),
     };
@@ -130,11 +179,19 @@ fn write_config(fallback: bool, program_paths: &ProgramFiles) -> Result<(), crat
     crate::services::logger::log_success("serialized config content");
 
     fs::write(&program_paths.config_path, &content).inspect_err(|err| {
-        crate::services::logger::log_error("couldnt write to config.json, it ", err)
+        tracing::error!(
+            task = "writing config to json",
+            status = "error",
+            "couldnt write config to json"
+        );
     })?;
 
-    crate::services::logger::log_success("written content to config.json");
-
+    log_helper(
+        "writing config to json",
+        "success",
+        None::<Format<String>>,
+        "Written config to json",
+    );
     Ok(())
 }
 
@@ -195,7 +252,12 @@ fn read_current_user(path: &PathBuf) -> Result<uuid::Uuid, crate::errors::Error>
             .context("There was no current user written in active_user.json file")?,
     )
     .context("couldnt get current user from active_user.json file")?;
-    crate::services::logger::log_success("got current user uuid");
+    log_helper(
+        "read user uuid",
+        "success",
+        Some(Format::Debug(&user_uuid)),
+        "Successfully got user uuid",
+    );
     Ok(user_uuid)
 }
 #[test]

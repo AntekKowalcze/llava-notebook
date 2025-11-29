@@ -1,13 +1,12 @@
 //! This module is responsible for creating database record and .md file
-use anyhow::Context;
-use rusqlite::{Connection, OptionalExtension};
-use std::{fs, path::PathBuf};
-
+use crate::utils::{Format, log_helper};
 use crate::{
     config::ProgramFiles,
     constans::{INSERT_NOTE_SQL_SCHEMA, MAX_NOTE_NAME_LENGTH, NOTE_EXTENSION},
-    services::logger,
 };
+use anyhow::Context;
+use rusqlite::{Connection, OptionalExtension};
+use std::{fs, path::PathBuf};
 //init note after new note clicked and name sumbited
 ///this note init note struct and creates md file
 fn init_note(
@@ -24,6 +23,12 @@ fn init_note(
         .open(&new_note_path)
     {
         Ok(_) => {
+            log_helper(
+                "note initialization",
+                "success",
+                None::<Format<String>>,
+                "Note created successfully",
+            );
             crate::services::logger::log_success("created note file succesfullly");
             Ok(crate::models::note::Note {
                 local_id: uuid::Uuid::new_v4(),
@@ -49,10 +54,19 @@ fn init_note(
             })
         }
         Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
+            tracing::error!(
+                task = "note initialization",
+                status = "error",
+                "note with this name already exists"
+            );
             return Err(crate::errors::Error::FileAlreadyExists);
         }
         Err(err) => {
-            crate::services::logger::log_error("couldnt create a file {}", &err);
+            tracing::error!(
+                task = "note initialization",
+                status = "error",
+                "couldnt init a note"
+            );
             //dodać obsługe, poprostu nie moge utworzyć pliku, popup z tym komunikatem żeby zmienić uprawnienia i wróć do działania programu
             Err(crate::errors::Error::FileOperationError(err))
         }
@@ -110,19 +124,30 @@ pub fn add_note_to_database(
 
     match transaction_result {
         Ok(_) => {
-            crate::services::logger::log_success(
-                "successfully initialized note and created record in notes table",
+            log_helper(
+                "addign note to db",
+                "success",
+                None::<Format<String>>,
+                "successfully created a note",
             );
+
             Ok(())
         }
         Err(err) => {
-            crate::services::logger::log_error(
-                "Database transaction failed, deleting orphaned file",
-                &err,
-            );
             if let Err(fs_err) = std::fs::remove_file(&note.content_path) {
-                crate::services::logger::log_error("Failed to cleanup orphaned file!", &fs_err);
+                tracing::error!(
+                    task = "adding note to db",
+                    status = "error",
+                    ?fs_err,
+                    "couldnt remove orphaned file",
+                );
             }
+            tracing::error!(
+                task = "adding note to db",
+                status = "error",
+                ?err,
+                "error while inserting note to db, deleting orphaned file",
+            );
             Err(crate::errors::Error::InternalError(err.into()))
         }
     }
@@ -135,7 +160,11 @@ fn validate_note_name(
 ) -> Result<(), crate::errors::Error> {
     if note_name.chars().count() >= MAX_NOTE_NAME_LENGTH {
         //longest unix filename
-        crate::services::logger::log_error("name too long", crate::errors::Error::NoteNameToLong);
+        tracing::error!(
+            task = "validating note name",
+            status = "error",
+            "note name too long",
+        );
         return Err(crate::errors::Error::NoteNameToLong);
     }
     let exists = conn
@@ -152,13 +181,19 @@ fn validate_note_name(
         .is_some();
 
     if exists {
-        crate::services::logger::log_error(
-            "Note name exists",
-            crate::errors::Error::NoteNameExistsError,
+        tracing::error!(
+            task = "validating note name",
+            status = "error",
+            "note name exists",
         );
         return Err(crate::errors::Error::NoteNameExistsError);
     } else {
-        crate::services::logger::log_success("note name validated successfully");
+        log_helper(
+            "validating note name",
+            "success",
+            None::<Format<String>>,
+            "note name validated successfully",
+        );
         Ok(())
     }
 }

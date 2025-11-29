@@ -1,8 +1,8 @@
 //! this module is responsible for updating .md file but also important fields in databases
 use crate::constans::*;
-use std::fs::{self};
-
+use crate::utils::{Format, log_helper};
 use anyhow::Context;
+use std::fs::{self};
 
 use crate::{config::ProgramFiles, services::storage::update};
 
@@ -26,6 +26,11 @@ fn update_md(
         .collect::<Vec<&str>>()
         .join(" ");
     if title.split_whitespace().count() > MAX_TITLE_LENGTH {
+        tracing::error!(
+            task = "validating title",
+            status = "error",
+            "title too long"
+        );
         return Err(crate::errors::Error::TitleTooLong);
     }
     fs::write(&tmp_filepath, written_string)?; //some permission error
@@ -44,7 +49,12 @@ fn update_md(
             },
         )
         .context("Couldnt get needed info about note from SQL while updating")?;
-    crate::services::logger::log_success("successfully updated a note");
+    log_helper(
+        "validating note name",
+        "success",
+        Some(Format::Display(&note_id)),
+        "note updated successfully",
+    );
 
     Ok(())
 }
@@ -68,4 +78,3 @@ fn update_test() {
     )
     .unwrap();
 }
-//TODO dodać anyhow, super obsługa błędów

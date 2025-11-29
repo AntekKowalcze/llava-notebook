@@ -1,17 +1,19 @@
-use anyhow::Context;
-
 use crate::constans::LOCAL_LOGIN_DB_SCHEMA;
+use crate::utils::{Format, log_helper};
+use anyhow::Context;
 //smartnote/users/local_login_db.sqlite
 ///creation of user_data local database
 pub fn connect_or_create_local_login_db() -> Result<rusqlite::Connection, crate::errors::Error> {
     let home_path = dirs_next::data_local_dir().ok_or(crate::errors::Error::FatalError)?;
     let mut local_login_db_path = home_path.join("smartnote/users");
     std::fs::create_dir_all(&local_login_db_path)?;
+    tracing::info!("Local login db dirs created");
     local_login_db_path = home_path.join("smartnote/users/local_login_db.sqlite");
 
     let mut local_login_conn = rusqlite::Connection::open(local_login_db_path).context(
         "Couldnt create, read or find local_login database, couldnt establish connection.",
     )?;
+    tracing::info!("Created connection to local_login_db");
     local_login_conn
         .pragma_update(None, "synchronous", &"NORMAL")
         .context("Pragma error while creating local users db, synchronous")?;
@@ -31,6 +33,11 @@ pub fn connect_or_create_local_login_db() -> Result<rusqlite::Connection, crate:
         .context("Couldnt create database of local users in database creation")?;
     tx.commit()
         .context("Couldnt create local login db, couldnt commit transaction")?;
-
+    log_helper::<String>(
+        "creation of database",
+        "success",
+        None::<Format<String>>,
+        "user log in database created successfully",
+    );
     Ok(local_login_conn)
 }

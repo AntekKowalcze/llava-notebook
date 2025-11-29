@@ -215,7 +215,7 @@ W pliku data models
 Summary made by local AI hosted on own server with privacy politics, and more ai features
 
 
-10. dodać logger
+10. dodać logger log4rs, tracing
 12. limit prób w hasłach
 13. testy integracyjne
  myśle że 1-2 punkty dziennie średnio to dobry wynik, jedne są krótsze, drugie dużo dłuższe

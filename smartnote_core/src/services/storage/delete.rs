@@ -1,8 +1,11 @@
-//! this module containt function for soft deleting notes locally
+//! this module contains function for soft deleting notes locally
+use crate::utils::{Format, log_helper};
+
 use anyhow::Context;
 
 use crate::{
     config::ProgramFiles,
+    models::note,
     services::storage::{db_creation::SyncState, update},
 };
 /// soft delete note
@@ -32,7 +35,7 @@ fn delete_note(
         paths.notes_path.join(format!("{name}.md")),
         paths.delete_tmp_path.join(format!("{name}.md")),
     ) {
-        crate::services::logger::log_error("Soft delete failed, rolling back DB", &err);
+        tracing::error!(task="deleting", status="error", %note_id, "Soft delete failed, rolling back DB");
         conn.execute(
             "UPDATE notes SET sync_state = :status_before, deleted_at = NULL WHERE local_id = :note_id",
             rusqlite::named_params! {
@@ -44,7 +47,13 @@ fn delete_note(
         return Err(crate::errors::Error::from(err));
     }
 
-    crate::services::logger::log_success("note successfully deleted");
+    log_helper(
+        "deleting note",
+        "success",
+        Some(Format::Display(&note_id)),
+        "note deleted succesfully",
+    );
+
     Ok(())
 }
 
