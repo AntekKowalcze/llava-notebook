@@ -67,7 +67,7 @@ fn program_flow() {
 
     let count: i64 = note_db_conn
         .query_row(
-            "SELECT COUNT(*) FROM notes WHERE name = :name AND owner_id = :owner",
+            +"SELECT COUNT(*) FROM notes WHERE name = :name AND owner_id = :owner",
             named_params! {":name": note_name, ":owner": owner_id.to_string()},
             |row| row.get(0),
         )

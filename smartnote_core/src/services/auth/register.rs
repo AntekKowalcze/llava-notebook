@@ -185,7 +185,7 @@ fn test_password_validation() {
 #[test]
 fn register_test() {
     let paths = ProgramFiles::init_in_base().unwrap();
-    let home_path = std::env::temp_dir();
+    let home_path = std::env::temp_dir().join(LOCAL_USERS_DB);
 
     let mut conn =
         crate::services::auth::database_creation::connect_or_create_local_login_db(&home_path)
