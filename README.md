@@ -1,7 +1,7 @@
 
 ---
 
-# 🧱 Architektura SmartNote
+# 🧱 Architektura llava
 
 ## 🎯 Założenia projektu
 
@@ -49,7 +49,7 @@ src/
 ## 🗂️ Struktura danych lokalnych
 
 ```
-~/.smartnote/
+~/.core/
   users/
     <user_email_hash>/
       db.sqlite              # Metadane i historia
@@ -169,7 +169,7 @@ W pliku data models
 ┌───────────────────────────────────────────┐
 │       💾  Lokalny Storage (Offline)       │
 │-------------------------------------------│
-│~/.smartnote/users/<user>/                 │                        
+│~/.llava/users/<user>/                 │                        
 │ ├── notes/*.md  Markdownowe notatki       │                     
 │ ├── assets/*    Obrazy i załączniki       │
 │ ├── db.sqlite   Metadane i historia       │

@@ -93,7 +93,7 @@ impl ProgramFiles {
     }
 
     pub fn init_in_base() -> Result<ProgramFiles, crate::errors::Error> {
-        let program_home_path: PathBuf = std::env::temp_dir().join("smartnote_test");
+        let program_home_path: PathBuf = std::env::temp_dir().join("llava_test");
         let active_user_path = program_home_path.join(ACTIVE_USER_JSON_PATH);
         let user_uuid = match read_current_user(&active_user_path) {
             //temp uuid on first run
@@ -195,9 +195,9 @@ fn write_config(program_paths: &ProgramFiles) -> Result<(), crate::errors::Error
 /// function for getting device id, or creating new if not exists
 pub fn get_device_id() -> Result<uuid::Uuid, crate::errors::Error> {
     let home_path = data_local_dir().ok_or(crate::errors::Error::FatalError)?;
-    let mut device_id_path = home_path.join("smartnote");
+    let mut device_id_path = home_path.join("llava");
     create_dir_all(&device_id_path)?;
-    device_id_path = home_path.join("smartnote/device_id.json");
+    device_id_path = home_path.join("llava/device_id.json");
 
     if device_id_path.exists() {
         let file_content = std::fs::read_to_string(&device_id_path)?;

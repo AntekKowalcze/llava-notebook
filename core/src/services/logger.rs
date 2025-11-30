@@ -27,7 +27,7 @@ pub fn configure_logger(
     path_to_log_file: &PathBuf,
 ) -> Result<tracing_appender::non_blocking::WorkerGuard, crate::errors::Error> {
     rename_log_file(&path_to_log_file)?;
-    let filter = tracing_subscriber::filter::EnvFilter::new("off,smartnote_core=trace");
+    let filter = tracing_subscriber::filter::EnvFilter::new("off,llava_core=trace");
     let log_file = OpenOptions::new()
         .create(true)
         .write(true)

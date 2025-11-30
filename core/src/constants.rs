@@ -2,18 +2,18 @@
 
 //config.rs
 //folders
-pub const USER_DIR_PATTERN: &str = "smartnote/users";
+pub const USER_DIR_PATTERN: &str = "llava/users";
 pub const SUBDIRS: &[&str; 5] = &["notes", "assets", "logs", "tmp", "tmp_delete"];
 //jsons
 pub const CONFIG_FILE: &str = "config.json";
-pub const ACTIVE_USER_JSON_PATH: &str = "smartnote/active_user.json";
-pub const DEVICE_ID_FILE: &str = "smartnote/device_id.json";
+pub const ACTIVE_USER_JSON_PATH: &str = "llava/active_user.json";
+pub const DEVICE_ID_FILE: &str = "llava/device_id.json";
 pub const DEVICE_ID_JSON_KEY: &str = "device_id";
 pub const ACTIVE_USER_JSON_KEY: &str = "user_uuid";
 
 //sqlite
 pub const NOTES_DB: &str = "note.sqlite";
-pub const LOCAL_USERS_DB: &str = "smartnote/users/local_login_db.sqlite";
+pub const LOCAL_USERS_DB: &str = "llava/users/local_login_db.sqlite";
 
 pub const LOGS_PATH: &str = "logs/app.log";
 

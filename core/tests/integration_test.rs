@@ -1,21 +1,21 @@
 use rusqlite::named_params;
 use rusqlite::*;
-use smartnote_core::{models::note, *};
+use llava_core::{models::note, *};
 use zeroize::{Zeroize, Zeroizing};
 #[test]
 fn program_flow() {
     let _ = clear_tmp();
     let note_name = "test_note".to_string();
     let program_paths =
-        smartnote_core::ProgramFiles::init_in_base().expect("failed creating program pahts");
+        llava_core::ProgramFiles::init_in_base().expect("failed creating program pahts");
 
-    let _logger_worker = smartnote_core::configure_logger(&program_paths.logs_path)
+    let _logger_worker = llava_core::configure_logger(&program_paths.logs_path)
         .expect("failed creating logger guard");
     let mut local_login_db_conn =
-        smartnote_core::connect_or_create_local_login_db(&program_paths.local_login_database_path)
+        llava_core::connect_or_create_local_login_db(&program_paths.local_login_database_path)
             .expect("failed creating local user db");
 
-    smartnote_core::register_user_offline(
+    llava_core::register_user_offline(
         "test".to_string(),
         Zeroizing::from("ZAQ!2wsx".to_string()),
         &program_paths,
@@ -35,7 +35,7 @@ fn program_flow() {
         .unwrap_or(false);
     assert!(user_exists, "User should exist in local DB");
 
-    let mut current_user = smartnote_core::local_log_in(
+    let mut current_user = llava_core::local_log_in(
         "test".to_string(),
         Zeroizing::from("ZAQ!2wsx".to_string()),
         &mut local_login_db_conn,
@@ -45,7 +45,7 @@ fn program_flow() {
 
     state.current_user = std::sync::Mutex::new(Some(current_user));
     let mut note_db_conn =
-        smartnote_core::get_connection(&program_paths).expect("failed creating notes db");
+        llava_core::get_connection(&program_paths).expect("failed creating notes db");
 
     let owner_id = state
         .current_user
@@ -54,7 +54,7 @@ fn program_flow() {
         .ok_or(crate::errors::Error::CurrentUserNotFound)
         .expect("failed to read owner_id");
 
-    smartnote_core::add_note_to_database(
+    llava_core::add_note_to_database(
         &mut note_db_conn,
         &program_paths,
         note_name.clone(),
@@ -84,7 +84,7 @@ fn program_flow() {
         )
         .expect("failed to get id of note");
     let note_id = uuid::Uuid::parse_str(&note_id).expect("failed to parse uuid");
-    smartnote_core::update_md(
+    llava_core::update_md(
         &note_db_conn,
         note_name.clone(),
         note_id,
@@ -109,10 +109,10 @@ fn program_flow() {
     assert_eq!(title, "integration test");
     assert!(!summary.is_empty());
 
-    let note_content = smartnote_core::read_note_content(&program_paths, note_name.clone())
+    let note_content = llava_core::read_note_content(&program_paths, note_name.clone())
         .expect("failed to read content from file");
 
-    smartnote_core::delete_note(
+    llava_core::delete_note(
         &mut note_db_conn,
         note_name.clone(),
         note_id,
@@ -143,7 +143,7 @@ fn program_flow() {
 }
 
 fn clear_tmp() -> Result<(), std::io::Error> {
-    let path = std::env::temp_dir().join("smartnote_test");
+    let path = std::env::temp_dir().join("llava_test");
     std::fs::remove_dir_all(path)?;
     Ok(())
 }
