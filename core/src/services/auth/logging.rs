@@ -1,6 +1,9 @@
 use std::str::FromStr;
 
-use crate::utils::{Format, log_helper};
+use crate::{
+    // AppState,
+    utils::{Format, log_helper},
+};
 use anyhow::Context;
 use argon2::{
     Argon2, PasswordHash, PasswordVerifier,
@@ -108,4 +111,7 @@ fn login_test() {
             .unwrap();
     local_log_in(username, password, &conn).unwrap();
 }
-//TODO add one test which tests everything
+
+// pub fn after_login_register(state: &AppState) -> Result<(), crate::errors::Error> {
+//     Ok(()) 
+// }

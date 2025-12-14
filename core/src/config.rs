@@ -26,7 +26,7 @@ pub struct ProgramFiles {
     pub device_id_path: PathBuf,
     pub active_user_path: PathBuf,
 }
-
+#[derive(Default, Debug)]
 pub struct AppState {
     pub device_id: uuid::Uuid,
     pub current_user: Mutex<Option<uuid::Uuid>>,
@@ -40,7 +40,7 @@ impl AppState {
         Ok(AppState {
             device_id: get_device_id()?,
             current_user: Mutex::new(None),
-            connection: Mutex::new(None),
+            connection: Mutex::new(None),//now for current user db add then for current note  db
             username: Mutex::new(None),
             paths: Mutex::new(None), //login will return current user
         })
@@ -55,7 +55,7 @@ pub struct ConfigData {
     pub data_dir: PathBuf,
 }
 
-///determining fallback and creating paths and ProgramFiles struct
+///creating paths and ProgramFiles struct
 impl ProgramFiles {
     pub fn init() -> Result<ProgramFiles, crate::errors::Error> {
         let program_home_path = data_local_dir()
@@ -84,10 +84,7 @@ impl ProgramFiles {
             }
         };
 
-        let program_paths = get_paths(
-            program_home_path.clone(),
-            user_uuid, //tu zmiana
-        )?; //function users uuid also, its to add
+        let program_paths = get_paths(program_home_path.clone(), user_uuid)?;
         write_config(&program_paths)?;
         Ok(program_paths)
     }
@@ -121,7 +118,7 @@ fn get_paths(
     program_home_path: PathBuf,
     user_uuid: uuid::Uuid,
 ) -> Result<ProgramFiles, crate::errors::Error> {
-    let app_string = format!("{}/{}/", USER_DIR_PATTERN, user_uuid); //in the future add uuid got from login
+    let app_string = format!("{}/{}/", USER_DIR_PATTERN, user_uuid);
     let mut user_home_path = program_home_path.clone();
     user_home_path.push(app_string);
     std::fs::create_dir_all(&user_home_path)?;
@@ -175,7 +172,7 @@ fn write_config(program_paths: &ProgramFiles) -> Result<(), crate::errors::Error
         .context("couldnt parse config content into json")?; //pretty
     crate::services::logger::log_success("serialized config content");
 
-    fs::write(&program_paths.config_path, &content).inspect_err(|err| {
+    fs::write(&program_paths.config_path, &content).inspect_err(|_err| {
         tracing::error!(
             task = "writing config to json",
             status = "error",
@@ -238,7 +235,7 @@ pub fn change_active_user(
     Ok(())
 }
 
-fn read_current_user(path: &PathBuf) -> Result<uuid::Uuid, crate::errors::Error> {
+pub fn read_current_user(path: &PathBuf) -> Result<uuid::Uuid, crate::errors::Error> {
     let file_content = std::fs::read_to_string(&path)?;
     let contents_json: serde_json::Value =
         serde_json::from_str(&file_content).context("failed to parse active_user.json file")?;

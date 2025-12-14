@@ -16,6 +16,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+llava_core = { path = "../../core" } 
+tracing = "0.1.43"
+tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
@@ -25,6 +28,9 @@ serde_json = "1"
 llava_core = { path = "../../core" }
 uuid = { version = "1", features = ["v4", "serde"] }
 zeroize = "1"
-
+tracing = "0.1.43"
 
 tauri-plugin-devtools = "2.0.0-rc"
+anyhow = "1.0.100"
+rusqlite = "0.37.0"
+

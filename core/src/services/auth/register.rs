@@ -20,13 +20,15 @@ use crate::config::ProgramFiles;
 pub fn register_user_offline(
     username: String,
     password: zeroize::Zeroizing<String>,
+    password_repeated: zeroize::Zeroizing<String>,
     paths: &crate::config::ProgramFiles,
     conn: &mut Connection,
 ) -> Result<(), crate::errors::Error> {
     let username = username.trim().to_string();
     validate_username(&username, &conn)?;
     let password = password.as_str().trim();
-    password_validation(password)?;
+    let password_repeated = password_repeated.as_str().trim();
+    password_validation(password, password_repeated)?;
     let notes_key: chacha20poly1305::Key = ChaCha20Poly1305::generate_key(&mut OsRng);
     let (password_hash, salt, encrypted_notes_key, nonce_for_key_wrap) =
         generate_enctypted_keys(password, notes_key)?;
@@ -126,7 +128,7 @@ fn generate_enctypted_keys(
 }
 
 ///this function validates password on backend side
-fn password_validation(password: &str) -> Result<(), crate::errors::Error> {
+fn password_validation(password: &str, password_repeated: &str) -> Result<(), crate::errors::Error> {
     if password.len() < MINIMAL_PASSWORD_LENGTH
         || !password.chars().any(|c| c.is_ascii_punctuation())
         || !password.chars().any(|c| c.is_ascii_uppercase())
@@ -138,6 +140,9 @@ fn password_validation(password: &str) -> Result<(), crate::errors::Error> {
             "password didnt pass validation"
         );
 
+        return Err(crate::errors::Error::PasswordValidation);
+    }
+    if password != password_repeated{
         return Err(crate::errors::Error::PasswordValidation);
     }
     log_helper(
