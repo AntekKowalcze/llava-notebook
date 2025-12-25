@@ -4,7 +4,7 @@ Trzy opcje:
 
     Zaloguj się do konta lokalnego (prywatne konto na urządzeniu)
 
-    Nowy użytkownik? Utwórz konto (link na dole)
+        Nowy użytkownik? Utwórz konto (link na dole)
 
 Ścieżka 1: Logowanie do konta online
 
@@ -61,6 +61,46 @@ Krok 3: Tworzenie konta online (jeśli wybrał TAK)
     Synchronizacja uruchomiona
 
 
+//TODO dodać odzyskiwanie hasła offline, jeden z podanych przy logowaniu kodów
+
+Jeśli pierwsze uruchomienie wariant: 
+Utwórz konto lokalnie -> czy chcesz podłączyć konto online? tak -> rejestracja/logowanie online -> email -> zalogowano 
+                                                            nie -> pokaż kody -> zalogowano
+
+Nie pierwsze uruchomienie -> Zaloguj konto lokalne -> masz konto online? tak- logowanie online
+                                                                         nie - zalogowano
+
+
+
+Jeśli nie pierwsze uruchomienie LOGOWANIE ONLINE, LOGOWANIE OFFLINE, utwórz konto ONLINE
+
+
+
+REJESTRACJA OFFLINE 
+NAZWA
+HASŁO
+HASŁO POWTÓRZONE 
+-> POKAŻ KODY DO ODZYSKANIA HASŁA
+
+
+REJESTRACJA OFFLNIE
+REJESTRACJA OFFLINE +
+EMAIL
+HASŁO
+POWTÓRZONE HASŁO (konto offline coś ala grupowe)
+EMAIL WERYFIKACYJNY 
+KLIK -> KONTO UTWORZONE I POŁĄCZONE Z LOKALNYM + URUCHAMIAMY SYNC
+
+
+
+LOGOWANIE OFFLINE:
+nazwa uzytkownika 
+hasło
+
+
+LOGOWANIE ONLINE:
+email
+hasło do konta online
 
 
 

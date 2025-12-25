@@ -1,6 +1,6 @@
+use llava_core::{models::note, *};
 use rusqlite::named_params;
 use rusqlite::*;
-use llava_core::{models::note, *};
 use zeroize::{Zeroize, Zeroizing};
 #[test]
 fn program_flow() {
@@ -18,7 +18,7 @@ fn program_flow() {
     llava_core::register_user_offline(
         "test".to_string(),
         Zeroizing::from("ZAQ!2wsx".to_string()),
-         Zeroizing::from("ZAQ!2wsx".to_string()),
+        Zeroizing::from("ZAQ!2wsx".to_string()),
         &program_paths,
         &mut local_login_db_conn,
     )

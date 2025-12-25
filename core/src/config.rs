@@ -1,11 +1,12 @@
 //! This module is responsible for configuring paths for applications do it by calling ProgramFiles::init()
-use crate::constants::*;
 use crate::utils::{Format, log_helper};
+use crate::{constants::*, errors};
 use anyhow::Context;
 use dirs_next::data_local_dir;
 use rusqlite::{Connection, named_params};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::ops::Deref;
+use std::path::{self, Path};
 use std::{
     fs::{self, create_dir_all},
     path::PathBuf,
@@ -28,9 +29,11 @@ pub struct ProgramFiles {
 }
 #[derive(Default, Debug)]
 pub struct AppState {
-    pub device_id: uuid::Uuid,
+    pub device_id: Mutex<Option<uuid::Uuid>>,
     pub current_user: Mutex<Option<uuid::Uuid>>,
-    pub connection: Mutex<Option<Connection>>,
+    pub users_db: Mutex<Option<Connection>>,
+    pub notes_db: Mutex<Option<Connection>>,
+
     pub username: Mutex<Option<String>>,
     pub paths: Mutex<Option<ProgramFiles>>,
 }
@@ -38,23 +41,22 @@ pub struct AppState {
 impl AppState {
     pub fn init() -> Result<AppState, crate::errors::Error> {
         Ok(AppState {
-            device_id: get_device_id()?,
+            device_id: Mutex::new(None),
             current_user: Mutex::new(None),
-            connection: Mutex::new(None),//now for current user db add then for current note  db
+            users_db: Mutex::new(None), //now for current user db add then for current note  db
+            notes_db: Mutex::new(None),
             username: Mutex::new(None),
             paths: Mutex::new(None), //login will return current user
         })
     }
     //mayby add updating currentuser to change current user, and updating connection go get connection and only get username here, or even in register
 }
-
 #[derive(Serialize, Deserialize)]
 
 /// ConfigData contains states of aplication
 pub struct ConfigData {
     pub data_dir: PathBuf,
 }
-
 ///creating paths and ProgramFiles struct
 impl ProgramFiles {
     pub fn init() -> Result<ProgramFiles, crate::errors::Error> {
@@ -112,7 +114,6 @@ impl ProgramFiles {
         Ok(program_paths)
     }
 }
-
 ///function which creates paths and create them in sense of getting current user
 fn get_paths(
     program_home_path: PathBuf,
@@ -124,7 +125,6 @@ fn get_paths(
     std::fs::create_dir_all(&user_home_path)?;
 
     for path in SUBDIRS {
-        //TODO check if keys should be stored in files
         let path_to_create = user_home_path.join(path);
 
         log_helper(
@@ -135,6 +135,7 @@ fn get_paths(
         );
         std::fs::create_dir_all(path_to_create)?;
     }
+
     log_helper(
         "gettign paths",
         "success",
@@ -190,33 +191,63 @@ fn write_config(program_paths: &ProgramFiles) -> Result<(), crate::errors::Error
 }
 
 /// function for getting device id, or creating new if not exists
-pub fn get_device_id() -> Result<uuid::Uuid, crate::errors::Error> {
-    let home_path = data_local_dir().ok_or(crate::errors::Error::FatalError)?;
-    let mut device_id_path = home_path.join("llava");
-    create_dir_all(&device_id_path)?;
-    device_id_path = home_path.join("llava/device_id.json");
-
+pub fn get_device_id(
+    local_conn: &Connection,
+    device_id_path: &PathBuf,
+) -> Result<uuid::Uuid, crate::errors::Error> {
+    // conn for local use db
+    if let Some(parent) = device_id_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
     if device_id_path.exists() {
-        let file_content = std::fs::read_to_string(&device_id_path)?;
-        let parsed_file: serde_json::Value = serde_json::from_str(&file_content)
-            .context("couldnt parse device id file content with serde")?;
-        let device_id = uuid::Uuid::parse_str(
-            parsed_file[DEVICE_ID_JSON_KEY]
-                .as_str()
-                .ok_or(crate::errors::Error::DeviceIdErorr)
-                .context("device id not found in device id file")?,
-        )
-        .context("couldnt get device id from device id file ")?;
-        Ok(device_id)
+        let has_error: Result<uuid::Uuid, crate::errors::Error> = {
+            let file_content = std::fs::read_to_string(&device_id_path)?;
+            let parsed_file: serde_json::Value = serde_json::from_str(&file_content)
+                .context("couldnt parse device id file content with serde")?;
+
+            let device_id = uuid::Uuid::parse_str(
+                parsed_file[DEVICE_ID_JSON_KEY]
+                    .as_str()
+                    .ok_or(crate::errors::Error::DeviceIdErorr)
+                    .context("device id not found in device id file")?,
+            )
+            .context("failed to parse uuid")?;
+            Ok(device_id)
+        };
+        match has_error {
+            //if exists and couldnt read it just find it in db and write again if failes we have problems
+            Ok(device_id_ok) => Ok(device_id_ok),
+            Err(err) => {
+                let db_id: Result<String, rusqlite::Error> =
+                    local_conn.query_row("SELECT device_id FROM users_data LIMIT 1", (), |row| {
+                        row.get(0)
+                    });
+                if let Ok(id) = db_id {
+                    let dev_uuid = uuid::Uuid::parse_str(&id).context("failed to parse uuid")?;
+                    let json_data = serde_json::json!({
+                        (DEVICE_ID_JSON_KEY): dev_uuid
+                    });
+
+                    // Convert the OBJECT to string, not the bare UUID
+                    let file_content = serde_json::to_string_pretty(&json_data)
+                        .context("couldnt serialize device id json")?;
+
+                    std::fs::write(&device_id_path, file_content)
+                        .context("couldnt write device id content")?;
+                    Ok(dev_uuid)
+                } else {
+                    return Err(crate::errors::Error::FatalError);
+                }
+            }
+        }
     } else {
         let device_id = uuid::Uuid::new_v4();
-
         let file_content = serde_json::json!({
                 DEVICE_ID_JSON_KEY: device_id,
         });
         let file_content = serde_json::to_string_pretty(&file_content)
             .context("couldnt parse device uuid to json ")?;
-        std::fs::write(&device_id_path, file_content)?;
+        std::fs::write(&device_id_path, file_content).context("couldnt write device id content")?;
         Ok(device_id)
     }
 }
@@ -271,7 +302,8 @@ fn test_changing_user() {
 #[test]
 fn test_creating_device_id() {
     let paths = ProgramFiles::init_in_base().unwrap();
-
-    let device_id = get_device_id().unwrap();
+    let local_conn =
+        crate::services::auth::database_creation::connect_or_create_local_login_db(path).unwrap();
+    let device_id = get_device_id(&local_conn, &paths.device_id_path).unwrap();
     println!("{}", device_id);
 }

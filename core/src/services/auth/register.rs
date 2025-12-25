@@ -41,7 +41,7 @@ pub fn register_user_offline(
         nonce_notes_key: nonce_for_key_wrap,
         is_online_linked: false,
         online_account_email: None,
-        device_id: crate::config::get_device_id()?,
+        device_id: crate::config::get_device_id(&conn, &paths.device_id_path)?,
         created_at: crate::utils::get_time(),
         last_login: crate::utils::get_time(),
     };
@@ -128,7 +128,10 @@ fn generate_enctypted_keys(
 }
 
 ///this function validates password on backend side
-fn password_validation(password: &str, password_repeated: &str) -> Result<(), crate::errors::Error> {
+fn password_validation(
+    password: &str,
+    password_repeated: &str,
+) -> Result<(), crate::errors::Error> {
     if password.len() < MINIMAL_PASSWORD_LENGTH
         || !password.chars().any(|c| c.is_ascii_punctuation())
         || !password.chars().any(|c| c.is_ascii_uppercase())
@@ -142,7 +145,7 @@ fn password_validation(password: &str, password_repeated: &str) -> Result<(), cr
 
         return Err(crate::errors::Error::PasswordValidation);
     }
-    if password != password_repeated{
+    if password != password_repeated {
         return Err(crate::errors::Error::PasswordValidation);
     }
     log_helper(
@@ -184,7 +187,8 @@ fn validate_username(username: &str, conn: &Connection) -> Result<(), crate::err
 #[test]
 fn test_password_validation() {
     let password = "aA#$#$#@";
-    password_validation(password).unwrap();
+    let password_repeated = "aA#$#$#@";
+    password_validation(passwor, password_repeatedd).unwrap();
 }
 
 #[test]
@@ -197,6 +201,7 @@ fn register_test() {
             .unwrap();
     register_user_offline(
         "tescik".to_string(),
+        zeroize::Zeroizing::from("ToJestTest!".to_string()),
         zeroize::Zeroizing::from("ToJestTest!".to_string()),
         &paths,
         &mut conn,

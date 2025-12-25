@@ -10,6 +10,7 @@ pub use models::note::Note;
 pub use services::auth::database_creation::connect_or_create_local_login_db;
 pub use services::auth::logging::local_log_in;
 pub use services::auth::register::register_user_offline;
+pub use services::auth::utils::check_if_first_start;
 pub use services::logger::configure_logger;
 pub use services::storage::db_creation::{SyncState, get_connection};
 pub use services::storage::delete::delete_note;

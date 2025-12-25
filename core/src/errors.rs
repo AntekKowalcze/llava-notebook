@@ -50,10 +50,9 @@ impl Serialize for Error {
     where
         S: serde::Serializer,
     {
-         match self {
+        match self {
             Error::InternalError(_) => serializer.serialize_str("Internal error"),
             _ => serializer.serialize_str(&self.to_string()),
         }
     }
 }
-//TODO dodać usuwanie pliku device id przy jakim kolwiek błędzie, pobieranie go z lokalnej bazy danych aby zapisać ponownie
