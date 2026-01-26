@@ -8,6 +8,7 @@ pub use config::{AppState, ProgramFiles};
 pub use errors::Error;
 pub use models::note::Note;
 pub use services::auth::database_creation::connect_or_create_local_login_db;
+pub use services::auth::logging::change_last_login;
 pub use services::auth::logging::local_log_in;
 pub use services::auth::register::register_user_offline;
 pub use services::auth::utils::check_if_first_start;

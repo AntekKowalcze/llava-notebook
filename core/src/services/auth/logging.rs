@@ -2,6 +2,8 @@ use std::str::FromStr;
 
 use crate::{
     // AppState,
+    ProgramFiles,
+    get_connection,
     utils::{Format, log_helper},
 };
 use anyhow::Context;
@@ -9,14 +11,15 @@ use argon2::{
     Argon2, PasswordHash, PasswordVerifier,
     password_hash::{self, SaltString},
 };
-use rusqlite::{OptionalExtension, named_params};
+use rusqlite::{Connection, OptionalExtension, named_params};
 use zeroize::Zeroize;
 
 pub fn local_log_in(
     username: String,
-    mut password: zeroize::Zeroizing<String>,
-    conn: &rusqlite::Connection,
-) -> Result<uuid::Uuid, crate::errors::Error> {
+    password: zeroize::Zeroizing<String>,
+    conn: &mut rusqlite::Connection,
+    paths: &crate::ProgramFiles,
+) -> Result<(uuid::Uuid, ProgramFiles, Connection), crate::errors::Error> {
     check_if_user_exists(&username, conn)?;
     //get hash and salt from db for this username, then hash given password again and check if hashes are the same if yes log in
     //if no return error wrong password,
@@ -69,7 +72,10 @@ pub fn local_log_in(
         )
         .context("no user with this id")?;
     let user_uuid = uuid::Uuid::parse_str(&user_uuid).context("failed to parse uuid")?;
-    Ok(user_uuid)
+    change_last_login(conn, &user_uuid)?;
+    let paths = crate::services::auth::register::after_validation(&user_uuid, paths)?;
+    let conn = get_connection(&paths)?;
+    Ok((user_uuid, paths, conn))
 }
 
 fn check_if_user_exists(
@@ -101,17 +107,39 @@ fn check_if_user_exists(
     }
 }
 
+pub fn change_last_login(
+    users_db: &mut rusqlite::Connection,
+    current_user_id: &uuid::Uuid,
+) -> Result<(), crate::errors::Error> {
+    let timestamp = crate::utils::get_time();
+    let tx = users_db
+        .transaction()
+        .context("failed to create transaction")?;
+    tx.execute(
+        "UPDATE users_data SET last_login = :time WHERE user_id = :id",
+        named_params! {
+            ":time": timestamp,
+            ":id": current_user_id.to_string(),
+        },
+    )
+    .context("Failed to update users_id")?;
+    tx.commit()
+        .context("failed to commit transaction, rolling back")?;
+    Ok(())
+}
+
 #[test]
 fn login_test() {
     let username = "twelth".to_string();
     let password = zeroize::Zeroizing::from("ToJestTest!".to_string());
     let home_path = std::env::temp_dir();
-    let conn =
+    let mut conn =
         crate::services::auth::database_creation::connect_or_create_local_login_db(&home_path)
             .unwrap();
-    local_log_in(username, password, &conn).unwrap();
+    let paths = ProgramFiles::init_in_base().unwrap();
+    local_log_in(username, password, &mut conn, &paths).unwrap();
 }
 
 // pub fn after_login_register(state: &AppState) -> Result<(), crate::errors::Error> {
-//     Ok(()) 
+//     Ok(())
 // }

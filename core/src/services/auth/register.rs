@@ -1,6 +1,7 @@
 //! Module responsible for registering user
 //! in this modules important data is encrypted, and keys for notes encryption are also created
 use crate::constants::*;
+use crate::services::auth::utils;
 use crate::utils::{Format, log_helper};
 use anyhow::Context;
 use argon2::{
@@ -12,10 +13,13 @@ use chacha20poly1305::{
     aead::{Aead, AeadCore, KeyInit},
 };
 use core::task;
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::{Connection, OptionalExtension, named_params, params};
+use serde_json::to_string;
+use std::path::Path;
+use uuid::Uuid;
 use zeroize::Zeroize;
 
-use crate::config::ProgramFiles;
+use crate::config::{ProgramFiles, change_active_user};
 ///function responsible for registering user offilne and adding it encrypted to local db
 pub fn register_user_offline(
     username: String,
@@ -23,7 +27,7 @@ pub fn register_user_offline(
     password_repeated: zeroize::Zeroizing<String>,
     paths: &crate::config::ProgramFiles,
     conn: &mut Connection,
-) -> Result<(), crate::errors::Error> {
+) -> Result<(uuid::Uuid, ProgramFiles, Connection), crate::errors::Error> {
     let username = username.trim().to_string();
     validate_username(&username, &conn)?;
     let password = password.as_str().trim();
@@ -70,14 +74,17 @@ pub fn register_user_offline(
     tx.commit().context(
         "Couldnt insert user into database, transaction failed while registering a user",
     )?;
-    crate::config::change_active_user(new_user.user_id, &paths)?; //narazie tutaj, moze po logowaniu damy to wszystko do jednej funkcji
+    crate::config::change_active_user(&new_user.user_id, &paths)?; //narazie tutaj, moze po logowaniu damy to wszystko do jednej funkcji
     log_helper(
         "registering",
         "success",
         Some(Format::Display(&new_user.username)),
         "User successfully registered",
     );
-    Ok(())
+    let paths = after_validation(&new_user.user_id, paths)?;
+    let conn = crate::services::storage::db_creation::get_connection(&paths)?;
+
+    Ok((new_user.user_id, paths, conn))
     //TODO add function after login/register which changes paths current user etc.
 }
 
@@ -182,6 +189,39 @@ fn validate_username(username: &str, conn: &Connection) -> Result<(), crate::err
 
         return Ok(());
     }
+}
+
+pub fn after_validation(
+    user_uuid: &uuid::Uuid,
+    paths: &crate::config::ProgramFiles,
+) -> Result<ProgramFiles, crate::errors::Error> {
+    change_active_user(&user_uuid, paths)?;
+    let paths = crate::config::get_paths(paths.app_home.clone(), user_uuid)?;
+    println!(
+        "{:?}",
+        paths
+            .app_home
+            .join("/llava/users/00000000-0000-0000-0000-000000000000")
+    );
+    if paths
+        .app_home
+        .join("/llava/users/00000000-0000-0000-0000-000000000000")
+        .exists()
+    {
+        std::fs::remove_dir_all(
+            paths
+                .app_home
+                .join("/llava/users/00000000-0000-0000-0000-000000000000"),
+        )
+        .context("failed while deleting nil uuid starting folder")?;
+        log_helper(
+            "after login",
+            "success",
+            None::<Format<String>>,
+            "Successfully deltetd nic folder",
+        );
+    }
+    Ok(paths)
 }
 
 #[test]

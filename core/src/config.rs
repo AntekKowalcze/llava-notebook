@@ -5,8 +5,9 @@ use anyhow::Context;
 use dirs_next::data_local_dir;
 use rusqlite::{Connection, named_params};
 use serde::{Deserialize, Serialize};
-use std::ops::Deref;
+
 use std::path::{self, Path};
+use std::str::FromStr;
 use std::{
     fs::{self, create_dir_all},
     path::PathBuf,
@@ -26,6 +27,7 @@ pub struct ProgramFiles {
     pub local_login_database_path: PathBuf,
     pub device_id_path: PathBuf,
     pub active_user_path: PathBuf,
+    pub app_home: PathBuf,
 }
 #[derive(Default, Debug)]
 pub struct AppState {
@@ -81,12 +83,11 @@ impl ProgramFiles {
                     ?err,
                     "Cannot get user uuid, possibly first run"
                 );
-
-                uuid::Uuid::new_v4()
+                uuid::Uuid::nil()
             }
         };
 
-        let program_paths = get_paths(program_home_path.clone(), user_uuid)?;
+        let program_paths = get_paths(program_home_path.clone(), &user_uuid)?;
         write_config(&program_paths)?;
         Ok(program_paths)
     }
@@ -105,19 +106,19 @@ impl ProgramFiles {
                     "Cannot get user uuid, possibly first run"
                 );
 
-                uuid::Uuid::new_v4()
+                uuid::Uuid::nil()
             }
         };
 
-        let program_paths = get_paths(program_home_path.clone(), user_uuid)?; //function users uuid also, its to add
+        let program_paths = get_paths(program_home_path.clone(), &user_uuid)?; //function users uuid also, its to add
         write_config(&program_paths)?;
         Ok(program_paths)
     }
 }
 ///function which creates paths and create them in sense of getting current user
-fn get_paths(
+pub fn get_paths(
     program_home_path: PathBuf,
-    user_uuid: uuid::Uuid,
+    user_uuid: &uuid::Uuid,
 ) -> Result<ProgramFiles, crate::errors::Error> {
     let app_string = format!("{}/{}/", USER_DIR_PATTERN, user_uuid);
     let mut user_home_path = program_home_path.clone();
@@ -155,6 +156,7 @@ fn get_paths(
         local_login_database_path: program_home_path.join(LOCAL_USERS_DB),
         device_id_path: program_home_path.join(DEVICE_ID_FILE),
         active_user_path: program_home_path.join(ACTIVE_USER_JSON_PATH),
+        app_home: program_home_path.clone(),
     })
 }
 
@@ -253,11 +255,11 @@ pub fn get_device_id(
 }
 /// function to change or set actie user after registering/login/changing account
 pub fn change_active_user(
-    user_uuid: uuid::Uuid,
+    user_uuid: &uuid::Uuid,
     paths: &ProgramFiles,
 ) -> Result<(), crate::errors::Error> {
     let data = serde_json::json!({
-        ACTIVE_USER_JSON_KEY: user_uuid
+        ACTIVE_USER_JSON_KEY: &user_uuid
     });
     let file_content = serde_json::to_string_pretty(&data)
         .context("failed to parse user uuid to json when changin active user")?;
@@ -296,7 +298,7 @@ fn init_test() {
 
 fn test_changing_user() {
     let paths = ProgramFiles::init_in_base().unwrap();
-    change_active_user(uuid::Uuid::new_v4(), &paths).unwrap();
+    change_active_user(&uuid::Uuid::new_v4(), &paths).unwrap();
 }
 
 #[test]
