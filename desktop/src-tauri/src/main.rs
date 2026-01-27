@@ -56,11 +56,10 @@ pub fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::commands::register_command,     //register locally
-            commands::commands::login_command,        //login locally
-            commands::commands::check_if_user_exists, //auth store checking
+            commands::commands::register_command, //register locally
+            commands::commands::login_command,    //login locally
+            commands::commands::check_if_user_exists,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
-//TODO delete temp user folder a`fter first run

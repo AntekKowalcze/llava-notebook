@@ -106,7 +106,6 @@ fn check_if_user_exists(
         return Err(crate::errors::Error::UserNotExists);
     }
 }
-
 pub fn change_last_login(
     users_db: &mut rusqlite::Connection,
     current_user_id: &uuid::Uuid,
@@ -127,7 +126,6 @@ pub fn change_last_login(
         .context("failed to commit transaction, rolling back")?;
     Ok(())
 }
-
 #[test]
 fn login_test() {
     let username = "twelth".to_string();

@@ -85,7 +85,6 @@ pub fn register_user_offline(
     let conn = crate::services::storage::db_creation::get_connection(&paths)?;
 
     Ok((new_user.user_id, paths, conn))
-    //TODO add function after login/register which changes paths current user etc.
 }
 
 ///this function generates encrypted keys
@@ -197,21 +196,16 @@ pub fn after_validation(
 ) -> Result<ProgramFiles, crate::errors::Error> {
     change_active_user(&user_uuid, paths)?;
     let paths = crate::config::get_paths(paths.app_home.clone(), user_uuid)?;
-    println!(
-        "{:?}",
-        paths
-            .app_home
-            .join("/llava/users/00000000-0000-0000-0000-000000000000")
-    );
-    if paths
+
+    let tmp_nil_path = paths
         .app_home
-        .join("/llava/users/00000000-0000-0000-0000-000000000000")
-        .exists()
-    {
+        .join("llava/users/00000000-0000-0000-0000-000000000000");
+    println!("{:?}", tmp_nil_path);
+    if tmp_nil_path.exists() {
         std::fs::remove_dir_all(
             paths
                 .app_home
-                .join("/llava/users/00000000-0000-0000-0000-000000000000"),
+                .join("llava/users/00000000-0000-0000-0000-000000000000"),
         )
         .context("failed while deleting nil uuid starting folder")?;
         log_helper(
