@@ -21,7 +21,6 @@ where
 {
     eprintln!("❌ {:?}, {}", error, log_content)
 }
-//TODO dodać opóźnienie po iluś źle wpisanych hasłach
 
 pub fn configure_logger(
     path_to_log_file: &PathBuf,

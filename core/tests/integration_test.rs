@@ -36,10 +36,11 @@ fn program_flow() {
         .unwrap_or(false);
     assert!(user_exists, "User should exist in local DB");
 
-    let mut current_user = llava_core::local_log_in(
+    let (mut current_user, some, some_two) = llava_core::local_log_in(
         "test".to_string(),
         Zeroizing::from("ZAQ!2wsx".to_string()),
         &mut local_login_db_conn,
+        &program_paths,
     )
     .expect("failed to get current user");
     let mut state = AppState::init().expect("failed creating app state");

@@ -1,33 +1,27 @@
 use std::str::FromStr;
 
-use crate::{
-    // AppState,
-    ProgramFiles,
-    get_connection,
-    utils::{Format, log_helper},
-};
 use anyhow::Context;
 use argon2::{
     Argon2, PasswordHash, PasswordVerifier,
     password_hash::{self, SaltString},
 };
 use rusqlite::{Connection, OptionalExtension, named_params};
+use serde::de;
+use uuid::timestamp;
 use zeroize::Zeroize;
+
+use crate::{errors, utils};
 
 pub fn local_log_in(
     username: String,
     password: zeroize::Zeroizing<String>,
     conn: &mut rusqlite::Connection,
-    paths: &crate::ProgramFiles,
-) -> Result<(uuid::Uuid, ProgramFiles, Connection), crate::errors::Error> {
+    paths: &crate::config::ProgramFiles,
+) -> Result<(uuid::Uuid, crate::config::ProgramFiles, Connection), crate::errors::Error> {
     check_if_user_exists(&username, conn)?;
-    //get hash and salt from db for this username, then hash given password again and check if hashes are the same if yes log in
-    //if no return error wrong password,
-    //there will be function to do thing after login, change active user, get paths, load notes,
-
     let hash = conn
         .query_row(
-            "SELECT password_hash, password_salt FROM users_data WHERE username = :username",
+            "SELECT password_hash FROM users_data WHERE username = :username",
             rusqlite::params![username],
             |row| {
                 let hash: String = row.get(0)?;
@@ -35,17 +29,17 @@ pub fn local_log_in(
                 Ok(hash)
             },
         )
-        .context("Couldnt get password_hash, password_salt FROM users_data db ")?;
+        .context("Couldnt get password_hash FROM users_data db ")?;
 
     let password_hash = PasswordHash::new(&hash)
         .context("Couldnt create a password hash from password given by user in login")?;
     let password_verified = Argon2::default()
         .verify_password(&password.as_bytes(), &password_hash)
         .is_ok();
-    log_helper(
+    crate::utils::log_helper(
         "logging",
         "success",
-        Some(Format::Display(&username)),
+        Some(crate::utils::Format::Display(&username)),
         "password verified succesfully",
     );
 
@@ -56,10 +50,10 @@ pub fn local_log_in(
         return Err(crate::errors::Error::WrongPassword);
     }
     //after logging add resetting password for local account, and then start online accounts,
-    log_helper(
+    crate::utils::log_helper(
         "logging",
         "success",
-        Some(Format::Display(&username)),
+        Some(crate::utils::Format::Display(&username)),
         "user logged in succesfully",
     );
     let user_uuid: String = conn
@@ -74,8 +68,57 @@ pub fn local_log_in(
     let user_uuid = uuid::Uuid::parse_str(&user_uuid).context("failed to parse uuid")?;
     change_last_login(conn, &user_uuid)?;
     let paths = crate::services::auth::register::after_validation(&user_uuid, paths)?;
-    let conn = get_connection(&paths)?;
+    let conn = crate::services::storage::db_creation::get_connection(&paths)?;
     Ok((user_uuid, paths, conn))
+}
+
+pub fn log_with_code(
+    mut code: String,
+    users_db: &rusqlite::Connection,
+    user_id: uuid::Uuid,
+) -> Result<(), crate::errors::Error> {
+    //REMOVE dashes on frontend before sending code
+    let mut found = 0;
+    let mut stmt = users_db
+        .prepare("SELECT code_hash FROM recovery_keys WHERE user_id = :id AND used_at IS NULL")
+        .context("failed to prepare statement")?;
+    let mut handle = stmt
+        .query(named_params! {
+            ":id":user_id.to_string()
+        })
+        .context("failed to get handle to codes")?;
+
+    if let Some(mut decoded) = base32::decode(base32::Alphabet::Crockford, &code) {
+        let argon2 = Argon2::default();
+        while let Ok(Some(row)) = handle.next() {
+            let mut hash: String = row.get(0).context("failed to get hash")?;
+            let phc = PasswordHash::new(&hash).context("failed to parse hash from db to phc")?;
+            if argon2.verify_password(&decoded, &phc).is_ok() {
+                found += 1;
+                users_db
+                    .execute(
+                        "UPDATE recovery_keys SET used_at = :time WHERE code_hash = :h",
+                        named_params! {
+                            ":time": utils::get_time(),
+                            ":h": hash
+                        },
+                    )
+                    .context("Failed to mark code as used")?;
+            }
+            hash.zeroize();
+
+            if found > 0 {
+                return Ok(());
+            }
+        }
+        decoded.zeroize();
+        code.zeroize();
+    } else {
+        return Err(errors::Error::InternalError(
+            "Failed to decode code".to_string(),
+        ));
+    }
+    Err(crate::errors::Error::WrongPassword)
 }
 
 fn check_if_user_exists(
@@ -93,10 +136,10 @@ fn check_if_user_exists(
         .is_some();
     if exists {
         crate::services::logger::log_success("username exists, all correct");
-        log_helper(
+        crate::utils::log_helper(
             "logging",
             "success",
-            Some(Format::Display(&username)),
+            Some(crate::utils::Format::Display(&username)),
             "user exists, can log in",
         );
 
@@ -106,6 +149,7 @@ fn check_if_user_exists(
         return Err(crate::errors::Error::UserNotExists);
     }
 }
+
 pub fn change_last_login(
     users_db: &mut rusqlite::Connection,
     current_user_id: &uuid::Uuid,
@@ -126,6 +170,78 @@ pub fn change_last_login(
         .context("failed to commit transaction, rolling back")?;
     Ok(())
 }
+
+pub fn check_error_count(
+    conn: &mut Connection,
+    user_uuid: &uuid::Uuid,
+) -> Result<i64, crate::errors::Error> {
+    let mut end_of_timeout: i64 = 0;
+    let tx = conn
+        .transaction()
+        .context("failed to create transaction in checking errors")?;
+
+    let statement: i64 = tx
+        .query_row(
+            "SELECT password_errors FROM users_data WHERE user_id = :user_id",
+            named_params!(
+                ":user_id": user_uuid.to_string(),
+            ),
+            |row| row.get(0),
+        )
+        .context("failed to get statement")?;
+    println!("{} error count", statement);
+    tx.execute(
+        "UPDATE users_data SET password_errors = :new_count WHERE user_id = :id",
+        rusqlite::named_params! {
+
+            ":new_count":statement+1,
+            ":id": user_uuid.to_string(),
+        },
+    )
+    .context("failed to increment error count in usersdb")?;
+
+    if (statement + 1) % 5 == 0 {
+        let multiplier = (statement + 1) / 5;
+        end_of_timeout = 30 * multiplier * 1000; //miliseconds
+        end_of_timeout = crate::utils::get_time() + end_of_timeout;
+        tx.execute(
+            "UPDATE users_data SET ending_block_timestamp = :end WHERE user_id = :id",
+            rusqlite::named_params! {
+                ":end": end_of_timeout,
+                ":id": user_uuid.to_string()
+            },
+        )
+        .context("failed to set ending block timestamp in users data")?;
+    }
+
+    tx.commit()
+        .context("failed to commit transaciton in checking erros")?;
+    Ok(end_of_timeout)
+}
+
+pub fn zero_error_count(conn: &Connection, uuid: &uuid::Uuid) -> Result<(), crate::errors::Error> {
+    conn.execute(
+        "UPDATE users_data SET password_errors = 0 WHERE user_id = :id",
+        named_params! {
+            ":id": uuid.to_string(),
+        },
+    )
+    .inspect_err(|err| println!("{}", err))
+    .context("Failed to set error count to 0")?;
+    Ok(())
+}
+pub fn get_timeout(conn: &Connection, uuid: &uuid::Uuid) -> Result<i64, crate::errors::Error> {
+    let timeout = conn
+        .query_row(
+            "SELECT ending_block_timestamp FROM users_data WHERE user_id = :id",
+            named_params! {
+                ":id": uuid.to_string(),
+            },
+            |row| row.get(0),
+        )
+        .context("Failed to get timeout")?;
+    Ok(timeout)
+}
 #[test]
 fn login_test() {
     let username = "twelth".to_string();
@@ -134,10 +250,6 @@ fn login_test() {
     let mut conn =
         crate::services::auth::database_creation::connect_or_create_local_login_db(&home_path)
             .unwrap();
-    let paths = ProgramFiles::init_in_base().unwrap();
+    let paths = crate::config::ProgramFiles::init_in_base().unwrap();
     local_log_in(username, password, &mut conn, &paths).unwrap();
 }
-
-// pub fn after_login_register(state: &AppState) -> Result<(), crate::errors::Error> {
-//     Ok(())
-// }

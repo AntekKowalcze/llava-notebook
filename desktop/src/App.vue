@@ -121,7 +121,7 @@
 
 </script>
 <template>
-    <div style=" height: 100vh; width: 100vw" class="flex  flex-col items-center">
+  <div class="min-h-screen w-full bg-note-graphite bg-cover bg-center flex flex-col items-center">
     <router-view />
   </div>
 </template>

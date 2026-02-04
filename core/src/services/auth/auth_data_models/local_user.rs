@@ -7,7 +7,6 @@ pub struct LocalUser {
     pub user_id: uuid::Uuid,
     pub username: String,
     pub password_hash: String, //hashed
-    pub password_salt: String,
     pub notes_key: Vec<u8>,
     pub nonce_notes_key: Vec<u8>,
     pub is_online_linked: bool,
@@ -16,6 +15,8 @@ pub struct LocalUser {
     pub device_id: uuid::Uuid,
     pub created_at: i64,
     pub last_login: i64,
+    pub password_errors: i64,
+    pub ending_block_timestamp: i64,
 }
 
 //now sqlite LOCAL db

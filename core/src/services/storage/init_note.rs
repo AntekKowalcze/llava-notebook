@@ -68,7 +68,7 @@ fn init_note(
                 "couldnt init a note"
             );
             //dodać obsługe, poprostu nie moge utworzyć pliku, popup z tym komunikatem żeby zmienić uprawnienia i wróć do działania programu
-            Err(crate::errors::Error::FileOperationError(err))
+            Err(crate::errors::Error::FileOperationError(err.to_string()))
         }
     }
 }
@@ -149,7 +149,7 @@ pub fn add_note_to_database(
                 ?err,
                 "error while inserting note to db, deleting orphaned file",
             );
-            Err(crate::errors::Error::InternalError(err.into()))
+            Err(crate::errors::Error::InternalError(err.to_string()))
         }
     }
 }
@@ -166,7 +166,7 @@ fn validate_note_name(
             status = "error",
             "note name too long",
         );
-        return Err(crate::errors::Error::NoteNameToLong);
+        return Err(crate::errors::Error::NoteNameTooLong);
     }
     let exists = conn
         .query_row(

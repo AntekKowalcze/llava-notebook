@@ -14,6 +14,7 @@ pub fn main() {
         if path.exists() {
             std::fs::remove_dir_all(path).expect("PROBABLY LLAVA_TEST IS NOT EXISTING JUST CREATE IT SO IT COULD BE DELETED WITH NO ERROR");
         }
+        // IF YOU NEED RESTART UNCOMMENT THIS LINE
         let p = llava_core::ProgramFiles::init_in_base().expect("failed creating program pahts");
         p
     };
@@ -59,6 +60,8 @@ pub fn main() {
             commands::commands::register_command, //register locally
             commands::commands::login_command,    //login locally
             commands::commands::check_if_user_exists,
+            commands::commands::check_timeout_before_submit,
+            commands::commands::generate_recovery_keys,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -28,6 +28,9 @@ pub fn connect_or_create_local_login_db(
     local_login_conn
         .pragma_update(None, "journal_mode", &"WAL")
         .context("Pragma error while creating local users db, journal_mode")?;
+    local_login_conn
+        .pragma_update(None, "foreign_keys", "ON")
+        .context("Failed to update pragma for enabling fks")?;
     let tx = local_login_conn
         .transaction()
         .context("Couldnt create local login database, couldnt create transaction")?;

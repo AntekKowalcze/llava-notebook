@@ -27,7 +27,8 @@ const routes = [
     { path: '/chooseRegisterForm', name: 'choose', component: () => import('../views/RegisterAskPage.vue') },
     { path: '/register', name: 'register', component: () => import('../views/RegisterPage.vue') },
     { path: '/login', name: "login", component: () => import('../views/LoginPage.vue') },
-    { path: '/loading', name: "loading", component: () => import('../views/LoadingPage.vue') }
+    { path: '/loading', name: "loading", component: () => import('../views/LoadingPage.vue') },
+    { path: '/recoveryCodes', name: 'recoveryCodes', component: () => import('../views/RecoveryCodesPage.vue') }
 ]
 
 export const router = createRouter({
@@ -38,9 +39,4 @@ export const router = createRouter({
     }
 })
 //TODO add router guard so you cant move between login and not login sites
-//TODO opóźnienie po iluś próbach, kody odzyskania hasła po rejestracji
 //TODO potem dashboard 
-// RZECZY PO LOGOWANIU REJESTEACJI -> change current user, change paths, 
-// and then delete this temporary users dir, create user folder in users folder with subdirs
-
-// change active  user -> get paths -> update paths in state => check if folders align with user names if not delete folders where there is no user aligned

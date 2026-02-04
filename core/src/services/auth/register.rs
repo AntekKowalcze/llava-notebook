@@ -4,6 +4,7 @@ use crate::constants::*;
 use crate::services::auth::utils;
 use crate::utils::{Format, log_helper};
 use anyhow::Context;
+use argon2::password_hash::rand_core::RngCore;
 use argon2::{
     Argon2,
     password_hash::{PasswordHasher, SaltString, rand_core::OsRng},
@@ -34,13 +35,12 @@ pub fn register_user_offline(
     let password_repeated = password_repeated.as_str().trim();
     password_validation(password, password_repeated)?;
     let notes_key: chacha20poly1305::Key = ChaCha20Poly1305::generate_key(&mut OsRng);
-    let (password_hash, salt, encrypted_notes_key, nonce_for_key_wrap) =
+    let (password_hash, encrypted_notes_key, nonce_for_key_wrap) =
         generate_enctypted_keys(password, notes_key)?;
     let new_user = crate::services::auth::auth_data_models::local_user::LocalUser {
         user_id: uuid::Uuid::new_v4(),
         username: username,
-        password_hash: password_hash,
-        password_salt: salt,
+        password_hash: password_hash, //SALT ALREADY IN PHC STRING
         notes_key: encrypted_notes_key,
         nonce_notes_key: nonce_for_key_wrap,
         is_online_linked: false,
@@ -48,6 +48,8 @@ pub fn register_user_offline(
         device_id: crate::config::get_device_id(&conn, &paths.device_id_path)?,
         created_at: crate::utils::get_time(),
         last_login: crate::utils::get_time(),
+        password_errors: 0,
+        ending_block_timestamp: 0,
     };
 
     let tx = conn.transaction().context(
@@ -60,7 +62,6 @@ pub fn register_user_offline(
         ":user_id": new_user.user_id.to_string(),
          ":username":new_user.username ,
          ":password_hash":new_user.password_hash,
-         ":password_salt":new_user.password_salt,
          ":notes_key":new_user.notes_key,
          ":nonce_notes_key":new_user.nonce_notes_key,
          ":is_online_linked": new_user.is_online_linked,
@@ -68,6 +69,8 @@ pub fn register_user_offline(
          ":device_id": new_user.device_id.to_string(),
          ":created_at":new_user.created_at,
          ":last_login":new_user.last_login,
+         ":password_errors":new_user.password_errors,
+         ":ending_block_timestamp":new_user.ending_block_timestamp,//timestamp
           },
     )
     .context("Couldnt insert user into database, transaction failed while registering a user")?;
@@ -83,7 +86,6 @@ pub fn register_user_offline(
     );
     let paths = after_validation(&new_user.user_id, paths)?;
     let conn = crate::services::storage::db_creation::get_connection(&paths)?;
-
     Ok((new_user.user_id, paths, conn))
 }
 
@@ -92,10 +94,10 @@ fn generate_enctypted_keys(
     //reuse on password change
     password: &str,
     mut notes_key: chacha20poly1305::Key,
-) -> Result<(String, String, Vec<u8>, Vec<u8>), crate::errors::Error> {
+) -> Result<(String, Vec<u8>, Vec<u8>), crate::errors::Error> {
     let salt: SaltString = SaltString::generate(&mut OsRng); //generating salt for password
     let argon2 = Argon2::default(); //creating argon2 instance
-    let mut kek_bytes = [0u8; KEY_ENCRYPTED_KEY_LENGTH]; // Can be any desired size
+    let mut kek_bytes = [0u8; KEY_ENCRYPTED_KEY_LENGTH];
     argon2
         .hash_password_into(
             password.as_bytes(),
@@ -116,7 +118,7 @@ fn generate_enctypted_keys(
         "password encrypted successfully",
     );
 
-    //generate random key
+    //generate random key for notes
     let kek = ChaCha20Poly1305::new(&kek_bytes.into());
     let nonce_for_key_wrap = ChaCha20Poly1305::generate_nonce(&mut OsRng);
     let encrypted_notes_key = kek
@@ -127,12 +129,54 @@ fn generate_enctypted_keys(
     notes_key.as_mut_slice().zeroize();
     Ok((
         password_hash,
-        salt.to_string(),
         encrypted_notes_key,
         nonce_for_key_wrap.to_vec(),
     ))
 }
 
+pub fn recovery_code_handling(
+    user_uuid: &uuid::Uuid,
+    users_db: &rusqlite::Connection,
+) -> Result<(Vec<String>), crate::errors::Error> {
+    let mut user_visible_codes: Vec<String> = Vec::new();
+    let arg = Argon2::default();
+    for _ in 0..NUMBER_OF_KEYS {
+        let (mut key, user_readable) = generate_recovery_code(&arg)?;
+        user_visible_codes.push(user_readable);
+        users_db.execute(
+            "INSERT INTO recovery_keys (user_id, code_hash, used_at)  VALUES (:id, :hash, NULL)",
+            named_params! {
+                ":id": user_uuid.to_string(),
+                ":hash": key,
+            },
+        ).inspect_err(|_| log_helper("handling recovery codes", "error", None::<Format<String>>, "Failed generating recovery keys")).context("failed to insert key into db")?;
+        key.zeroize();
+    }
+    log_helper(
+        "handling recovery codes",
+        "success",
+        None::<Format<String>>,
+        "successfully generated and inserted recovery keys",
+    );
+    Ok(user_visible_codes)
+}
+
+fn generate_recovery_code(
+    argon_instance: &Argon2<'_>,
+) -> Result<(String, String), crate::errors::Error> {
+    let salt: SaltString = SaltString::generate(&mut OsRng); //generating salt for password
+
+    let mut key_bytes = [0u8; RECOVERY_CODE_LENGTH];
+    OsRng.fill_bytes(&mut key_bytes);
+    let key = argon_instance
+        .hash_password(&key_bytes, &salt)
+        .context("failed to hash key")?
+        .to_string();
+    salt.to_string().zeroize();
+    let readable_code = base32::encode(base32::Alphabet::Crockford, &key_bytes);
+    key_bytes.zeroize();
+    Ok((key, readable_code))
+}
 ///this function validates password on backend side
 fn password_validation(
     password: &str,
@@ -160,7 +204,7 @@ fn password_validation(
         None::<Format<String>>,
         "Password validated successfully",
     );
-
+    //TODO dodać fronted wyświetlający kody + możę ściaganie do pliku tych kodów + zapomniałeś hasła przy logowaniu i pytanie o zalogowanie
     Ok(())
 }
 ///this function validate username on backend side
@@ -222,7 +266,7 @@ pub fn after_validation(
 fn test_password_validation() {
     let password = "aA#$#$#@";
     let password_repeated = "aA#$#$#@";
-    password_validation(passwor, password_repeatedd).unwrap();
+    password_validation(password, password_repeated).unwrap();
 }
 
 #[test]
@@ -241,4 +285,37 @@ fn register_test() {
         &mut conn,
     )
     .unwrap();
+}
+
+#[test]
+fn generate_codes() {
+    let paths = ProgramFiles::init_in_base().unwrap();
+    let mut conn = rusqlite::Connection::open_in_memory().unwrap();
+
+    // Initialize schema manually
+    conn.execute_batch(LOCAL_LOGIN_DB_SCHEMA).unwrap();
+
+    register_user_offline(
+        "tescik".to_string(),
+        zeroize::Zeroizing::from("ToJestTest!".to_string()),
+        zeroize::Zeroizing::from("ToJestTest!".to_string()),
+        &paths,
+        &mut conn,
+    )
+    .unwrap();
+
+    let u_uuid: String = conn
+        .query_row(
+            "SELECT user_id FROM users_data WHERE username = :name;",
+            named_params! {
+                ":name": "tescik".to_string(),
+            },
+            |row| row.get(0),
+        )
+        .unwrap();
+
+    let u_uuid = uuid::Uuid::parse_str(&u_uuid).unwrap();
+    let keys = recovery_code_handling(&u_uuid, &conn).unwrap();
+    println!("keys: {:#?}", keys);
+    //    recovery_code_handling();
 }

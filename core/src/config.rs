@@ -51,7 +51,6 @@ impl AppState {
             paths: Mutex::new(None), //login will return current user
         })
     }
-    //mayby add updating currentuser to change current user, and updating connection go get connection and only get username here, or even in register
 }
 #[derive(Serialize, Deserialize)]
 
@@ -210,7 +209,7 @@ pub fn get_device_id(
             let device_id = uuid::Uuid::parse_str(
                 parsed_file[DEVICE_ID_JSON_KEY]
                     .as_str()
-                    .ok_or(crate::errors::Error::DeviceIdErorr)
+                    .ok_or(crate::errors::Error::DeviceIdError)
                     .context("device id not found in device id file")?,
             )
             .context("failed to parse uuid")?;
@@ -304,8 +303,10 @@ fn test_changing_user() {
 #[test]
 fn test_creating_device_id() {
     let paths = ProgramFiles::init_in_base().unwrap();
-    let local_conn =
-        crate::services::auth::database_creation::connect_or_create_local_login_db(path).unwrap();
+    let local_conn = crate::services::auth::database_creation::connect_or_create_local_login_db(
+        &paths.local_login_database_path,
+    )
+    .unwrap();
     let device_id = get_device_id(&local_conn, &paths.device_id_path).unwrap();
     println!("{}", device_id);
 }

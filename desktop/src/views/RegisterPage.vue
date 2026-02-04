@@ -10,13 +10,14 @@ import { invoke } from '@tauri-apps/api/core';
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth';
 import { RouterLink } from 'vue-router';
+import { useToast } from 'vue-toastification';
 const authStore = useAuthStore();
 const router = useRouter();
 const username = ref<string>('');
 const password = ref<string>('');
 const repeatPassword = ref<string>('');
 const isPasswordValid = ref<boolean>(false);
-
+const toast = useToast();
 const passwordsMatch = computed(() => {
   return password.value === repeatPassword.value;
 });
@@ -44,12 +45,13 @@ async function submitRegister() {
         loggedIn: true,
         loggedInUsername: username.value,
         hasAnyUsers: true,
-
       })
       console.log(authStore.loggedIn, authStore.loggedInUsername);
-      await router.replace({ name: "choose" });
+      toast.success("successfully regisered local user account");
+      await router.replace({ name: "recoveryCodes" });
 
     } catch (err) {
+      toast.error("Failed registering local user");
       console.error("Registration failed:", err);
     }
   } else {
