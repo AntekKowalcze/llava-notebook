@@ -1,15 +1,10 @@
 //! this module contains function for soft deleting notes locally
-use std::str::FromStr;
 
 use crate::utils::{Format, log_helper};
 
 use anyhow::Context;
 
-use crate::{
-    config::ProgramFiles,
-    models::note,
-    services::storage::{db_creation::SyncState, update},
-};
+use crate::services::storage::db_creation::SyncState;
 /// soft delete note
 pub fn delete_note(
     conn: &rusqlite::Connection,

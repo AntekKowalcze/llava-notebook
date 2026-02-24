@@ -1,16 +1,11 @@
 use anyhow::Context;
-use argon2::{
-    Argon2, PasswordHash, PasswordVerifier,
-    password_hash::{self, SaltString},
-};
+use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use rusqlite::{Connection, OptionalExtension, named_params};
-use serde::de;
 use sha2::{Digest, Sha256};
-use std::str::FromStr;
-use uuid::timestamp;
+
 use zeroize::Zeroize;
 
-use crate::{constants::SESSION_TOKEN_TIME_ALIVE, errors, utils};
+use crate::{errors, utils};
 
 pub fn local_log_in(
     username: String,

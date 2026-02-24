@@ -1,4 +1,5 @@
 ///Online user struct for mongo
+#[allow(dead_code)]
 pub struct OnlineUser {
     email: String,
     localusernames: Vec<(String, uuid::Uuid)>, //username, device id

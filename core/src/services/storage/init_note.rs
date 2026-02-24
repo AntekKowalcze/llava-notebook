@@ -6,7 +6,7 @@ use crate::{
 };
 use anyhow::Context;
 use rusqlite::{Connection, OptionalExtension};
-use std::{fs, path::PathBuf};
+use std::path::PathBuf;
 //init note after new note clicked and name sumbited
 ///this note init note struct and creates md file
 fn init_note(

@@ -7,18 +7,18 @@ mod commands;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn main() {
     let program_paths: ProgramFiles = if cfg!(not(debug_assertions)) {
-        let p = llava_core::ProgramFiles::init().expect("failed creating program pahts");
-        p
+        
+        llava_core::ProgramFiles::init().expect("failed creating program pahts")
     } else {
         // let path = std::env::temp_dir().join("llava_test");
         // if path.exists() {
         //     std::fs::remove_dir_all(path).expect("PROBABLY LLAVA_TEST IS NOT EXISTING JUST CREATE IT SO IT COULD BE DELETED WITH NO ERROR");
         // }
         // IF YOU NEED RESTART UNCOMMENT THIS LINE
-        let p = llava_core::ProgramFiles::init_in_base().expect("failed creating program pahts");
-        p
+        
+        llava_core::ProgramFiles::init_in_base().expect("failed creating program pahts")
     };
-    let mut user_db =
+    let user_db =
         llava_core::connect_or_create_local_login_db(&program_paths.local_login_database_path)
             .expect("error while creating locla login db");
     let _logger_worker = if cfg!(not(debug_assertions)) {

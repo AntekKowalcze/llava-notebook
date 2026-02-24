@@ -1,18 +1,12 @@
 //! This module is responsible for configuring paths for applications do it by calling ProgramFiles::init()
+use crate::constants::*;
 use crate::utils::{Format, log_helper};
-use crate::{constants::*, errors};
 use anyhow::Context;
 use dirs_next::data_local_dir;
-use rusqlite::{Connection, named_params};
+use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
-use std::path::{self, Path};
-use std::str::FromStr;
-use std::{
-    fs::{self, create_dir_all},
-    path::PathBuf,
-    sync::Mutex,
-};
+use std::{fs, path::PathBuf, sync::Mutex};
 #[derive(Debug, Clone)]
 /// Struct with important paths
 pub struct ProgramFiles {
@@ -218,7 +212,7 @@ pub fn get_device_id(
         match has_error {
             //if exists and couldnt read it just find it in db and write again if failes we have problems
             Ok(device_id_ok) => Ok(device_id_ok),
-            Err(err) => {
+            Err(_err) => {
                 let db_id: Result<String, rusqlite::Error> =
                     local_conn.query_row("SELECT device_id FROM users_data LIMIT 1", (), |row| {
                         row.get(0)

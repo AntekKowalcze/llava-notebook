@@ -3,9 +3,6 @@ use crate::constants::*;
 use crate::utils::{Format, log_helper};
 use anyhow::Context;
 use std::fs::{self};
-use std::str::FromStr;
-
-use crate::{config::ProgramFiles, services::storage::update};
 
 ///function responsible for updating .md file contents
 pub fn update_md(
@@ -42,17 +39,16 @@ pub fn update_md(
     let note_path = program_paths.notes_path.join(note_name);
     fs::rename(&tmp_filepath, note_path)?;
 
-    let value = conn
-        .execute(
-            UPDATE_NOTE_SQL_QUERY,
-            rusqlite::named_params! {
-                ":updated_time": crate::utils::get_time(),
-                ":summary": summary,
-                ":title" : title,
-                ":id": note_id.to_string(),
-            },
-        )
-        .context("Couldnt get needed info about note from SQL while updating")?;
+    conn.execute(
+        UPDATE_NOTE_SQL_QUERY,
+        rusqlite::named_params! {
+            ":updated_time": crate::utils::get_time(),
+            ":summary": summary,
+            ":title" : title,
+            ":id": note_id.to_string(),
+        },
+    )
+    .context("Couldnt get needed info about note from SQL while updating")?;
     log_helper(
         "validating note name",
         "success",

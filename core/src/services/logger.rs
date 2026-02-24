@@ -1,15 +1,10 @@
 //! Module for application logger, temporarry holds terminal logging
 use anyhow::Context;
 use std::fs::create_dir_all;
-use std::path::{self, PathBuf};
+use std::path::PathBuf;
 use std::{fmt::Debug, fs::OpenOptions};
-use tracing::subscriber;
-use tracing_appender::non_blocking::{self, WorkerGuard};
 use tracing_subscriber::Layer;
-use tracing_subscriber::{Registry, fmt, layer::SubscriberExt, util::SubscriberInitExt};
-
-use crate::config::{AppState, ProgramFiles};
-use crate::utils::get_time;
+use tracing_subscriber::{Registry, fmt, layer::SubscriberExt};
 
 pub fn log_success(log_content: &str) {
     println!("✅ {}", log_content)

@@ -1,26 +1,21 @@
 //! Module responsible for registering user
 //! in this modules important data is encrypted, and keys for notes encryption are also created
 use crate::constants::*;
-use crate::services::auth::utils;
 use crate::utils::{Format, log_helper};
 use anyhow::Context;
-use argon2::password_hash::Salt;
+
 use argon2::password_hash::rand_core::RngCore;
 use argon2::{
     Argon2, PasswordHash, PasswordVerifier,
-    password_hash::{PasswordHasher, SaltString, rand_core::OsRng, self},
+    password_hash::{PasswordHasher, SaltString, rand_core::OsRng},
 };
 
-use chacha20poly1305::ChaChaPoly1305;
 use chacha20poly1305::{
     ChaCha20Poly1305,
     aead::{Aead, AeadCore, KeyInit},
 };
-use core::task;
 use rusqlite::{Connection, OptionalExtension, named_params, params};
-use serde_json::to_string;
-use std::path::Path;
-use uuid::Uuid;
+
 use zeroize::Zeroize;
 
 use crate::config::{ProgramFiles, change_active_user};
@@ -358,7 +353,7 @@ pub fn change_password(
     if let Some(mut decoded) = base32::decode(base32::Alphabet::Crockford, &code) {
         let argon2 = Argon2::default();
         while let Ok(Some(row)) = handle.next() {
-            let mut hash: String = row.get(0).context("failed to get hash")?;
+            let  hash: String = row.get(0).context("failed to get hash")?;
             let phc: PasswordHash<'_> =
                 argon2::PasswordHash::new(&hash).context("failed to parse hash from db to phc")?;
             if argon2.verify_password(&decoded, &phc).is_ok() {

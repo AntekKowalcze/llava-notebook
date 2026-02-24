@@ -1,6 +1,5 @@
-use anyhow::{anyhow, Context};
-use llava_core::{config::change_active_user, services::auth::logging::SessionState, AppState};
-use tauri::{App, State};
+use anyhow::anyhow;
+use llava_core::{services::auth::logging::SessionState, AppState};
 use zeroize::Zeroizing;
 
 #[tauri::command]
@@ -99,7 +98,7 @@ pub async fn login_command(
         .map_err(|_| anyhow!("failed to lock AppState.connection"))?;
     let conn: &mut rusqlite::Connection =
         conn_guard.as_mut().ok_or(llava_core::Error::FatalError)?;
-    llava_core::zero_error_count(&conn, &new_uuid)?;
+    llava_core::zero_error_count(conn, &new_uuid)?;
     crate::commands::command_helpers::chagne_state_after_login(
         &state, new_uuid, notes_conn, new_paths, username,
     )?;
@@ -144,7 +143,7 @@ pub async fn check_if_user_exists(
         .map_err(|_| anyhow!("Failed to lock AppState.paths"))?;
     let conn: &mut rusqlite::Connection =
         conn_guard.as_mut().ok_or(llava_core::Error::FatalError)?;
-    return llava_core::check_if_first_start(conn);
+    llava_core::check_if_first_start(conn)
 }
 
 #[tauri::command]
@@ -161,7 +160,7 @@ pub async fn log_with_code(
     let users_db = users_db_guard
         .as_ref()
         .ok_or(llava_core::Error::FatalError)?;
-    let user_uuid = llava_core::get_user_uuid(&users_db, &username)?;
+    let user_uuid = llava_core::get_user_uuid(users_db, &username)?;
     let paths: llava_core::ProgramFiles = {
         let guard = state.paths.lock().map_err(|_| anyhow!("lock paths"))?;
         guard.as_ref().ok_or(llava_core::Error::FatalError)?.clone()
@@ -207,6 +206,6 @@ pub async fn check_login_on_start(
     let users_db = user_db_guard
         .as_ref()
         .ok_or(llava_core::Error::FatalError)?;
-    let is_logged_in = llava_core::check_if_user_logged_in(&users_db)?;
+    let is_logged_in = llava_core::check_if_user_logged_in(users_db)?;
     Ok(is_logged_in)
 }
