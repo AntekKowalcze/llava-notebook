@@ -10,10 +10,10 @@ pub fn main() {
         let p = llava_core::ProgramFiles::init().expect("failed creating program pahts");
         p
     } else {
-        let path = std::env::temp_dir().join("llava_test");
-        if path.exists() {
-            std::fs::remove_dir_all(path).expect("PROBABLY LLAVA_TEST IS NOT EXISTING JUST CREATE IT SO IT COULD BE DELETED WITH NO ERROR");
-        }
+        // let path = std::env::temp_dir().join("llava_test");
+        // if path.exists() {
+        //     std::fs::remove_dir_all(path).expect("PROBABLY LLAVA_TEST IS NOT EXISTING JUST CREATE IT SO IT COULD BE DELETED WITH NO ERROR");
+        // }
         // IF YOU NEED RESTART UNCOMMENT THIS LINE
         let p = llava_core::ProgramFiles::init_in_base().expect("failed creating program pahts");
         p
@@ -61,7 +61,9 @@ pub fn main() {
             commands::commands::login_command,    //login locally
             commands::commands::check_if_user_exists,
             commands::commands::check_timeout_before_submit,
-            commands::commands::generate_recovery_keys,
+            commands::commands::change_password,
+            // commands::commands::generate_recovery_keys,
+            commands::commands::log_with_code
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

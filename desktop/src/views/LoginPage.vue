@@ -7,6 +7,8 @@ import { ref } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import { useRouter } from 'vue-router';
 import { useToast } from "vue-toastification"
+import { useAuthStore } from '../stores/auth';
+
 const toast = useToast();
 
 
@@ -15,7 +17,7 @@ const password = ref<string>()
 const username = ref<string>()
 const disabled = ref<boolean>(false);
 async function submitLogin() {
-    //here before login command check if user is timeouted 
+    const authStore = useAuthStore();    //here before login command check if user is timeouted 
     try {
         let timeout: number = await invoke<number>('check_timeout_before_submit', { username: username.value })
         console.log(timeout)
@@ -29,18 +31,25 @@ async function submitLogin() {
             password: password.value
         })
         toast.success("Logged in successfully");
+        authStore.$patch({
+            loggedIn: true,
+            loggedInUsername: username.value,
+        })
+
         router.replace({ name: "loading" })
 
     } catch (err: any) {
         if (err == "WrongPassword") {
             console.log(err)
-            toast.error("Wrong Password", {//TODO add password recovery
+            toast.warning("Wrong Password", {//TODO add password recovery 
+                //password recovery steps: forgot password (router check if logged in if yes, go to change password, if no go to type username and code if code good go to change password after password changed log if you are not)
+
 
             })
         } else if (err.AccountLocked) {
             showTimeout(err.AccountLocked);
-        } else if (err = "UserNotExists") {
-            toast.error("User does not exist!")
+        } else if (err === "UserNotExists") {
+            toast.warning("User does not exist!")
         }
         return;
     }
@@ -63,6 +72,9 @@ function showTimeout(lengthMs: number) {
         <TextInput :name="'password'" :placeholder="'password'" :type="InputTypes.Password" v-model="password">
         </TextInput>
         <FormButtons :disabled="disabled" :content="'Submit'" @click="submitLogin"></FormButtons>
+
+        <RouterLink to="/recovery" class="mt-12 text-note-ivory/80 hover:underline">Forgot password?
+        </RouterLink>
         <RouterLink to="/register" class="mt-12 text-note-ivory/80 hover:underline">Do you want to create account?
         </RouterLink>
     </FormCard>

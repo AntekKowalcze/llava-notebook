@@ -9,6 +9,7 @@ pub struct LocalUser {
     pub password_hash: String, //hashed
     pub notes_key: Vec<u8>,
     pub nonce_notes_key: Vec<u8>,
+    pub kek_salt: String,
     pub is_online_linked: bool,
     pub online_account_email: Option<String>,
     #[zeroize(skip)]

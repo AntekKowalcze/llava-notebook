@@ -32,7 +32,7 @@ pub fn local_log_in(
         .context("Couldnt get password_hash FROM users_data db ")?;
 
     let password_hash = PasswordHash::new(&hash)
-        .context("Couldnt create a password hash from password given by user in login")?;
+        .context("CoPrepared using GPT-5.2 Thinkinguldnt create a password hash from password given by user in login")?;
     let password_verified = Argon2::default()
         .verify_password(&password.as_bytes(), &password_hash)
         .is_ok();
@@ -73,11 +73,11 @@ pub fn local_log_in(
 }
 
 pub fn log_with_code(
+    paths: &crate::config::ProgramFiles,
     mut code: String,
     users_db: &rusqlite::Connection,
     user_id: uuid::Uuid,
-) -> Result<(), crate::errors::Error> {
-    //REMOVE dashes on frontend before sending code
+) -> Result<(crate::config::ProgramFiles, Connection), crate::errors::Error> {
     let mut found = 0;
     let mut stmt = users_db
         .prepare("SELECT code_hash FROM recovery_keys WHERE user_id = :id AND used_at IS NULL")
@@ -100,24 +100,29 @@ pub fn log_with_code(
                         "UPDATE recovery_keys SET used_at = :time WHERE code_hash = :h",
                         named_params! {
                             ":time": utils::get_time(),
-                            ":h": hash
+                            ":h": hash//should i use phc here instead of hash
                         },
                     )
                     .context("Failed to mark code as used")?;
             }
             hash.zeroize();
 
+            code.zeroize();
             if found > 0 {
-                return Ok(());
+                //change_last_login(&mut users_db, &user_id)?;
+                let paths = crate::services::auth::register::after_validation(&user_id, paths)?;
+                let conn = crate::services::storage::db_creation::get_connection(&paths)?;
+                // Ok((user_uuid, paths, conn))
+                decoded.zeroize();
+                return Ok((paths, conn));
             }
         }
-        decoded.zeroize();
-        code.zeroize();
     } else {
         return Err(errors::Error::InternalError(
             "Failed to decode code".to_string(),
         ));
     }
+
     Err(crate::errors::Error::WrongPassword)
 }
 
@@ -242,6 +247,7 @@ pub fn get_timeout(conn: &Connection, uuid: &uuid::Uuid) -> Result<i64, crate::e
         .context("Failed to get timeout")?;
     Ok(timeout)
 }
+
 #[test]
 fn login_test() {
     let username = "twelth".to_string();
@@ -253,3 +259,4 @@ fn login_test() {
     let paths = crate::config::ProgramFiles::init_in_base().unwrap();
     local_log_in(username, password, &mut conn, &paths).unwrap();
 }
+//TODO add remember me  keychain/keyring-style like session with some secret

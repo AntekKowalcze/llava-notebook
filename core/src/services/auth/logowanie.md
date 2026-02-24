@@ -61,7 +61,7 @@ Krok 3: Tworzenie konta online (jeśli wybrał TAK)
     Synchronizacja uruchomiona
 
 
-//TODO dodać odzyskiwanie hasła offline, jeden z podanych przy logowaniu kodów część odzyskiwania po wpisaniu kodu
+
 
 Jeśli pierwsze uruchomienie wariant: 
 Utwórz konto lokalnie -> czy chcesz podłączyć konto online? tak -> rejestracja/logowanie online -> email -> zalogowano 

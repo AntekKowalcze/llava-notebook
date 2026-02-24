@@ -50,6 +50,7 @@ fn init_note(
                 sync_state: crate::services::storage::db_creation::SyncState::LocalOnly,
 
                 encrypted: false,
+
                 crypto_meta: None, //change it after adding encription
             })
         }
@@ -238,4 +239,3 @@ fn note_validator_test() {
     let owner_id: uuid::Uuid = serde_json::from_value(json["user_uuid"].clone()).unwrap();
     validate_note_name(note_name, &conn, &owner_id).unwrap();
 }
-//TODO add delete user, with folder deletation and password confirmation, all notes will be deleted

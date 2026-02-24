@@ -9,11 +9,11 @@ pub async fn register_command(
     password: String,
     password_repeated: String,
     state: tauri::State<'_, AppState>,
-) -> Result<(), llava_core::Error> {
+) -> Result<Vec<String>, llava_core::Error> {
     let password_zeroized = Zeroizing::from(password);
     let password_repeated_zeroized = Zeroizing::from(password_repeated);
 
-    let (new_uuid, new_paths, conn) = {
+    let (new_uuid, new_paths, conn, codes) = {
         let mut conn_guard = state
             .users_db
             .lock()
@@ -37,30 +37,13 @@ pub async fn register_command(
             conn,
         )?
     };
+    crate::commands::command_helpers::chagne_state_after_login(
+        &state, new_uuid, conn, new_paths, username,
+    )?;
 
-    *state
-        .current_user
-        .lock()
-        .map_err(|_| anyhow!("couldnt edit current user"))? = Some(new_uuid);
+    println!("{:#?}", state);
 
-    *state
-        .notes_db
-        .lock()
-        .map_err(|_| anyhow!("Couldnt edit notes db in state"))? = Some(conn);
-
-    *state
-        .paths
-        .lock()
-        .map_err(|_| anyhow!("Couldnt edit paths in state"))? = Some(new_paths);
-
-    *state
-        .username
-        .lock()
-        .map_err(|_| anyhow!("Couldnt edit username in state"))? = Some(username.clone());
-
-    // println!("{:#?}", state);
-
-    Ok(())
+    Ok(codes)
 }
 
 #[tauri::command]
@@ -117,25 +100,10 @@ pub async fn login_command(
     let conn: &mut rusqlite::Connection =
         conn_guard.as_mut().ok_or(llava_core::Error::FatalError)?;
     llava_core::zero_error_count(&conn, &new_uuid)?;
-
-    *state
-        .current_user
-        .lock()
-        .map_err(|_| anyhow!("couldnt edit current user"))? = Some(new_uuid);
-    *state
-        .notes_db
-        .lock()
-        .map_err(|_| anyhow!("Couldnt edit notes db in state"))? = Some(notes_conn);
-    *state
-        .paths
-        .lock()
-        .map_err(|_| anyhow!("Couldnt edit paths in state"))? = Some(new_paths);
-    *state
-        .username
-        .lock()
-        .map_err(|_| anyhow!("Couldnt edit username in state"))? = Some(username.clone());
-
-    // println!("{:#?}", state);
+    crate::commands::command_helpers::chagne_state_after_login(
+        &state, new_uuid, notes_conn, new_paths, username,
+    )?;
+    println!("{:#?}", state);
 
     Ok(())
 }
@@ -165,28 +133,7 @@ pub async fn check_timeout_before_submit(
     }
     Err(llava_core::Error::FatalError)
 }
-#[tauri::command]
 
-pub async fn generate_recovery_keys(
-    state: tauri::State<'_, AppState>,
-) -> Result<Vec<String>, llava_core::Error> {
-    let user_id_guard = state
-        .current_user
-        .lock()
-        .map_err(|_| anyhow!("Failed to obtain user id from state"))?;
-    let conn_guard = state
-        .users_db
-        .lock()
-        .map_err(|_| anyhow!("Failed to get conn from state"))?;
-    let users_db = conn_guard.as_ref().ok_or(llava_core::Error::FatalError)?;
-
-    let user_uuid = user_id_guard
-        .as_ref()
-        .ok_or(llava_core::Error::FatalError)?;
-
-    let keys = llava_core::recovery_code_handling(user_uuid, users_db)?;
-    Ok(keys)
-}
 #[tauri::command]
 pub async fn check_if_user_exists(
     state: tauri::State<'_, AppState>,
@@ -198,4 +145,53 @@ pub async fn check_if_user_exists(
     let conn: &mut rusqlite::Connection =
         conn_guard.as_mut().ok_or(llava_core::Error::FatalError)?;
     return llava_core::check_if_first_start(conn);
+}
+
+#[tauri::command]
+pub async fn log_with_code(
+    mut code: String,
+    username: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), llava_core::Error> {
+    code.retain(|c| c != '-');
+    let users_db_guard = state
+        .users_db
+        .lock()
+        .map_err(|_| anyhow!("Error while locking users_db"))?;
+    let users_db = users_db_guard
+        .as_ref()
+        .ok_or(llava_core::Error::FatalError)?;
+    let user_uuid = llava_core::get_user_uuid(&users_db, &username)?;
+    let paths: llava_core::ProgramFiles = {
+        let guard = state.paths.lock().map_err(|_| anyhow!("lock paths"))?;
+        guard.as_ref().ok_or(llava_core::Error::FatalError)?.clone()
+    };
+    let (paths, notes_conn) = llava_core::log_with_code(&paths, code, users_db, user_uuid)?;
+
+    crate::commands::command_helpers::chagne_state_after_login(
+        &state, user_uuid, notes_conn, paths, username,
+    )?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn change_password(
+    username: String,
+    password: String,
+    password_repeated: String,
+    mut code: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), llava_core::Error> {
+    code.retain(|c| c != '-');
+    let user_db_guard = state
+        .users_db
+        .lock()
+        .map_err(|_| anyhow!("failed to get users_db from state"))?;
+    let user_db = user_db_guard
+        .as_ref()
+        .ok_or(llava_core::Error::FatalError)?;
+    // can i just get any key from used of user and get kek from it? or do i need specially code was used last time?
+    llava_core::change_password(user_db, username, password, password_repeated, code)?;
+    Ok(())
 }

@@ -1,3 +1,19 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer components {
+    .Vue-Toastification__toast--success.my-toast {
+        @apply bg-note-pumice/90 text-note-graphite;
+    }
+
+    @layer components {
+        .Vue-Toastification__toast--warning.my-toast {
+            @apply bg-note-paprika text-note-graphite;
+        }
+    }
+
+    .Vue-Toastification__toast--error.my-toast {
+        @apply bg-note-garnet text-note-graphite;
+    }
+}

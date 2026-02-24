@@ -17,6 +17,8 @@ app.use(Toast as any, {
     maxToasts: 20,
     newestOnTop: true,
     position: "bottom-center",
+    toastClassName: "my-toast",
+    icon: false,
 });
 
 

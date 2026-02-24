@@ -6,14 +6,14 @@ const routes = [
         path: '/', name: "index",
         // redirect: "/chooseRegisterForm"
         beforeEnter: async () => {
+            const authStore = useAuthStore()
             try {
-                const authStore = useAuthStore()
                 await authStore.checkUsers();
-                const hasAnyUsers = authStore.hasAnyUsers
-                console.log(hasAnyUsers)
-                if (hasAnyUsers) {//first run
+                const hasNoUsers = authStore.hasNoUsers
+                console.log(hasNoUsers)
+                if (hasNoUsers) {//first run
                     return { path: "/register", replace: true }
-                } else if (hasAnyUsers && authStore.loggedIn) {
+                } else if (!hasNoUsers && authStore.loggedIn) {
                     return { path: "/main", replace: true }
                 } else {
                     return { path: "/login", replace: true }
@@ -28,7 +28,22 @@ const routes = [
     { path: '/register', name: 'register', component: () => import('../views/RegisterPage.vue') },
     { path: '/login', name: "login", component: () => import('../views/LoginPage.vue') },
     { path: '/loading', name: "loading", component: () => import('../views/LoadingPage.vue') },
-    { path: '/recoveryCodes', name: 'recoveryCodes', component: () => import('../views/RecoveryCodesPage.vue') }
+    { path: '/recoveryCodes', name: 'recoveryCodes', component: () => import('../views/RecoveryCodesPage.vue') },
+    {
+        path: '/changePassword', name: 'changePassword', component: () => import('../views/ChangePassword.vue'),
+        //     beforeEnter: async () => {
+        //         const authStore = useAuthStore()
+
+        //         if (authStore.loggedIn) {
+        //             console.log(authStore.loggedIn)
+        //             return true;
+        //         } else {
+        //             return { path: "/recovery", replace: true }
+        //         }
+        //     },
+    },
+    { path: '/recovery', name: 'recovery', component: () => import('../views/RecoveryPage.vue') }
+
 ]
 
 export const router = createRouter({

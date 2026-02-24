@@ -13,7 +13,7 @@ use std::{
     path::PathBuf,
     sync::Mutex,
 };
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 /// Struct with important paths
 pub struct ProgramFiles {
     pub base: PathBuf,

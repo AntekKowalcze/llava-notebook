@@ -20,32 +20,34 @@ pub const LOGS_PATH: &str = "logs/app.log";
 //register.rs
 //SQL
 pub const LOCAL_USER_DB_INSERT_SQL_SCHEMA: &str = r#"INSERT INTO users_data (
-        user_id,
-        username,
-        password_hash,
-        notes_key,
-        nonce_notes_key,
-        is_online_linked,
-        online_account_email, 
-        device_id, 
-        created_at, 
-        last_login,
-        password_errors,
-        ending_block_timestamp
-        ) VALUES (
-       :user_id,
-       :username, 
-       :password_hash, 
-       :notes_key, 
-       :nonce_notes_key, 
-       :is_online_linked, 
-       :online_account_email, 
-       :device_id, 
-       :created_at, 
-       :last_login,
-       :password_errors,
-       :ending_block_timestamp
-       )"#;
+                user_id,
+                username,
+                password_hash,
+                notes_key,
+                nonce_notes_key,
+                kek_salt,
+                is_online_linked,
+                online_account_email, 
+                device_id, 
+                created_at, 
+                last_login,
+                password_errors,
+                ending_block_timestamp
+                ) VALUES (
+                :user_id,
+                :username, 
+                :password_hash, 
+                :notes_key, 
+                :nonce_notes_key,
+                :kek_salt, 
+                :is_online_linked, 
+                :online_account_email, 
+                :device_id, 
+                :created_at, 
+                :last_login,
+                :password_errors,
+                :ending_block_timestamp
+                )"#;
 //Encryption
 pub const KEY_ENCRYPTED_KEY_LENGTH: usize = 32;
 pub const MINIMAL_PASSWORD_LENGTH: usize = 8;
@@ -164,6 +166,7 @@ pub const LOCAL_LOGIN_DB_SCHEMA: &str = r#" CREATE TABLE IF NOT EXISTS users_dat
                         password_hash TEXT NOT NULL, 
                         notes_key BLOB NOT NULL,
                         nonce_notes_key BLOB NOT NULL,
+                        kek_salt STRING,
                         is_online_linked INTEGER NOT NULL DEFAULT 0, 
                         online_account_email TEXT DEFAULT NULL, 
                         device_id TEXT NOT NULL,
@@ -177,12 +180,15 @@ pub const LOCAL_LOGIN_DB_SCHEMA: &str = r#" CREATE TABLE IF NOT EXISTS users_dat
                         CREATE INDEX IF NOT EXISTS idx_users_data_username ON users_data(username);
                         
 
-                        CREATE TABLE recovery_keys (id INTEGER PRIMARY KEY,
+                        CREATE TABLE IF NOT EXISTS recovery_keys (id INTEGER PRIMARY KEY,
                          user_id TEXT NOT NULL, 
                          code_hash TEXT NOT NULL,
                          used_at INTEGER,
+                         wrapped_notes_key BLOB NOT NULL,
+                         wrapped_notes_key_nonce BLOB NOT NULL,
+                         recovery_kdf_salt TEXT NOT NULL,
                          FOREIGN KEY(user_id) REFERENCES users_data(user_id) ON DELETE CASCADE);
-                        CREATE INDEX idx_recovery_keys_user_unused
+                        CREATE INDEX IF NOT EXISTS idx_recovery_keys_user_unused
                         ON recovery_keys(user_id, used_at);
                         "#;
 //CHANGE TO EXECUTE BATCH IF ITS NOT THIS
