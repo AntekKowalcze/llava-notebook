@@ -63,7 +63,7 @@ function CopyToClipboard() {
    text-note-pumice marker:text-note-paprika
     min-h-[16rem]
   ">
-            <!-- TODO different error toasts on register, add save button functionality -->
+
             <li v-if="!keys.length" class="text-note-pumice marker:text-note-paprika">
                 Generating codes…
             </li>

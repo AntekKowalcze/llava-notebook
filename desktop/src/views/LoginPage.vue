@@ -26,7 +26,7 @@ async function submitLogin() {
             showTimeout(timeout)
             return;
         }
-        await invoke<void>('login_command', {
+        let userId = await invoke<string>('login_command', {
             username: username.value,
             password: password.value
         })
@@ -34,6 +34,7 @@ async function submitLogin() {
         authStore.$patch({
             loggedIn: true,
             loggedInUsername: username.value,
+            loggedInUserId: userId
         })
 
         router.replace({ name: "loading" })
@@ -41,8 +42,7 @@ async function submitLogin() {
     } catch (err: any) {
         if (err == "WrongPassword") {
             console.log(err)
-            toast.warning("Wrong Password", {//TODO add password recovery 
-                //password recovery steps: forgot password (router check if logged in if yes, go to change password, if no go to type username and code if code good go to change password after password changed log if you are not)
+            toast.warning("Wrong Password", {
 
 
             })

@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use anyhow::Context;
 use argon2::{
     Argon2, PasswordHash, PasswordVerifier,
@@ -7,10 +5,12 @@ use argon2::{
 };
 use rusqlite::{Connection, OptionalExtension, named_params};
 use serde::de;
+use sha2::{Digest, Sha256};
+use std::str::FromStr;
 use uuid::timestamp;
 use zeroize::Zeroize;
 
-use crate::{errors, utils};
+use crate::{constants::SESSION_TOKEN_TIME_ALIVE, errors, utils};
 
 pub fn local_log_in(
     username: String,
@@ -68,6 +68,7 @@ pub fn local_log_in(
     let user_uuid = uuid::Uuid::parse_str(&user_uuid).context("failed to parse uuid")?;
     change_last_login(conn, &user_uuid)?;
     let paths = crate::services::auth::register::after_validation(&user_uuid, paths)?;
+    session_operations(&conn, user_uuid)?;
     let conn = crate::services::storage::db_creation::get_connection(&paths)?;
     Ok((user_uuid, paths, conn))
 }
@@ -111,6 +112,7 @@ pub fn log_with_code(
             if found > 0 {
                 //change_last_login(&mut users_db, &user_id)?;
                 let paths = crate::services::auth::register::after_validation(&user_id, paths)?;
+                session_operations(&users_db, user_id)?;
                 let conn = crate::services::storage::db_creation::get_connection(&paths)?;
                 // Ok((user_uuid, paths, conn))
                 decoded.zeroize();
@@ -248,6 +250,77 @@ pub fn get_timeout(conn: &Connection, uuid: &uuid::Uuid) -> Result<i64, crate::e
     Ok(timeout)
 }
 
+pub fn session_operations(
+    users_db: &Connection,
+    user_id: uuid::Uuid,
+) -> Result<(), crate::errors::Error> {
+    let session_uuid = uuid::Uuid::new_v4();
+    let session_uuid_hash = base32::encode(
+        base32::Alphabet::Crockford,
+        &Sha256::digest(session_uuid.to_string().as_bytes()), //changing uuid to sha and then encoding it as text / to_string() is used so hashes match when i save to keyring cuz it needs to_string also
+    );
+    let expires_at = crate::utils::get_time() / 100 + crate::constants::SESSION_TOKEN_TIME_ALIVE; // /100 -> to seconds
+    let mut stmt = users_db.prepare("INSERT INTO session_data(hashed_token, user_id, expires_at) VALUES (:session_hash, :uid, :expires);").context("failed to prepare insert statement to session_data")?;
+    stmt.execute(named_params! {
+        ":session_hash": session_uuid_hash,
+        ":uid": user_id.to_string(),
+        ":expires": expires_at,
+    })
+    .context("failed to insert data into session_data table")?;
+    let keyring_entry = keyring::Entry::new("llava_desktop", "session_token")
+        .context("failed to create keyring entry")?;
+    keyring_entry
+        .set_password(&session_uuid.to_string())
+        .context("failed to set secret in keyring")?;
+    Ok(())
+}
+
+#[derive(serde::Serialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum SessionState {
+    LoggedIn { user_id: String },
+    Expired,
+    NotLoggedIn,
+}
+pub fn check_if_user_logged_in(
+    users_db: &Connection,
+) -> Result<SessionState, crate::errors::Error> {
+    let keyring_entry = keyring::Entry::new("llava_desktop", "session_token")
+        .context("failed to create keyring entry")?;
+
+    let token = match keyring_entry.get_password() {
+        Ok(t) => t,
+        Err(keyring::Error::NoEntry) | Err(_) => return Ok(SessionState::NotLoggedIn),
+    };
+
+    let hashed = base32::encode(
+        base32::Alphabet::Crockford,
+        &Sha256::digest(token.as_bytes()),
+    );
+
+    let result = users_db.query_row(
+        "SELECT user_id, expires_at FROM session_data WHERE hashed_token = ?1",
+        rusqlite::params![hashed],
+        |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)),
+    );
+
+    match result {
+        Ok((user_id, expires_at)) => {
+            if expires_at > (crate::utils::get_time() / 100) {
+                Ok(SessionState::LoggedIn { user_id })
+            } else {
+                let _ = keyring_entry.delete_credential();
+                Ok(SessionState::Expired)
+            }
+        }
+        Err(rusqlite::Error::QueryReturnedNoRows) => {
+            let _ = keyring_entry.delete_credential();
+            Ok(SessionState::NotLoggedIn)
+        }
+        Err(e) => Err(crate::errors::Error::InternalError(e.to_string())),
+    }
+}
+
 #[test]
 fn login_test() {
     let username = "twelth".to_string();
@@ -259,4 +332,3 @@ fn login_test() {
     let paths = crate::config::ProgramFiles::init_in_base().unwrap();
     local_log_in(username, password, &mut conn, &paths).unwrap();
 }
-//TODO add remember me  keychain/keyring-style like session with some secret

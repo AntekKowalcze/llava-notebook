@@ -94,6 +94,7 @@ pub fn register_user_offline(
     let codes = recovery_code_handling(&new_user.username, conn, password)?; //get recovery codes as strings
 
     let paths = after_validation(&new_user.user_id, paths)?;
+    crate::services::auth::logging::session_operations(&conn, new_user.user_id)?;
     let conn = crate::services::storage::db_creation::get_connection(&paths)?; //get connection for note database
     Ok((new_user.user_id, paths, conn, codes))
 }
@@ -145,15 +146,13 @@ fn generate_enctypted_keys(
     ))
 }
 
-//     let nonce_for_key_wrap = ChaCha20Poly1305::generate_nonce(&mut OsRng);
-//TODO odszyfrowac klucz do notatek jakos go zapisac i przeszyfrowac nowym hasłem i zaipsać w bazie
 
 pub fn recovery_code_handling(
     username: &str,
     users_db: &rusqlite::Connection,
     password: &str,
 ) -> Result<Vec<String>, crate::errors::Error> {
-    let user_uuid = crate::get_user_uuid(users_db, &username)?;
+    let user_uuid = crate::utils::get_user_uuid(users_db, &username)?;
     let mut user_visible_codes: Vec<String> = Vec::new();
     let arg = Argon2::default();
     let (notes_key, nonce, kek_salt) = users_db
@@ -276,7 +275,7 @@ fn password_validation(
         None::<Format<String>>,
         "Password validated successfully",
     );
-    //TODO + zapomniałeś hasła przy logowaniu i pytanie o zalogowanie
+    
     Ok(())
 }
 ///this function validate username on backend side
@@ -340,8 +339,8 @@ pub fn change_password(
     password: String,
     password_repeated: String,
     mut code: String,
-) -> Result<(), crate::Error> {
-    let user_uuid = crate::get_user_uuid(users_db, &username)?;
+) -> Result<(), crate::errors::Error> {
+    let user_uuid = crate::utils::get_user_uuid(users_db, &username)?;
     let password = password.as_str().trim();
     let password_repeated = password_repeated.as_str().trim();
     password_validation(&password, &password_repeated)?;

@@ -4,18 +4,17 @@ import { invoke } from "@tauri-apps/api/core";
 const routes = [
     {
         path: '/', name: "index",
-        // redirect: "/chooseRegisterForm"
         beforeEnter: async () => {
             const authStore = useAuthStore()
             try {
-                await authStore.checkUsers();
+                await Promise.all([authStore.checkUsers(), authStore.checkSession()]) //check session should probably return user id and then 
                 const hasNoUsers = authStore.hasNoUsers
-                console.log(hasNoUsers)
                 if (hasNoUsers) {//first run
                     return { path: "/register", replace: true }
                 } else if (!hasNoUsers && authStore.loggedIn) {
                     return { path: "/main", replace: true }
-                } else {
+                } else if (!hasNoUsers && !authStore.loggedIn) {
+                    console.log("not logged in")
                     return { path: "/login", replace: true }
                 }
             } catch (err) {
@@ -29,19 +28,7 @@ const routes = [
     { path: '/login', name: "login", component: () => import('../views/LoginPage.vue') },
     { path: '/loading', name: "loading", component: () => import('../views/LoadingPage.vue') },
     { path: '/recoveryCodes', name: 'recoveryCodes', component: () => import('../views/RecoveryCodesPage.vue') },
-    {
-        path: '/changePassword', name: 'changePassword', component: () => import('../views/ChangePassword.vue'),
-        //     beforeEnter: async () => {
-        //         const authStore = useAuthStore()
-
-        //         if (authStore.loggedIn) {
-        //             console.log(authStore.loggedIn)
-        //             return true;
-        //         } else {
-        //             return { path: "/recovery", replace: true }
-        //         }
-        //     },
-    },
+    { path: '/changePassword', name: 'changePassword', component: () => import('../views/ChangePassword.vue'), },
     { path: '/recovery', name: 'recovery', component: () => import('../views/RecoveryPage.vue') }
 
 ]
@@ -53,5 +40,5 @@ export const router = createRouter({
         return { top: 0 }
     }
 })
-//TODO add router guard so you cant move between login and not login sites
+//TODO raczej nie potrzebne bo nie ma consoli w prod add router guard so you cant move between login and not login sites 
 //TODO potem dashboard 

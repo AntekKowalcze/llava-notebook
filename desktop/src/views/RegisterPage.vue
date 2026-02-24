@@ -40,16 +40,18 @@ async function submitRegister() {
   loading.value = true
 
   try {
-    keys.value = await invoke<string[]>("register_command", {
+    const [recoveryKeys, userId] = await invoke<[string[], string]>("register_command", {
       username: username.value,
       password: password.value,
       passwordRepeated: repeatPassword.value
     })
+    keys.value = recoveryKeys
 
     console.log("Registration success");
     authStore.$patch({
       loggedIn: true,
       loggedInUsername: username.value,
+      loggedInUserId: userId,
       hasNoUsers: false,
       recoveryKeys: keys.value
     })
@@ -94,4 +96,3 @@ async function submitRegister() {
     <LoadingCircle v-else></LoadingCircle>
   </FormCard>
 </template>
-<!-- TODO add chanigng password logic -->

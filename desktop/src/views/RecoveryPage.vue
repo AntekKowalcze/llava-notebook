@@ -17,10 +17,11 @@ const authStore = useAuthStore();
 
 async function checkCode() {
     try {
-        await invoke<void>("log_with_code", { username: username.value, code: code.value })
+        let userId = await invoke<string>("log_with_code", { username: username.value, code: code.value })
         authStore.$patch({
             loggedIn: true,
             loggedInUsername: username.value,
+            loggedInUserId: userId,
             pendingCode: code.value
         })
         toast.success("Code correct, logged in successfully")

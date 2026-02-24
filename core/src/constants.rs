@@ -53,6 +53,7 @@ pub const KEY_ENCRYPTED_KEY_LENGTH: usize = 32;
 pub const MINIMAL_PASSWORD_LENGTH: usize = 8;
 pub const RECOVERY_CODE_LENGTH: usize = 16;
 pub const NUMBER_OF_KEYS: usize = 8;
+pub const SESSION_TOKEN_TIME_ALIVE: i64 = 60 * 60 * 24 * 30; //60 sekund * 60 minut * 24 godziny * 30 dni
 //init_note.rs
 //extensions
 pub const NOTE_EXTENSION: &str = "md";
@@ -190,5 +191,12 @@ pub const LOCAL_LOGIN_DB_SCHEMA: &str = r#" CREATE TABLE IF NOT EXISTS users_dat
                          FOREIGN KEY(user_id) REFERENCES users_data(user_id) ON DELETE CASCADE);
                         CREATE INDEX IF NOT EXISTS idx_recovery_keys_user_unused
                         ON recovery_keys(user_id, used_at);
+                       
+                       
+                        CREATE TABLE IF NOT EXISTS session_data (hashed_token TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL, 
+                        created_at INTEGER NOT NULL DEFAULT(unixepoch()) ,
+                        expires_at INTEGER NOT NULL,
+                        FOREIGN KEY(user_id) REFERENCES users_data(user_id) ON DELETE CASCADE);
+                              
                         "#;
-//CHANGE TO EXECUTE BATCH IF ITS NOT THIS

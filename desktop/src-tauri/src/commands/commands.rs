@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Context};
-use llava_core::{config::change_active_user, AppState};
+use llava_core::{config::change_active_user, services::auth::logging::SessionState, AppState};
 use tauri::{App, State};
 use zeroize::Zeroizing;
 
@@ -9,7 +9,7 @@ pub async fn register_command(
     password: String,
     password_repeated: String,
     state: tauri::State<'_, AppState>,
-) -> Result<Vec<String>, llava_core::Error> {
+) -> Result<(Vec<String>, String), llava_core::Error> {
     let password_zeroized = Zeroizing::from(password);
     let password_repeated_zeroized = Zeroizing::from(password_repeated);
 
@@ -43,7 +43,7 @@ pub async fn register_command(
 
     println!("{:#?}", state);
 
-    Ok(codes)
+    Ok((codes, new_uuid.to_string()))
 }
 
 #[tauri::command]
@@ -51,7 +51,7 @@ pub async fn login_command(
     username: String,
     password: String,
     state: tauri::State<'_, AppState>,
-) -> Result<(), llava_core::Error> {
+) -> Result<String, llava_core::Error> {
     let password_zeroized = Zeroizing::from(password);
 
     let (new_uuid, new_paths, notes_conn) = {
@@ -105,7 +105,7 @@ pub async fn login_command(
     )?;
     println!("{:#?}", state);
 
-    Ok(())
+    Ok(new_uuid.to_string())
 }
 
 #[tauri::command]
@@ -152,7 +152,7 @@ pub async fn log_with_code(
     mut code: String,
     username: String,
     state: tauri::State<'_, AppState>,
-) -> Result<(), llava_core::Error> {
+) -> Result<String, llava_core::Error> {
     code.retain(|c| c != '-');
     let users_db_guard = state
         .users_db
@@ -172,7 +172,7 @@ pub async fn log_with_code(
         &state, user_uuid, notes_conn, paths, username,
     )?;
 
-    Ok(())
+    Ok(user_uuid.to_string())
 }
 
 #[tauri::command]
@@ -194,4 +194,19 @@ pub async fn change_password(
     // can i just get any key from used of user and get kek from it? or do i need specially code was used last time?
     llava_core::change_password(user_db, username, password, password_repeated, code)?;
     Ok(())
+}
+
+#[tauri::command]
+pub async fn check_login_on_start(
+    state: tauri::State<'_, AppState>,
+) -> Result<SessionState, llava_core::Error> {
+    let user_db_guard = state
+        .users_db
+        .lock()
+        .map_err(|_| anyhow!("Couldnt get user_db guard"))?;
+    let users_db = user_db_guard
+        .as_ref()
+        .ok_or(llava_core::Error::FatalError)?;
+    let is_logged_in = llava_core::check_if_user_logged_in(&users_db)?;
+    Ok(is_logged_in)
 }

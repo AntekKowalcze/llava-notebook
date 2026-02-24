@@ -10,6 +10,7 @@ pub use models::note::Note;
 pub use services::auth::database_creation::connect_or_create_local_login_db;
 pub use services::auth::logging::change_last_login;
 pub use services::auth::logging::check_error_count;
+pub use services::auth::logging::check_if_user_logged_in;
 pub use services::auth::logging::get_timeout;
 pub use services::auth::logging::local_log_in;
 pub use services::auth::logging::log_with_code;

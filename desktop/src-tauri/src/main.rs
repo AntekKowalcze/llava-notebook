@@ -40,6 +40,7 @@ pub fn main() {
 
     state.users_db = std::sync::Mutex::from(Some(user_db));
     state.device_id = std::sync::Mutex::from(Some(device_id));
+
     // state.current_user = std::sync::Mutex::from(Some(
     //     llava_core::config::read_current_user(&program_paths.active_user_path)
     //         .expect("error while reading current user"),
@@ -62,8 +63,8 @@ pub fn main() {
             commands::commands::check_if_user_exists,
             commands::commands::check_timeout_before_submit,
             commands::commands::change_password,
-            // commands::commands::generate_recovery_keys,
-            commands::commands::log_with_code
+            commands::commands::log_with_code,
+            commands::commands::check_login_on_start
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
