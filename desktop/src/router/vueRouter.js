@@ -1,6 +1,8 @@
 import { createWebHashHistory, createRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import { invoke } from "@tauri-apps/api/core";
+import { useToast } from "vue-toastification";
+const toast = useToast()
 const routes = [
     {
         path: '/', name: "index",
@@ -12,6 +14,7 @@ const routes = [
                 if (hasNoUsers) {//first run
                     return { path: "/register", replace: true }
                 } else if (!hasNoUsers && authStore.loggedIn) {
+                    toast.success(authStore.loggedInUsername + " logged in")
                     return { path: "/main", replace: true }
                 } else if (!hasNoUsers && !authStore.loggedIn) {
                     console.log("not logged in")
@@ -40,5 +43,3 @@ export const router = createRouter({
         return { top: 0 }
     }
 })
-//TODO raczej nie potrzebne bo nie ma consoli w prod add router guard so you cant move between login and not login sites 
-//TODO potem dashboard 

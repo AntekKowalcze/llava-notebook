@@ -51,3 +51,19 @@ pub fn get_user_uuid(
 
     Ok(uuid)
 }
+
+pub fn get_username_from_uuid(
+    users_db: &Connection,
+    user_uuid: String,
+) -> Result<String, crate::errors::Error> {
+    let username: String = users_db
+        .query_row(
+            "SELECT username FROM users_data WHERE user_id = :id;",
+            named_params! {
+                ":id": user_uuid,
+            },
+            |row| row.get::<_, String>(0),
+        )
+        .context("Failed to get user uuid from database")?;
+    Ok(username)
+}

@@ -59,7 +59,7 @@ async function submitRegister() {
     toast.success("successfully regisered local user account");
     await router.replace({ name: "recoveryCodes" });
 
-  } catch (err: any) {//TODO add error matching
+  } catch (err: any) {
     if (err === "UsernameExistsError") {
       toast.warning("Username already exists")
 

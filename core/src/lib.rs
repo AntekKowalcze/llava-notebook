@@ -27,3 +27,4 @@ pub use services::storage::read::read_note_content;
 pub use services::storage::update::update_md;
 pub use utils::get_time;
 pub use utils::get_user_uuid;
+pub use utils::get_username_from_uuid;

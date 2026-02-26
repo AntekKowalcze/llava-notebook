@@ -19,25 +19,33 @@ export const useAuthStore = defineStore('auth', () => {
         }
     }
     async function checkSession() {
-        console.log("here")
         try {
             const state = await invoke<{ status: string; user_id?: string }>('check_login_on_start');
-            console.log(state.status)
+
             if (state.status === 'logged_in') {
-
-                loggedIn.value = true;
                 loggedInUserId.value = state.user_id ?? null;
-                console.log(loggedIn.value, loggedInUserId.value);
 
+                try {
+                    loggedInUsername.value = await invoke<string>(
+                        'get_username_from_uuid',
+                        { userUuid: loggedInUserId.value }
+                    );
+                } catch (err) {
+                    console.error('Failed to get username:', err);
+                    loggedInUsername.value = null;
+                }
+
+                // ustawiasz loggedIn dopiero gdy masz już wszystkie dane
+                loggedIn.value = true;
+                console.log(loggedIn, loggedInUserId, loggedInUsername)
             } else {
                 loggedIn.value = false;
             }
         } catch {
             loggedIn.value = false;
         }
-
-
     }
+
 
 
     return { hasNoUsers, loggedIn, loggedInUsername, loggedInUserId, recoveryKeys, checkUsers, pendingCode, checkSession };

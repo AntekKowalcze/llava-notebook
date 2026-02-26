@@ -7,7 +7,6 @@ mod commands;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn main() {
     let program_paths: ProgramFiles = if cfg!(not(debug_assertions)) {
-        
         llava_core::ProgramFiles::init().expect("failed creating program pahts")
     } else {
         // let path = std::env::temp_dir().join("llava_test");
@@ -15,7 +14,7 @@ pub fn main() {
         //     std::fs::remove_dir_all(path).expect("PROBABLY LLAVA_TEST IS NOT EXISTING JUST CREATE IT SO IT COULD BE DELETED WITH NO ERROR");
         // }
         // IF YOU NEED RESTART UNCOMMENT THIS LINE
-        
+
         llava_core::ProgramFiles::init_in_base().expect("failed creating program pahts")
     };
     let user_db =
@@ -64,7 +63,8 @@ pub fn main() {
             commands::commands::check_timeout_before_submit,
             commands::commands::change_password,
             commands::commands::log_with_code,
-            commands::commands::check_login_on_start
+            commands::commands::check_login_on_start,
+            commands::commands::get_username_from_uuid
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
