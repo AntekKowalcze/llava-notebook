@@ -64,7 +64,8 @@ pub fn main() {
             commands::commands::change_password,
             commands::commands::log_with_code,
             commands::commands::check_login_on_start,
-            commands::commands::get_username_from_uuid
+            commands::commands::get_username_from_uuid,
+            commands::commands::local_logout_command
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -8,7 +8,7 @@ use std::fs::{self};
 pub fn update_md(
     //możę usunąć note_id/name w sensie jedno z tych ale to zobacze jak będzie łatwiej zaimplementować w taurii
     //remember about changin state to pending upload when update when adding sync
-    conn: &rusqlite::Connection,
+    notes_db: &rusqlite::Connection,
     name: String,
     note_id: uuid::Uuid, //możliwa zmiana na uuid
     written_string: String,
@@ -39,16 +39,17 @@ pub fn update_md(
     let note_path = program_paths.notes_path.join(note_name);
     fs::rename(&tmp_filepath, note_path)?;
 
-    conn.execute(
-        UPDATE_NOTE_SQL_QUERY,
-        rusqlite::named_params! {
-            ":updated_time": crate::utils::get_time(),
-            ":summary": summary,
-            ":title" : title,
-            ":id": note_id.to_string(),
-        },
-    )
-    .context("Couldnt get needed info about note from SQL while updating")?;
+    notes_db
+        .execute(
+            UPDATE_NOTE_SQL_QUERY,
+            rusqlite::named_params! {
+                ":updated_time": crate::utils::get_time(),
+                ":summary": summary,
+                ":title" : title,
+                ":id": note_id.to_string(),
+            },
+        )
+        .context("Couldnt get needed info about note from SQL while updating")?;
     log_helper(
         "validating note name",
         "success",

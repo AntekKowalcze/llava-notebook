@@ -1,5 +1,19 @@
-//! Module responsible for registering user
-//! in this modules important data is encrypted, and keys for notes encryption are also created
+//! # Local user register module
+//! **Purpose**: This module is responsible for all actions taken while creating local account.   
+//! It handles saving account data to database, create and encrypt keys and hash passwords, it also handles keyring logged in account saving
+//!  ## Exported functions 
+//! * [register_user_offline] - Full registration flow from validating password and username to encryption to changing state of the app
+//! * [recovery_code_handling] - Function responsible for generating and handling recovery keys database
+//! * [after_validation] - Function responsible for changing physical state of the app (paths)
+//! * [change_password] - Function responsible for changing password, reencrypting notes key, rehashing etc.
+//! ## Key design decisions
+//! Password is entry for all kdf, notes key is random, encrypted and wrapped with KEK. All important data is zeroized. 
+//! Recovery key behaves as password, after use user is logged in, and its needed for password change, every key reencrypts notes key
+//! ## Dependencies
+//! - `argon2` — Password hashing and KEK derivation
+//! - `chacha20poly1305` — Authenticated encryption of key material
+//! - `rusqlite` — SQLite via `users_data` and `recovery_keys` tables
+//! - `zeroize` — Secure memory wiping of sensitive values
 use crate::constants::*;
 use crate::utils::{Format, log_helper};
 use anyhow::Context;
@@ -14,22 +28,20 @@ use chacha20poly1305::{
     ChaCha20Poly1305,
     aead::{Aead, AeadCore, KeyInit},
 };
-use rusqlite::types::Null;
 use rusqlite::{Connection, OptionalExtension, named_params, params};
 
 use zeroize::Zeroize;
 
 use crate::config::{ProgramFiles, change_active_user};
-///function responsible for registering user offilne and adding it encrypted to local db
 pub fn register_user_offline(
     username: String,
     password: zeroize::Zeroizing<String>,
     password_repeated: zeroize::Zeroizing<String>,
     paths: &crate::config::ProgramFiles,
-    conn: &mut Connection,
+    users_db: &mut Connection,
 ) -> Result<(uuid::Uuid, ProgramFiles, Connection, Vec<String>), crate::errors::Error> {
     let username = username.trim().to_string();
-    validate_username(&username, &conn)?;
+    validate_username(&username, &users_db)?;
     let password = password.as_str().trim();
     let password_repeated = password_repeated.as_str().trim();
     password_validation(password, password_repeated)?;
@@ -45,14 +57,14 @@ pub fn register_user_offline(
         kek_salt: salt,
         is_online_linked: false,
         online_account_email: None,
-        device_id: crate::config::get_device_id(&conn, &paths.device_id_path)?,
+        device_id: crate::config::get_device_id(&users_db, &paths.device_id_path)?,
         created_at: crate::utils::get_time(),
         last_login: crate::utils::get_time(),
         password_errors: 0,
         ending_block_timestamp: 0,
     };
 
-    let tx = conn.transaction().context(
+    let tx = users_db.transaction().context(
         "Couldnt insert user into database, transaction failed while registering a user",
     )?;
 
@@ -72,13 +84,12 @@ pub fn register_user_offline(
          ":last_login":new_user.last_login,
          ":password_errors":new_user.password_errors,
          ":ending_block_timestamp":new_user.ending_block_timestamp,//timestamp
-          }, //TODO jeśli nie ma już kluczy odzyskiwania dla użytkownika to wyświetl komunikatr po użyciu kodu sprawdzić w bazie czy jest wiecej niż jeden not used where uzytkownik i jeśli zwróci true to toast
+          },
     )
     .context("Couldnt insert user into database, transaction failed while registering a user")?;
     tx.commit().context(
         "Couldnt insert user into database, transaction failed while registering a user",
     )?;
-    //flow generate on register -> return to state, get from frontend after entering recovery code keys paht
     crate::config::change_active_user(&new_user.user_id, &paths)?;
     log_helper(
         "registering",
@@ -87,15 +98,14 @@ pub fn register_user_offline(
         "User successfully registered",
     );
 
-    let codes = recovery_code_handling(&new_user.username, conn, password)?; //get recovery codes as strings
+    let codes = recovery_code_handling(&new_user.username, users_db, password)?; //get recovery codes as strings
 
     let paths = after_validation(&new_user.user_id, paths)?;
-    crate::services::auth::logging::session_operations(&conn, new_user.user_id)?;
-    let conn = crate::services::storage::db_creation::get_connection(&paths)?; //get connection for note database
-    Ok((new_user.user_id, paths, conn, codes))
+    crate::services::auth::logging::session_operations(&users_db, new_user.user_id)?;
+    let users_db = crate::services::storage::db_creation::get_connection(&paths)?; //get connection for note database
+    Ok((new_user.user_id, paths, users_db, codes))
 }
 
-///this function generates encrypted keys
 fn generate_enctypted_keys(
     //reuse on password change
     password: &str,
@@ -148,7 +158,7 @@ fn generate_enctypted_keys(
     ))
 }
 
-
+//to generate more keys just run this funciton
 pub fn recovery_code_handling(
     username: &str,
     users_db: &rusqlite::Connection,
@@ -280,7 +290,6 @@ fn generate_recovery_code(
         kdf_salt.to_string(),
     ))
 }
-///this function validates password on backend side
 fn password_validation(
     password: &str,
     password_repeated: &str,
@@ -310,9 +319,8 @@ fn password_validation(
     
     Ok(())
 }
-///this function validate username on backend side
-fn validate_username(username: &str, conn: &Connection) -> Result<(), crate::errors::Error> {
-    let exists = conn
+fn validate_username(username: &str, users_db: &Connection) -> Result<(), crate::errors::Error> {
+    let exists = users_db
         .query_row(
             "SELECT username FROM users_data WHERE username = :name",
             params![username],
@@ -510,7 +518,7 @@ fn register_test() {
     let paths = ProgramFiles::init_in_base().unwrap();
     let home_path = std::env::temp_dir().join(LOCAL_USERS_DB);
 
-    let mut conn =
+    let mut users_db =
         crate::services::auth::database_creation::connect_or_create_local_login_db(&home_path)
             .unwrap();
     register_user_offline(
@@ -518,7 +526,7 @@ fn register_test() {
         zeroize::Zeroizing::from("ToJestTest!".to_string()),
         zeroize::Zeroizing::from("ToJestTest!".to_string()),
         &paths,
-        &mut conn,
+        &mut users_db,
     )
     .unwrap();
 }
@@ -526,21 +534,21 @@ fn register_test() {
 #[test]
 fn generate_codes() {
     let paths = ProgramFiles::init_in_base().unwrap();
-    let mut conn = rusqlite::Connection::open_in_memory().unwrap();
+    let mut users_db = rusqlite::Connection::open_in_memory().unwrap();
 
     // Initialize schema manually
-    conn.execute_batch(LOCAL_LOGIN_DB_SCHEMA).unwrap();
+    users_db.execute_batch(LOCAL_LOGIN_DB_SCHEMA).unwrap();
 
     register_user_offline(
         "tescik".to_string(),
         zeroize::Zeroizing::from("ToJestTest!".to_string()),
         zeroize::Zeroizing::from("ToJestTest!".to_string()),
         &paths,
-        &mut conn,
+        &mut users_db,
     )
     .unwrap();
 
-    let u_uuid: String = conn
+    let u_uuid: String = users_db
         .query_row(
             "SELECT user_id FROM users_data WHERE username = :name;",
             named_params! {
@@ -551,6 +559,6 @@ fn generate_codes() {
         .unwrap();
 
     let u_uuid = uuid::Uuid::parse_str(&u_uuid).unwrap();
-    let keys = recovery_code_handling("tescik", &conn, "ToJestTest!").unwrap();
+    let keys = recovery_code_handling("tescik", &users_db, "ToJestTest!").unwrap();
     println!("keys: {:#?}", keys);
 }

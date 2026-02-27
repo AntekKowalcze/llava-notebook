@@ -1,4 +1,26 @@
-//! Module used for creating and checking database settings, this module also gives connection to db
+//! # Notes database creation module
+//! **Purpose**: Opens a connection to the notes SQLite database, applies all required PRAGMAs for
+//! performance and integrity, and ensures the full schema exists. Also defines [`SyncState`] with
+//! the `ToSql` / `FromSql` impls needed to bind it directly in queries.
+//!
+//! ## Exported items
+//! * [`get_connection`] — Public entry point; calls the internal setup, logs the result, and
+//!   returns a ready-to-use [`Connection`]
+//! * [`SyncState`] — Enum representing the cloud sync status of a note or attachment
+//!   (`LocalOnly`, `PendingUpload`, `Synced`, `Conflict`, `Error`, `PendingDeleted`);
+//!   serialisable and bindable directly to SQLite TEXT columns
+//!
+//! ## Key design decisions
+//! Schema creation runs inside a transaction so the batch is atomic — either all tables and
+//! indexes exist or none do. PRAGMAs are set on every connection open: `foreign_keys = ON`,
+//! `journal_mode = WAL`, `synchronous = NORMAL`, `cache_size = -64000` (64 MB), `temp_store =
+//! MEMORY`, and `busy_timeout = 5000 ms`. WAL mode is chosen to allow concurrent reads during
+//! writes, which matters for the Tauri frontend fetching notes while a sync worker writes.
+//!
+//! ## Dependencies
+//! - `rusqlite` — SQLite connection, pragma updates, transaction, `ToSql`/`FromSql` traits
+//! - `anyhow` — `.context()` error propagation
+
 use crate::utils::{Format, log_helper};
 use anyhow::Context;
 use rusqlite::{Connection, Result};
@@ -8,7 +30,7 @@ use crate::constants::NOTE_DB_SCHEMA;
 pub fn get_connection(
     paths: &crate::config::ProgramFiles,
 ) -> Result<Connection, crate::errors::Error> {
-    let conn = creating_tables(paths)
+    let notes_db = creating_tables(paths)
         .inspect_err(|err| crate::services::logger::log_error("error while creating tables", &err))
         .context("couldnt create tables in getting connection foruser connection to db")?;
     log_helper(
@@ -17,34 +39,40 @@ pub fn get_connection(
         None::<Format<String>>,
         "Successfully got connection",
     );
-    Ok(conn)
+    Ok(notes_db)
 }
 
 fn creating_tables(
     paths: &crate::config::ProgramFiles,
 ) -> Result<Connection, crate::errors::Error> {
-    let mut conn = Connection::open(&paths.data_base_path)
+    let mut notes_db = Connection::open(&paths.data_base_path)
         .context("couldnt establish connection to notes database")?;
 
     // ustawienia pragm
-    conn.pragma_update(None, "foreign_keys", "ON")
+    notes_db
+        .pragma_update(None, "foreign_keys", "ON")
         .context("Pragma error while creating notes db, foreign_keys")?;
-    conn.pragma_update(None, "synchronous", "NORMAL")
+    notes_db
+        .pragma_update(None, "synchronous", "NORMAL")
         .context("Pragma error while creating notes db, synchronous")?;
-    conn.pragma_update(None, "cache_size", "-64000")
+    notes_db
+        .pragma_update(None, "cache_size", "-64000")
         .context("Pragma error while creating notes db, cache size")?;
-    conn.pragma_update(None, "temp_store", "MEMORY")
+    notes_db
+        .pragma_update(None, "temp_store", "MEMORY")
         .context("Pragma error while creating notes db, temp_store")?;
-    conn.pragma_update(None, "busy_timeout", "5000")
+    notes_db
+        .pragma_update(None, "busy_timeout", "5000")
         .context("Pragma error while creating notes db, busy timeout")?;
-    conn.pragma_update(None, "journal_mode", "WAL")
+    notes_db
+        .pragma_update(None, "journal_mode", "WAL")
         .context("Pragma error while creating notes db, journal mode")?;
 
     // opcjonalne potwierdzenie (tylko do logów)
-    if let Ok(mode) = conn.pragma_query_value(None, "journal_mode", |r| r.get::<_, String>(0)) {
+    if let Ok(mode) = notes_db.pragma_query_value(None, "journal_mode", |r| r.get::<_, String>(0)) {
         crate::services::logger::log_success(&format!("Journal mode set to {}", mode));
     }
-    let tx = conn
+    let tx = notes_db
         .transaction()
         .context("failed to create database for notes")?;
     let schema = NOTE_DB_SCHEMA;
@@ -57,7 +85,7 @@ fn creating_tables(
         None::<Format<String>>,
         "db schema correct",
     );
-    Ok(conn)
+    Ok(notes_db)
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]

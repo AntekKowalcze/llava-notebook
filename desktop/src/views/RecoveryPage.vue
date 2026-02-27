@@ -17,7 +17,11 @@ const authStore = useAuthStore();
 
 async function checkCode() {
     try {
-        let userId = await invoke<string>("log_with_code", { username: username.value, code: code.value })
+        let [userId, one_code] = await invoke<[string, boolean]>("log_with_code", { username: username.value, code: code.value })
+        if (one_code) {
+            toast.info("You have used all of your codes, generate more in settings");
+            //TODO add function for generating codes (just new 8 codes use what you have)
+        }
         authStore.$patch({
             loggedIn: true,
             loggedInUsername: username.value,

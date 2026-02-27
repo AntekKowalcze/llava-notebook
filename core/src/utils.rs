@@ -30,10 +30,10 @@ where
 }
 
 pub fn get_user_uuid(
-    conn: &Connection,
+    users_db: &Connection,
     username: &str,
 ) -> Result<uuid::Uuid, crate::errors::Error> {
-    let uuid_str_opt = conn
+    let uuid_str_opt = users_db
         .query_row(
             "SELECT user_id FROM users_data WHERE username = :n",
             named_params! {

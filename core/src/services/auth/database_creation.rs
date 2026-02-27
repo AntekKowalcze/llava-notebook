@@ -1,8 +1,23 @@
+//! # Local login database creation module
+//! **Purpose**: Opens (or creates) the shared `local_login_db.sqlite` file, applies PRAGMAs,
+//! and ensures the `users_data`, `recovery_keys`, and `session_data` tables exist.
+//! Unlike the notes DB this file is **not** per-user — it lives at `llava/users/local_login_db.sqlite`
+//! and is shared across all local accounts on the device.
+//!
+//! ## Exported functions
+//! * [`connect_or_create_local_login_db`] — Opens the SQLite file at the given path, sets
+//!   PRAGMAs (`WAL`, `synchronous = NORMAL`, `cache_size = -2000`, `temp_store = MEMORY`,
+//!   `foreign_keys = ON`), then runs `LOCAL_LOGIN_DB_SCHEMA` in a single transaction to
+//!   create all tables and indexes if they do not yet exist
+//!
+//! ## Dependencies
+//! - `rusqlite` — Connection, pragma updates, transaction
+//! - `anyhow` — `.context()` error propagation
+
 use crate::constants::LOCAL_LOGIN_DB_SCHEMA;
 use crate::utils::{Format, log_helper};
 use anyhow::Context;
 //llava/users/local_login_db.sqlite
-///creation of user_data local database
 pub fn connect_or_create_local_login_db(
     local_login_db_path: &std::path::Path,
 ) -> Result<rusqlite::Connection, crate::errors::Error> {

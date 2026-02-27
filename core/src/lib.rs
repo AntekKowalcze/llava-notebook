@@ -13,6 +13,7 @@ pub use services::auth::logging::check_error_count;
 pub use services::auth::logging::check_if_user_logged_in;
 pub use services::auth::logging::get_timeout;
 pub use services::auth::logging::local_log_in;
+pub use services::auth::logging::local_logout;
 pub use services::auth::logging::log_with_code;
 pub use services::auth::logging::zero_error_count;
 pub use services::auth::register::change_password;

@@ -1,221 +1,207 @@
+Here's the full architecture document translated to English with fixed markdown formatting:
 
----
+***
 
-# 🧱 Architektura llava
+# 🧱 Llava Architecture
 
-## 🎯 Założenia projektu
+## 🎯 Project Goals
 
-* Offline-first notatnik z możliwością synchronizacji przez MongoDB i S3.
-* Zapis lokalny w plikach Markdown + metadane w SQLite.
-* Pełne szyfrowanie end-to-end (E2E) danych użytkownika.
-* Każdy użytkownik posiada osobny profil i lokalną bazę danych.
-* Aplikacja desktopowa oparta o **Tauri (Rust + Vue/Svelte)**.
+* Offline-first note-taking app with optional sync via MongoDB and S3.
+* Local storage in Markdown files + metadata in SQLite.
+* Full end-to-end encryption (E2E) of all user data.
+* Each user has a separate profile and local database.
+* Desktop application built on **Tauri (Rust + Vue)**.
 
----
+***
 
-## ⚙️ Tech stack
+## ⚙️ Tech Stack
 
-* **Frontend:** Vue + Tauri UI
+* **Frontend:** Vue + TypeScript
 * **Backend:** Rust (tokio, serde, rusqlite, mongodb, aws-sdk-s3)
-* **Lokalna baza:** SQLite (z feature `bundled`)
-* **Chmurowa baza:** MongoDB Atlas
-* **Przechowywanie plików AWS S3 (zaszyfrowane)
-* **Szyfrowanie:** ChaCha20-Poly1305 + Argon2id (E2E)
-* **Parser Markdown:** pulldown_cmark / comrak
+* **Local DB:** SQLite (with `bundled` feature)
+* **Cloud DB:** MongoDB Atlas
+* **File/attachment storage:** AWS S3 (encrypted)
+* **Encryption:** ChaCha20-Poly1305 + Argon2id (E2E)
+* **Markdown parser:** pulldown_cmark / comrak
 
----
+***
 
-## 🧩 Struktura projektu (moduły Rust)
-
-```
-src/
- ├── main.rs            # Punkt wejścia, konfiguracja Tauri
- ├── commands.rs        # #[tauri::command] API dla frontendu
- ├── models/            # Definicje struktur (Note, User, Attachment)
- ├── services/
- │    ├── storage.rs    # CRUD lokalny (Markdown + SQLite)
- │    ├── sync.rs       # Synchronizacja z MongoDB + S3
- │    ├── crypto.rs     # Szyfrowanie / deszyfrowanie danych
- │    ├── auth.rs       # Logowanie i konta użytkowników
- │    ├── attachment.rs # Zarządzanie plikami i ich stanem synchronizacji
- │    ├── cleaner.rs    # Sprzątanie osieroconych plików (S3/local)
- │    └── logger.rs     # Logowanie operacji i błędów
- ├── config.rs          # Ustawienia i ścieżki aplikacji
- └── utils.rs           # Pomocnicze funkcje
-```
-
----
-
-## 🗂️ Struktura danych lokalnych
+## 🗂️ Local Data Structure
 
 ```
-~/.core/
+~/llava/
   users/
-    <user_email_hash>/
-      db.sqlite              # Metadane i historia
-      notes/<uuid>.md        # Treść notatek (Markdown)
-      assets/<uuid>/...      # Obrazy i załączniki
-      keys/master.key        # Zaszyfrowany klucz główny
-      config.json
+    <user_uuid>/
+      db.sqlite              # Metadata and history
+      notes/<uuid>.md        # Note content (Markdown)
+      assets/<uuid>/...      # Images and attachments
       logs/app.log
 ```
 
----
+***
 
-## 📄 Model danych
+## 📄 Data Model
+`todo`
 
+### ☁️ MongoDB (cloud database)
+In data models file.
 
-### ☁️ MongoDB (chmurowa baza) 
+***
 
-W pliku data models
-## 🔐 Bezpieczeństwo
+## 🔐 Security
 
-* Szyfrowanie end-to-end (E2E): notatki i pliki szyfrowane lokalnie.
-* Klucz główny tworzony z hasła użytkownika (Argon2id).
-* Przechowywanie zaszyfrowanego master keya lokalnie (`keys/master.key`).
-* S3 i MongoDB widzą wyłącznie zaszyfrowane dane.
-* Utrata klucza = brak możliwości odszyfrowania (wymagany backup).
+* End-to-end encryption (E2E): notes and files encrypted locally.
+* Master key derived from user's password (Argon2id).
+* Encrypted master key stored locally in SQLite.
+* S3 and MongoDB only ever see encrypted data.
+* Lost key = no decryption possible (backup required).
+* Lost password → recovery codes, each one wraps the notes key (KEK).
 
----
+***
 
-## 🔄 Synchronizacja
+## 🔄 Synchronization
 
-* Tryb **offline-first** — wszystko działa lokalnie, nawet bez internetu.
-* **SyncManager** co 30 sekund lub po `Ctrl+S`:
+* **Offline-first** — everything works locally, even without internet.
+* **SyncManager** every 30 seconds or on `Ctrl+S`:
+  1. Pushes local changes to Mongo/S3 (upsert per `local_id`).
+  2. Pulls remote changes (`updated_at` > `last_sync`).
+  3. Resolves conflicts (last-writer-wins + history snapshots).
+  4. Emits events: `sync:started`, `sync:progress`, `sync:completed`.
+* `sync_ops` queue in SQLite stores all pending changes.
 
-  1. Wysyła lokalne zmiany do Mongo/S3 (upsert per `local_id`).
-  2. Pobiera zdalne zmiany (`updated_at` > `last_sync`).
-  3. Rozwiązuje konflikty (last-writer-wins + snapshot historii).
-  4. Emituje eventy `sync:started`, `sync:progress`, `sync:completed`.
-* Kolejka `sync_ops` w SQLite przechowuje wszystkie oczekujące zmiany.
+***
 
----
+## 🧹 Attachment Management
 
-## 🧹 Zarządzanie załącznikami
+* Every attachment has `checksum_encrypted` and `sync_state`.
+* Upload to S3 happens after encryption (streaming).
+* Deterministic S3 keys (`user_id/local_id/attachment_id`).
+* `AttachmentCleaner` removes orphaned files locally and in S3.
 
-* Każdy załącznik ma `checksum_encrypted` i `sync_state`.
-* Upload do S3 odbywa się po szyfrowaniu (streaming).
-* Deterministyczne klucze S3 (`user_id/local_id/attachment_id`).
-* `AttachmentCleaner` usuwa osierocone pliki lokalne i w S3.
+***
 
----
+## 🧠 Additional Mechanisms
 
-## 🧠 Mechanizmy dodatkowe
+* **History snapshots:** every note edit saves a local version (`history/<note_id>/v{n}.md`).
+* **Logger:** logs CRUD, sync, crypto operations and errors.
+* **Tauri Event System:** Rust ↔ frontend communication (`sync:started`, `note:created`, `error:network`).
+* **Offline mode:** user can manually disable synchronization.
 
-* **History snapshots:** każda edycja notatki zapisuje wersję lokalnie (`history/<note_id>/v{n}.md`).
-* **Logger:** loguje operacje CRUD, sync, crypto, błędy.
-* **Tauri Event System:** komunikacja Rust ↔ frontend (`sync:started`, `note:created`, `error:network`).
-* **Offline mode:** użytkownik może wyłączyć synchronizację ręcznie.
+***
 
----
+## 🧰 Supporting Technologies
 
-## 🧰 Technologie wspomagające
-
-* `rusqlite` – lokalna baza danych (z feature `bundled`)
-* `mongodb` – klient MongoDB
-* `aws-sdk-s3` – upload i download zaszyfrowanych plików
-* `tokio` – asynchroniczność
+* `rusqlite` – local database (with `bundled` feature)
+* `mongodb` – MongoDB client
+* `aws-sdk-s3` – upload and download of encrypted files
+* `tokio` – async runtime
 * `uuid`, `chrono`, `serde`, `argon2`, `chacha20poly1305`
 
----
+***
 
-## 🚀 Plan rozwoju (iteracyjny)
+## 🚀 Development Plan (iterative)
 
-1. Lokalny CRUD (Markdown + SQLite)
-2. GUI (Tauri + Vue/Svelte)
-3. Podstawowy sync notatek z MongoDB
-4. Lokalny AttachmentManager + upload do S3
-5. E2E szyfrowanie notatek i załączników
-6. Logger + historia wersji + konflikt manager
-7. Integracja eventów Tauri i powiadomień w UI
+| # | Milestone |
+|---|---|
+| 0 | Local registration/login + frontend |
+| 1 | Local CRUD (Markdown + SQLite) |
+| 2 | Basic note sync with MongoDB |
+| 3 | Local AttachmentManager + S3 upload |
+| 4 | E2E encryption of notes and attachments |
+| 5 | Logger + version history + conflict manager |
+| 6 | Tauri event integration + UI notifications |
+| 7 | AI summary (local, self-hosted, private) |
 
----
+***
 
-## 📊 Kluczowe zasady projektowe
+## 📊 Core Design Principles
 
-* Każdy komponent ma **jedną odpowiedzialność** (SRP).
-* Dane **zawsze najpierw lokalnie**, później sync.
-* Synchronizacja **idempotentna** (bez duplikatów).
-* Brak serwera pośredniego — klient sam szyfruje i wysyła dane.
-* Kod i logika przygotowane pod **multi-device sync**.
+* Every component has a **single responsibility** (SRP).
+* Data **always local first**, sync later.
+* Synchronization is **idempotent** (no duplicates).
+* No intermediate server — the client encrypts and sends data directly.
+* Code and logic prepared for **multi-device sync**.
 
+***
+
+## 🏗️ Architecture Diagram
+
+```
         ┌────────────────────────────┐
         │        🖥️  Frontend        │
-        │  Vue / Svelte (Tauri UI)   │
+        │       Vue (Tauri UI)       │
         │                            │
-        │  • Edycja Markdown         │
-        │  • Podgląd live preview    │
-        │  • Lista notatek / tagi    │
-        │  • Powiadomienia i eventy  │
+        │  • Markdown editor         │
+        │  • Live preview            │
+        │  • Note list / tags        │
+        │  • Notifications & events  │
         └──────────────┬─────────────┘
                        │
-                 Tauri Commands + Event System
+             Tauri Commands + Events
                        │
                        ▼
-┌────────────────────────────────────────────────────┐
-│              ⚙️  Rust Backend (Tauri)              │
-│----------------------------------------------------│
-│  AppState (shared state)                           │ 
-│  ├── StorageService    CRUD na plikach i SQLite    │ 
-│  ├── SyncManager       Synchronizacja z Mongo/S3   │   
-│  ├── CryptoService     Szyfrowanie / deszyfrowanie │ 
-│  ├── AttachmentManager Zarządzanie załącznikami    │ 
-│  ├── AuthService       Logowanie / klucz master    │   
-│  ├── Cleaner           Usuwanie orphaned plików    │
-│  └── Logger            Audyt i diagnostyka         │  
-└──────────────────────┬─────────────────────────────┘
+┌───────────────────────────────────────────────────┐
+│             ⚙️  Rust Backend (Tauri)              │
+│───────────────────────────────────────────────────│
+│  AppState (shared state)                          │
+│  ├── StorageService    CRUD on files and SQLite   │
+│  ├── SyncManager       Sync with Mongo/S3         │
+│  ├── CryptoService     Encryption / decryption    │
+│  ├── AttachmentManager Attachment management      │
+│  ├── AuthService       Login / master key         │
+│  ├── Cleaner           Remove orphaned files      │
+│  └── Logger            Audit and diagnostics      │
+└──────────────────────┬────────────────────────────┘
                        │
                        ▼
-┌───────────────────────────────────────────┐
-│       💾  Lokalny Storage (Offline)       │
-│-------------------------------------------│
-│~/.llava/users/<user>/                 │                        
-│ ├── notes/*.md  Markdownowe notatki       │                     
-│ ├── assets/*    Obrazy i załączniki       │
-│ ├── db.sqlite   Metadane i historia       │
-│ ├── keys/master.key zyfrowany klucz główny│
-| └── logs/app.log   Dziennik operacji      │
-│ |__ tmp/        Pliki w trakcie zapisu    │
-│ |__ delete_tmp/ notatki po soft delete    │
-│                                           │
-│  → Zapis offline-first                    │
-│  → Szyfrowanie E2E                        │
-└───────────────────┬───────────────────────┘
-                    |
+┌──────────────────────────────────────────────┐
+│        💾  Local Storage (Offline)           │
+│──────────────────────────────────────────────│
+│  ~/.llava/users/<uuid>/                      │
+│  ├── notes/*.md       Markdown notes         │
+│  ├── assets/*         Images and attachments │
+│  ├── db.sqlite        Metadata and history   │
+│  ├── keys/master.key  Encrypted master key   │
+│  ├── logs/app.log     Operation journal      │
+│  ├── tmp/             Files being written    │
+│  └── delete_tmp/      Soft-deleted notes     │
+│                                              │
+│  → Offline-first writes                      │
+│  → E2E encryption                            │
+└───────────────────┬──────────────────────────┘
                     │
-                   Sync (co 30s / Ctrl + S )
-                    │
-                    ▼
-┌───────────────────────────────────────────┐
-│             ☁️  Cloud Backend             │
-│-------------------------------------------│
-│ MongoDB Atlas -> Metadane notatek (JSON)  │                        
-│ S3 Storage -> Zaszyfrowane pliki i obrazy │                     
-│                                           │
-│          🔒 Wszystko zaszyfrowan          │
-│           → ChaCha20-Poly1305             │
-│           → Klucz z Argon2id              │
-│                                           │
-│      🧹 Cleaner dba o spójność            │
-│         (usuwa orphaned pliki)            │
-└───────────────────┬───────────────────────┘
+              Sync (every 30s / Ctrl+S)
                     │
                     ▼
-  ┌──────────────────────────────────┐
-  │ 🔄  Synchronizacja dwukierunkowa |
-  │----------------------------------|
-  │  1. Zmiany lokalne → Mongo/S3    │  
-  │  2. Zmiany zdalne → lokalny cache│  
-  │  3. Konflikty → last-writer-wins │  
-  │  4. Historia i snapshoty         │  
-  │  5. Eventy do UI (progress, err) │  
-  └──────────────────────────────────┘
+┌──────────────────────────────────────────────┐
+│             ☁️  Cloud Backend                │
+│──────────────────────────────────────────────│
+│  MongoDB Atlas  → Note metadata (JSON)       │
+│  S3 Storage     → Encrypted files & images   │
+│                                              │
+│          🔒 Everything encrypted             │
+│           → ChaCha20-Poly1305                │
+│           → Key derived with Argon2id        │
+│                                              │
+│      🧹 Cleaner maintains consistency        │
+│         (removes orphaned files)             │
+└───────────────────┬──────────────────────────┘
+                    │
+                    ▼
+  ┌────────────────────────────────────┐
+  │  🔄  Bidirectional Synchronization │
+  │────────────────────────────────────│
+  │ 1. Local changes  → Mongo/S3       │
+  │ 2. Remote changes → local cache    │
+  │ 3. Conflicts      → last-write-wins│
+  │ 4. History and snapshots           │
+  │ 5. Events to UI (progress, error)  │
+  └────────────────────────────────────┘
+```
 
+***
 
-Summary made by local AI hosted on own server with privacy politics, and more ai features
+## 🤖 AI
 
+* Note summaries generated by a local AI hosted on your own server — private by design, with more AI features planned.
 
-10. dodać logger log4rs, tracing
-12. limit prób w hasłach
-13. testy integracyjne
- myśle że 1-2 punkty dziennie średnio to dobry wynik, jedne są krótsze, drugie dużo dłuższe

@@ -50,4 +50,3 @@ export const useAuthStore = defineStore('auth', () => {
 
     return { hasNoUsers, loggedIn, loggedInUsername, loggedInUserId, recoveryKeys, checkUsers, pendingCode, checkSession };
 });
-//TODO add logout

@@ -1,9 +1,24 @@
-//! in this module paths and config/meta values are stored
+//! # Application constants module
+//! **Purpose**: Central store for all compile-time constants — filesystem paths, SQL schemas,
+//! encryption parameters, and data limits — grouped by the module that consumes them.
+//!
+//! ## Sections
+//! - **Filesystem** — Directory patterns (`USER_DIR_PATTERN`, `SUBDIRS`), JSON file paths and keys
+//!   for active-user and device-id files, SQLite file locations, and the log file path
+//! - **SQL schemas** — Full `CREATE TABLE` / `INSERT` / `UPDATE` statements for the notes DB
+//!   (`NOTE_DB_SCHEMA`, `INSERT_NOTE_SQL_SCHEMA`, `UPDATE_NOTE_SQL_QUERY`) and the local login DB
+//!   (`LOCAL_LOGIN_DB_SCHEMA`, `LOCAL_USER_DB_INSERT_SQL_SCHEMA`)
+//! - **Encryption** — KEK length (`KEY_ENCRYPTED_KEY_LENGTH = 32`), recovery code byte length
+//!   (`RECOVERY_CODE_LENGTH = 16`), number of generated recovery codes (`NUMBER_OF_KEYS = 8`),
+//!   and session token lifetime (`SESSION_TOKEN_TIME_ALIVE` = 30 days in seconds)
+//! - **Validation limits** — `MINIMAL_PASSWORD_LENGTH`, `MAX_NOTE_NAME_LENGTH`, `MAX_TITLE_LENGTH`,
+//!   `SUMMARY_LENGTH`
+//! - **Note format** — File extension (`NOTE_EXTENSION = "md"`), temp extension (`TEMP_NOTE_EXTENSION`)
 
 //config.rs
 //folders
 pub const USER_DIR_PATTERN: &str = "llava/users";
-pub const SUBDIRS: &[&str; 5] = &["notes", "assets", "logs", "tmp", "tmp_delete"];
+pub const SUBDIRS: &[&str; 4] = &["notes", "assets", "tmp", "tmp_delete"];
 //jsons
 pub const CONFIG_FILE: &str = "config.json";
 pub const ACTIVE_USER_JSON_PATH: &str = "llava/active_user.json";
@@ -15,7 +30,7 @@ pub const ACTIVE_USER_JSON_KEY: &str = "user_uuid";
 pub const NOTES_DB: &str = "note.sqlite";
 pub const LOCAL_USERS_DB: &str = "llava/users/local_login_db.sqlite";
 
-pub const LOGS_PATH: &str = "logs/app.log";
+pub const LOGS_PATH: &str = "llava/logs/app.log";
 
 //register.rs
 //SQL

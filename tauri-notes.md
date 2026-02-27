@@ -1,1 +1,0 @@
-in every place where function gets pathbuf  ?or do i ment ProgramFiles sturct? change it to State<StructName>

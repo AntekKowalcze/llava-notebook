@@ -76,7 +76,7 @@ fn init_note(
 
 ///function responsible for all operations needed to initialize note, creating struct and inserting it to sqlite
 pub fn add_note_to_database(
-    conn: &mut rusqlite::Connection,
+    notes_db: &mut rusqlite::Connection,
     paths: &ProgramFiles,
     name: String,
     owner_id: uuid::Uuid,
@@ -91,12 +91,12 @@ pub fn add_note_to_database(
     //     .context("failed to parse json of active_user.json file")?;
     // let owner_id: uuid::Uuid = serde_json::from_value(json["user_uuid"].clone())
     //     .context("Couldnt convert user_uuid red from active_user.json to uuid")?;
-    validate_note_name(&name, &conn, &owner_id)?;
+    validate_note_name(&name, &notes_db, &owner_id)?;
     //getting current user
 
     let note = init_note(owner_id, &paths.notes_path, name)?;
     let transaction_result = {
-        let tx = conn
+        let tx = notes_db
             .transaction()
             .context("Couldnt commit transaction while inserting a note, sql error")?;
         tx.execute(
@@ -157,7 +157,7 @@ pub fn add_note_to_database(
 ///function which valiates note name, it should be distinct
 fn validate_note_name(
     note_name: &str,
-    conn: &Connection,
+    notes_db: &Connection,
     owner_id: &uuid::Uuid,
 ) -> Result<(), crate::errors::Error> {
     if note_name.chars().count() >= MAX_NOTE_NAME_LENGTH {
@@ -169,7 +169,7 @@ fn validate_note_name(
         );
         return Err(crate::errors::Error::NoteNameTooLong);
     }
-    let exists = conn
+    let exists = notes_db
         .query_row(
             "SELECT 1 FROM notes WHERE owner_id = :owner_id AND name = :note_name",
             rusqlite::named_params! {
@@ -217,7 +217,7 @@ fn check_if_file_is_created() {
 #[test]
 fn add_to_db() {
     let path = crate::config::ProgramFiles::init_in_base().unwrap();
-    let mut conn = crate::services::storage::db_creation::get_connection(&path).unwrap();
+    let mut notes_db = crate::services::storage::db_creation::get_connection(&path).unwrap();
     let name = "tttsss".to_owned();
     let file_content = fs::read_to_string(&path.active_user_path).unwrap();
     let json: serde_json::Value = serde_json::from_str(&file_content)
@@ -226,16 +226,16 @@ fn add_to_db() {
     let owner_id: uuid::Uuid = serde_json::from_value(json["user_uuid"].clone())
         .context("Couldnt convert user_uuid red from active_user.json to uuid")
         .unwrap();
-    add_note_to_database(&mut conn, &path, name, owner_id).unwrap();
+    add_note_to_database(&mut notes_db, &path, name, owner_id).unwrap();
 }
 
 #[test]
 fn note_validator_test() {
     let path = crate::config::ProgramFiles::init_in_base().unwrap();
-    let conn = crate::services::storage::db_creation::get_connection(&path).unwrap();
+    let notes_db = crate::services::storage::db_creation::get_connection(&path).unwrap();
     let note_name = "ttt";
     let file_content = fs::read_to_string(&path.active_user_path).unwrap();
     let json: serde_json::Value = serde_json::from_str(&file_content).unwrap();
     let owner_id: uuid::Uuid = serde_json::from_value(json["user_uuid"].clone()).unwrap();
-    validate_note_name(note_name, &conn, &owner_id).unwrap();
+    validate_note_name(note_name, &notes_db, &owner_id).unwrap();
 }

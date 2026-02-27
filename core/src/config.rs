@@ -1,4 +1,45 @@
-//! This module is responsible for configuring paths for applications do it by calling ProgramFiles::init()
+//! # Application path configuration module
+//! **Purpose**: This module is responsible for resolving, creating, and persisting all filesystem
+//! paths the application relies on. Call [`ProgramFiles::init`] at startup to get a fully
+//! initialised [`ProgramFiles`] struct. All user data is isolated under a per-UUID subdirectory,
+//! so switching accounts only requires calling [`get_paths`] with a new UUID.
+//!
+//! ## Exported items
+//! * [`ProgramFiles`] — Struct holding every important path (databases, notes, assets, logs, config,
+//!   tmp dirs, device-id file, active-user file). Passed by reference throughout the application
+//! * [`AppState`] — Tauri application state; wraps all shared runtime values (`device_id`,
+//!   `current_user`, both DB connections, `username`, `paths`) in `Mutex<Option<T>>` for
+//!   thread-safe lazy initialisation
+//! * [`ConfigData`] — Serialisable struct written to `config.json`; currently stores `data_dir`
+//! * [`ProgramFiles::init`] — Production initialiser; resolves base via `dirs_next::data_local_dir`,
+//!   reads active user UUID from `active_user.json` (falls back to nil UUID on first run),
+//!   creates all subdirectories, and writes `config.json`
+//! * [`ProgramFiles::init_in_base`] — Test initialiser; uses `std::env::temp_dir()/llava_test`
+//!   as the base instead of the system data directory
+//! * [`get_paths`] — Builds a [`ProgramFiles`] for a given `(home, uuid)` pair, creates all
+//!   required subdirectories on disk (via `SUBDIRS` constant), and returns the struct
+//! * [`get_device_id`] — Reads the device UUID from `device_id.json`; if the file is missing
+//!   a new UUIDv4 is generated and written; if the file is corrupt the UUID is recovered from
+//!   the `users_data` table and the file is rewritten
+//! * [`change_active_user`] — Writes a new UUID into `active_user.json`; called after
+//!   login, registration, or account switching
+//! * [`read_current_user`] — Reads and parses the UUID from `active_user.json`
+//!
+//! ## Key design decisions
+//! On first run no `active_user.json` exists, so [`read_current_user`] will fail;
+//! `init` / `init_in_base` catch this error and substitute `Uuid::nil()` as a temporary
+//! placeholder. The nil-UUID directory is cleaned up by `after_validation` in the auth module
+//! once a real user logs in or registers. All user data lives under
+//! `{app_home}/{USER_DIR_PATTERN}/{uuid}/`, which means account isolation is purely filesystem-level.
+//! `AppState` stores everything behind `Mutex<Option<T>>` so Tauri commands can mutate shared
+//! state safely without async locks.
+//!
+//! ## Dependencies
+//! - `dirs_next` — Resolves the platform data-local directory (`%APPDATA%`, `~/.local/share`, etc.)
+//! - `serde` / `serde_json` — Serialisation of [`ConfigData`] and device-id / active-user JSON files
+//! - `rusqlite` — DB fallback in [`get_device_id`] when the device-id file is unreadable
+//! - `uuid` — UUIDv4 generation for new device IDs and nil-UUID sentinel on first run
+//! - `std::sync::Mutex` — Thread-safe shared state in [`AppState`]
 use crate::constants::*;
 use crate::utils::{Format, log_helper};
 use anyhow::Context;
@@ -8,7 +49,6 @@ use serde::{Deserialize, Serialize};
 
 use std::{fs, path::PathBuf, sync::Mutex};
 #[derive(Debug, Clone)]
-/// Struct with important paths
 pub struct ProgramFiles {
     pub base: PathBuf,
     pub data_base_path: PathBuf,
@@ -48,11 +88,9 @@ impl AppState {
 }
 #[derive(Serialize, Deserialize)]
 
-/// ConfigData contains states of aplication
 pub struct ConfigData {
     pub data_dir: PathBuf,
 }
-///creating paths and ProgramFiles struct
 impl ProgramFiles {
     pub fn init() -> Result<ProgramFiles, crate::errors::Error> {
         let program_home_path = data_local_dir()
@@ -108,7 +146,6 @@ impl ProgramFiles {
         Ok(program_paths)
     }
 }
-///function which creates paths and create them in sense of getting current user
 pub fn get_paths(
     program_home_path: PathBuf,
     user_uuid: &uuid::Uuid,
@@ -142,7 +179,7 @@ pub fn get_paths(
         data_base_path: user_home_path.join(NOTES_DB),
         notes_path: user_home_path.join("notes"),
         assets_path: user_home_path.join("assets"),
-        logs_path: user_home_path.join(LOGS_PATH),
+        logs_path: program_home_path.join(LOGS_PATH),
         config_path: user_home_path.join(CONFIG_FILE),
         tmp_path: user_home_path.join("tmp"),
         delete_tmp_path: user_home_path.join("tmp_delete"),
@@ -153,7 +190,6 @@ pub fn get_paths(
     })
 }
 
-///function responsible for writeing config data, current directory and if is it fallback
 fn write_config(program_paths: &ProgramFiles) -> Result<(), crate::errors::Error> {
     let config_content = ConfigData {
         data_dir: program_paths.base.to_path_buf(),
@@ -185,7 +221,6 @@ fn write_config(program_paths: &ProgramFiles) -> Result<(), crate::errors::Error
     Ok(())
 }
 
-/// function for getting device id, or creating new if not exists
 pub fn get_device_id(
     local_conn: &Connection,
     device_id_path: &PathBuf,
@@ -246,7 +281,6 @@ pub fn get_device_id(
         Ok(device_id)
     }
 }
-/// function to change or set actie user after registering/login/changing account
 pub fn change_active_user(
     user_uuid: &uuid::Uuid,
     paths: &ProgramFiles,

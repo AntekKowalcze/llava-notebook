@@ -1,3 +1,43 @@
+//! # Local user login module
+//! **Purpose**: This module is responsible for all actions taken during local user authentication.
+//! It handles password verification, recovery code login, session token management, keyring storage,
+//! failed attempt tracking with progressive timeouts, and logout.
+//!
+//! ## Exported functions
+//! * [`local_log_in`] — Full password-based login flow: verifies user existence, checks password via Argon2,
+//!   updates last login timestamp, initialises paths, creates session token
+//! * [`log_with_code`] — Login using a recovery code; verifies the code against stored Argon2 hashes,
+//!   marks code as used, and starts a session. Returns whether only one code remains
+//! * [`change_last_login`] — Updates the `last_login` timestamp for a given user in a database transaction
+//! * [`check_error_count`] — Increments the `password_errors` counter for a user; every 5 failures
+//!   sets a progressive `ending_block_timestamp` timeout (30 s × multiplier)
+//! * [`zero_error_count`] — Resets `password_errors` to 0 after a successful login
+//! * [`get_timeout`] — Retrieves the current `ending_block_timestamp` for a user, used by the caller
+//!   to determine whether the account is temporarily blocked
+//! * [`session_operations`] — Generates a new UUIDv4 session token, stores its SHA-256 hash in
+//!   `session_data`, and saves the raw token to the system keyring
+//! * [`check_if_user_logged_in`] — Reads the session token from the keyring, hashes it, and queries
+//!   `session_data`; returns a [`SessionState`] variant: `LoggedIn`, `Expired`, or `NotLoggedIn`
+//! * [`local_logout`] — Clears the active user config, deletes the session row from `session_data`,
+//!   and removes the token from the system keyring
+//!
+//! ## Key design decisions
+//! Password is never stored in plain form — only an Argon2id PHC string is kept in the database and
+//! verified at login time. The session token is a random UUID stored raw in the system keyring;
+//! only its SHA-256 / Base32 hash lives in the database, so a keyring leak does not expose the DB
+//! directly. Recovery codes are Crockford-Base32-encoded random bytes, hashed with Argon2id; each
+//! code is single-use and marked with a `used_at` timestamp. All sensitive byte arrays
+//! (`password`, code bytes, KEK bytes) are zeroized immediately after use.
+//!
+//! ## Dependencies
+//! - `argon2` — Password and recovery-code hash verification
+//! - `sha2` — SHA-256 digest of session UUID before DB storage
+//! - `base32` — Crockford encoding for session token hash and recovery code representation
+//! - `rusqlite` — SQLite access via `users_data`, `session_data`, and `recovery_keys` tables
+//! - `keyring` — OS keyring storage for the raw session token
+//! - `zeroize` — Secure memory wiping of passwords and key material
+//! - `uuid` — UUIDv4 generation for session tokens and user identification
+
 use anyhow::Context;
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use rusqlite::{Connection, OptionalExtension, named_params};
@@ -10,11 +50,11 @@ use crate::{errors, utils};
 pub fn local_log_in(
     username: String,
     password: zeroize::Zeroizing<String>,
-    conn: &mut rusqlite::Connection,
+    users_db: &mut rusqlite::Connection,
     paths: &crate::config::ProgramFiles,
 ) -> Result<(uuid::Uuid, crate::config::ProgramFiles, Connection), crate::errors::Error> {
-    check_if_user_exists(&username, conn)?;
-    let hash = conn
+    check_if_user_exists(&username, users_db)?;
+    let hash = users_db
         .query_row(
             "SELECT password_hash FROM users_data WHERE username = :username",
             rusqlite::params![username],
@@ -63,7 +103,7 @@ pub fn local_log_in(
         return Err(crate::errors::Error::WrongPassword);
     }
 
-    let user_uuid: String = conn
+    let user_uuid: String = users_db
         .query_row(
             "SELECT user_id FROM users_data WHERE username = :name",
             named_params! {
@@ -81,19 +121,19 @@ pub fn local_log_in(
             )
         })
         .context("no user with this id")?;
-
+    //delete session keyring token,
     let user_uuid = uuid::Uuid::parse_str(&user_uuid).context("failed to parse uuid")?;
-    change_last_login(conn, &user_uuid)?;
+    change_last_login(users_db, &user_uuid)?;
     let paths = crate::services::auth::register::after_validation(&user_uuid, paths)?;
-    session_operations(&conn, user_uuid)?;
-    let conn = crate::services::storage::db_creation::get_connection(&paths)?;
+    session_operations(&users_db, user_uuid)?;
+    let users_db = crate::services::storage::db_creation::get_connection(&paths)?;
     crate::utils::log_helper(
         "logging",
         "success",
         Some(crate::utils::Format::Display(&username)),
         "user logged in succesfully",
     );
-    Ok((user_uuid, paths, conn))
+    Ok((user_uuid, paths, users_db))
 }
 
 pub fn log_with_code(
@@ -101,8 +141,19 @@ pub fn log_with_code(
     mut code: String,
     users_db: &rusqlite::Connection,
     user_id: uuid::Uuid,
-) -> Result<(crate::config::ProgramFiles, Connection), crate::errors::Error> {
+) -> Result<(crate::config::ProgramFiles, Connection, bool), crate::errors::Error> {
     let mut found = 0;
+    let count: i8 = users_db
+        .query_row(
+            "SELECT COUNT(*) FROM recovery_keys WHERE user_id = :id and used_at IS NULL",
+            named_params! {":id": user_id.to_string()},
+            |row| row.get::<_, i8>(0),
+        )
+        .context("Failed to get count of recovery codes left")?;
+    let mut one_code = false;
+    if count == 1 {
+        one_code = true;
+    }
     let mut stmt = users_db
         .prepare("SELECT code_hash FROM recovery_keys WHERE user_id = :id AND used_at IS NULL")
         .inspect_err(|e| {
@@ -132,6 +183,7 @@ pub fn log_with_code(
 
     if let Some(mut decoded) = base32::decode(base32::Alphabet::Crockford, &code) {
         let argon2 = Argon2::default();
+
         while let Ok(Some(row)) = handle.next() {
             let mut hash: String = row
                 .get(0)
@@ -183,7 +235,7 @@ pub fn log_with_code(
             if found > 0 {
                 let paths = crate::services::auth::register::after_validation(&user_id, paths)?;
                 session_operations(&users_db, user_id)?;
-                let conn = crate::services::storage::db_creation::get_connection(&paths)?;
+                let users_db = crate::services::storage::db_creation::get_connection(&paths)?;
                 decoded.zeroize();
                 crate::utils::log_helper(
                     "logging with code",
@@ -191,7 +243,7 @@ pub fn log_with_code(
                     None::<crate::utils::Format<String>>,
                     "user logged in using recovery code",
                 );
-                return Ok((paths, conn));
+                return Ok((paths, users_db, one_code));
             }
         }
     } else {
@@ -215,9 +267,9 @@ pub fn log_with_code(
 
 fn check_if_user_exists(
     username: &str,
-    conn: &rusqlite::Connection,
+    users_db: &rusqlite::Connection,
 ) -> Result<(), crate::errors::Error> {
-    let exists = conn
+    let exists = users_db
         .query_row(
             "SELECT username FROM users_data WHERE username = :name",
             rusqlite::params![username],
@@ -292,11 +344,11 @@ pub fn change_last_login(
 }
 
 pub fn check_error_count(
-    conn: &mut Connection,
+    users_db: &mut Connection,
     user_uuid: &uuid::Uuid,
 ) -> Result<i64, crate::errors::Error> {
     let mut end_of_timeout: i64 = 0;
-    let tx = conn
+    let tx = users_db
         .transaction()
         .inspect_err(|e| {
             tracing::error!(
@@ -384,22 +436,26 @@ pub fn check_error_count(
     Ok(end_of_timeout)
 }
 
-pub fn zero_error_count(conn: &Connection, uuid: &uuid::Uuid) -> Result<(), crate::errors::Error> {
-    conn.execute(
-        "UPDATE users_data SET password_errors = 0 WHERE user_id = :id",
-        named_params! {
-            ":id": uuid.to_string(),
-        },
-    )
-    .inspect_err(|e| {
-        tracing::error!(
-            task = "zero error count",
-            status = "error",
-            error = ?e,
-            "failed to reset password_errors to 0"
+pub fn zero_error_count(
+    users_db: &Connection,
+    uuid: &uuid::Uuid,
+) -> Result<(), crate::errors::Error> {
+    users_db
+        .execute(
+            "UPDATE users_data SET password_errors = 0 WHERE user_id = :id",
+            named_params! {
+                ":id": uuid.to_string(),
+            },
         )
-    })
-    .context("Failed to set error count to 0")?;
+        .inspect_err(|e| {
+            tracing::error!(
+                task = "zero error count",
+                status = "error",
+                error = ?e,
+                "failed to reset password_errors to 0"
+            )
+        })
+        .context("Failed to set error count to 0")?;
     crate::utils::log_helper(
         "zero error count",
         "success",
@@ -409,8 +465,8 @@ pub fn zero_error_count(conn: &Connection, uuid: &uuid::Uuid) -> Result<(), crat
     Ok(())
 }
 
-pub fn get_timeout(conn: &Connection, uuid: &uuid::Uuid) -> Result<i64, crate::errors::Error> {
-    let timeout = conn
+pub fn get_timeout(users_db: &Connection, uuid: &uuid::Uuid) -> Result<i64, crate::errors::Error> {
+    let timeout = users_db
         .query_row(
             "SELECT ending_block_timestamp FROM users_data WHERE user_id = :id",
             named_params! {
@@ -574,14 +630,42 @@ pub fn check_if_user_logged_in(
     }
 }
 
+pub fn local_logout(
+    user_uuid: String,
+    users_db: &Connection,
+    paths: &crate::config::ProgramFiles,
+) -> Result<(), crate::errors::Error> {
+    crate::config::change_active_user(&uuid::Uuid::nil(), paths)?;
+    users_db
+        .execute(
+            "DELETE FROM session_data WHERE user_id = :id",
+            named_params! { ":id": user_uuid },
+        )
+        .inspect_err(|err| tracing::error!(task = "local logout", status="error", error = ?err, "database error while deleting session data"))
+        .context("failed to delete session from db")?;
+
+    // remove token from keyring
+    let entry = keyring::Entry::new("llava_desktop", "session_token").inspect_err(|err| tracing::error!(task="logout", status="error", error=?err, "keyring error while creating entry"))
+        .context("failed to create keyring entry")?;
+    let _ = entry.delete_credential();
+    crate::utils::log_helper(
+        "local logout",
+        "success",
+        None::<crate::utils::Format<String>>,
+        "user logged out successfully",
+    );
+
+    Ok(())
+}
+
 #[test]
 fn login_test() {
     let username = "twelth".to_string();
     let password = zeroize::Zeroizing::from("ToJestTest!".to_string());
     let home_path = std::env::temp_dir();
-    let mut conn =
+    let mut users_db =
         crate::services::auth::database_creation::connect_or_create_local_login_db(&home_path)
             .unwrap();
     let paths = crate::config::ProgramFiles::init_in_base().unwrap();
-    local_log_in(username, password, &mut conn, &paths).unwrap();
+    local_log_in(username, password, &mut users_db, &paths).unwrap();
 }

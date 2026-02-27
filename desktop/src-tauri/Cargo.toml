@@ -34,3 +34,9 @@ tauri-plugin-devtools = "2.0.0-rc"
 anyhow = "1.0.100"
 rusqlite = "0.38.0"
 
+[profile.release]
+opt-level = "s"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"

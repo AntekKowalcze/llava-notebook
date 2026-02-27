@@ -462,7 +462,6 @@ dependencies = [
  "chrono",
  "dirs-next",
  "keyring",
- "log",
  "rusqlite",
  "sanitise-file-name",
  "serde",

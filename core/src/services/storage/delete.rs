@@ -7,12 +7,12 @@ use anyhow::Context;
 use crate::services::storage::db_creation::SyncState;
 /// soft delete note
 pub fn delete_note(
-    conn: &rusqlite::Connection,
+    notes_db: &rusqlite::Connection,
     name: String,
     note_id: uuid::Uuid,
     paths: &crate::config::ProgramFiles,
 ) -> Result<(), crate::errors::Error> {
-    let current_sync_status: SyncState = conn
+    let current_sync_status: SyncState = notes_db
         .query_row(
             "SELECT sync_state FROM notes WHERE local_id = :note_id",
             rusqlite::named_params! { ":note_id": note_id.to_string() },
@@ -20,7 +20,7 @@ pub fn delete_note(
         )
         .context("couldnt get currenct sync status for rollback in deletation of note SQL ERROR")?;
 
-    conn.execute(
+    notes_db.execute(
         "UPDATE notes SET sync_state = 'PendingDeleted', deleted_at = :time WHERE local_id = :note_id",
         rusqlite::named_params! {
             ":time": crate::utils::get_time(),
@@ -33,7 +33,7 @@ pub fn delete_note(
         paths.delete_tmp_path.join(format!("{name}.md")),
     ) {
         tracing::error!(task="deleting", status="error", %note_id, "Soft delete failed, rolling back DB");
-        conn.execute(
+        notes_db.execute(
             "UPDATE notes SET sync_state = :status_before, deleted_at = NULL WHERE local_id = :note_id",
             rusqlite::named_params! {
                 ":status_before": current_sync_status,
