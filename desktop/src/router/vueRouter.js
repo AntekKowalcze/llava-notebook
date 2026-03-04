@@ -2,6 +2,7 @@ import { createWebHashHistory, createRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import { invoke } from "@tauri-apps/api/core";
 import { useToast } from "vue-toastification";
+import MainView from "../views/MainView.vue";
 const toast = useToast()
 const routes = [
     {
@@ -9,13 +10,15 @@ const routes = [
         beforeEnter: async () => {
             const authStore = useAuthStore()
             try {
+
                 await Promise.all([authStore.checkUsers(), authStore.checkSession()]) //check session should probably return user id and then 
+
                 const hasNoUsers = authStore.hasNoUsers
                 if (hasNoUsers) {//first run
                     return { path: "/register", replace: true }
                 } else if (!hasNoUsers && authStore.loggedIn) {
                     toast.success(authStore.loggedInUsername + " logged in")
-                    return { path: "/main", replace: true }
+                    return { path: "/main/", replace: true }
                 } else if (!hasNoUsers && !authStore.loggedIn) {
                     console.log("not logged in")
                     return { path: "/login", replace: true }
@@ -25,7 +28,13 @@ const routes = [
             }
         }
     },
-    { path: '/main', name: 'main', component: () => import('../views/LoadingPage.vue') },
+    {
+        path: '/main', name: 'main', component: () => import('../views/MainView.vue'), children: [
+            { path: '', name: 'editor', component: () => import('../views/LoadingPage.vue') },      // /main
+            { path: 'dashboard', name: 'dashboard', component: () => import('../views/DashboardView.vue') },   // /main/dashboard
+            { path: 'settings', name: 'settings', component: () => import('../views/SettingsView.vue') },    // /main/settings
+        ]
+    },
     { path: '/chooseRegisterForm', name: 'choose', component: () => import('../views/RegisterAskPage.vue') },
     { path: '/register', name: 'register', component: () => import('../views/RegisterPage.vue') },
     { path: '/login', name: "login", component: () => import('../views/LoginPage.vue') },

@@ -32,7 +32,7 @@ const props = defineProps<{
           {{ props.subText }}
         </p>
       </div>
-      <!-- Inputy -->
+      <!-- Inputs -->
       <div
         class="w-full h-fit p-5 select-none  border-note-ivory/20 rounded flex flex-col items-center justify-center text-note-ivory/30">
         <slot>

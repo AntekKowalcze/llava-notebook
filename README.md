@@ -148,7 +148,7 @@ In data models file.
 │  ├── SyncManager       Sync with Mongo/S3         │
 │  ├── CryptoService     Encryption / decryption    │
 │  ├── AttachmentManager Attachment management      │
-│  ├── AuthService       Login / master key         │
+│  ├── AuthService       Login/register/masterkey   │
 │  ├── Cleaner           Remove orphaned files      │
 │  └── Logger            Audit and diagnostics      │
 └──────────────────────┬────────────────────────────┘
@@ -161,8 +161,6 @@ In data models file.
 │  ├── notes/*.md       Markdown notes         │
 │  ├── assets/*         Images and attachments │
 │  ├── db.sqlite        Metadata and history   │
-│  ├── keys/master.key  Encrypted master key   │
-│  ├── logs/app.log     Operation journal      │
 │  ├── tmp/             Files being written    │
 │  └── delete_tmp/      Soft-deleted notes     │
 │                                              │

@@ -19,7 +19,7 @@ pub struct Note {
     pub is_deleted: bool,
     pub deleted_at: Option<i64>,
 
-    pub version: i64, //zmieniać wersje o 1 co zapis, porównywać na czasie ostatniej modyfikacji, wersja tylko pomocniczo
+    pub version: i64, //change versions by 1 every save, compare at the time of last modification, version only for auxiliary purposes
     pub cloud_version: Option<i64>,
     pub sync_state: crate::services::storage::db_creation::SyncState,
 

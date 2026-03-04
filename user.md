@@ -67,6 +67,8 @@ Write notes from many devices
 
 Show sync status (“last synced at…” / “pending uploads”)
 
+Backup 
+
 Offline mode indicator
 
 Automatic retry on failed sync

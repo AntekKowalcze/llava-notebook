@@ -2,7 +2,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import LoadingCircle from "../components/LoadingCircle.vue";
 
-
+import IconComponent from "../components/IconComponent.vue";
 //LOGOUT LOGIC
 import FormButtons from "../components/forms/FormButtons.vue";
 import { useAuthStore } from "../stores/auth";
@@ -29,6 +29,7 @@ async function logout() {
 </script>
 
 <template>
+    <IconComponent></IconComponent>
     <LoadingCircle />
     <!-- LOGOUT -->
     <FormButtons :disabled="false" :content="buttonContent" @click="logout"></FormButtons>

@@ -1,6 +1,7 @@
 use std::fs;
 ///function responsible for reading notes content
 pub fn read_note_content(
+    //todo change to english
     //możę zmienic z name na uuid i path wywalić do kosza i przepisać na query po id zeby zdobyć path
     paths: &crate::config::ProgramFiles,
     name: String,

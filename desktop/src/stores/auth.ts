@@ -35,7 +35,6 @@ export const useAuthStore = defineStore('auth', () => {
                     loggedInUsername.value = null;
                 }
 
-                // ustawiasz loggedIn dopiero gdy masz już wszystkie dane
                 loggedIn.value = true;
                 console.log(loggedIn, loggedInUserId, loggedInUsername)
             } else {

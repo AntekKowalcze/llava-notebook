@@ -106,7 +106,8 @@ async fn main() {
             _ => panic!("no option like this exitting",),
         }
     }
-} //po polączeniu dodać wszystkie notatki z vectora
+    
+} //after establishing connection add all notes to vector
 ///creating note by getting values from other functions
 fn create_note() -> Note {
     let created_at = getting_created_at();

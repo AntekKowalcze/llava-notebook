@@ -1,4 +1,5 @@
 //! This module is responsible for creating database record and .md file
+
 use crate::utils::{Format, log_helper};
 use crate::{
     config::ProgramFiles,
@@ -9,6 +10,9 @@ use rusqlite::{Connection, OptionalExtension};
 use std::path::PathBuf;
 //init note after new note clicked and name sumbited
 ///this note init note struct and creates md file
+//TODO every note should be encrypted on disk, with same key as in database, title as plaintext should be deleted from sql schema, it should be deriven from constatnt not editable # as first sign in md file (title sign and first line content is title) and name of the note should be changed to uuid of note, to getting note file content should be just export,
+// TODO after function which saves note content manually there should be command which increents activity number in sql database
+// TODO TREAT CRETING NOTE AS EDITING SO RUN ADDING ACTIVITY COUNT AFTER CREATION AND DELETATION
 fn init_note(
     owner_id: uuid::Uuid, //get it from current user file
     path: &PathBuf,       //path of notes
@@ -37,7 +41,7 @@ fn init_note(
 
                 name: name,
                 title: "".to_owned(),
-                summary: "".to_owned(),
+                summary: "".to_owned(), //Smth here is off why should i store name and summary unecrypted?
                 content_path: new_note_path,
 
                 created_at: crate::utils::get_time(),
@@ -68,7 +72,7 @@ fn init_note(
                 status = "error",
                 "couldnt init a note"
             );
-            //dodać obsługe, poprostu nie moge utworzyć pliku, popup z tym komunikatem żeby zmienić uprawnienia i wróć do działania programu
+
             Err(crate::errors::Error::FileOperationError(err.to_string()))
         }
     }

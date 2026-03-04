@@ -45,7 +45,7 @@ use sha2::{Digest, Sha256};
 
 use zeroize::Zeroize;
 
-use crate::{errors, utils};
+use crate::{ProgramFiles, errors, utils};
 
 pub fn local_log_in(
     username: String,
@@ -184,7 +184,7 @@ pub fn log_with_code(
     if let Some(mut decoded) = base32::decode(base32::Alphabet::Crockford, &code) {
         let argon2 = Argon2::default();
 
-        while let Ok(Some(row)) = handle.next() {
+        while let Some(row) = handle.next().context("failed to get next row")? {
             let mut hash: String = row
                 .get(0)
                 .inspect_err(|e| {
@@ -548,8 +548,7 @@ pub fn session_operations(
     );
     Ok(())
 }
-
-#[derive(serde::Serialize)]
+#[derive(Debug, serde::Serialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum SessionState {
     LoggedIn { user_id: String },
@@ -559,6 +558,7 @@ pub enum SessionState {
 
 pub fn check_if_user_logged_in(
     users_db: &Connection,
+    paths: &ProgramFiles,
 ) -> Result<SessionState, crate::errors::Error> {
     let keyring_entry = keyring::Entry::new("llava_desktop", "session_token")
         .inspect_err(|e| {
@@ -596,6 +596,9 @@ pub fn check_if_user_logged_in(
                     Some(crate::utils::Format::Display(&user_id)),
                     "user is logged in",
                 );
+                let parsed_user_id =
+                    &uuid::Uuid::parse_str(&user_id).context("failed to parse ID")?;
+                crate::config::change_active_user(parsed_user_id, &paths)?;
                 Ok(SessionState::LoggedIn { user_id })
             } else {
                 let _ = keyring_entry.delete_credential();

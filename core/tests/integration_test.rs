@@ -24,7 +24,7 @@ fn program_flow() {
     )
     .unwrap();
 
-    // Assert: użytkownik w bazie lokalnej
+    // Assert: user in local database
     let user_exists: bool = local_login_db_conn
         .query_row(
             "SELECT 1 FROM users_data WHERE username = :name",

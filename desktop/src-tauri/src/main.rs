@@ -6,17 +6,20 @@ use tauri::Manager;
 mod commands;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn main() {
-    let program_paths: ProgramFiles = if cfg!(not(debug_assertions)) {
-        llava_core::ProgramFiles::init().expect("failed creating program pahts")
-    } else {
+    // ! how program paths now which user path to create
+    let program_paths: ProgramFiles = 
+    // if cfg!(not(debug_assertions)) {
+        llava_core::ProgramFiles::init().expect("failed creating program pahts");
+    // }
+    //  else {
         // let path = std::env::temp_dir().join("llava_test");
         // if path.exists() {
         //     std::fs::remove_dir_all(path).expect("PROBABLY LLAVA_TEST IS NOT EXISTING JUST CREATE IT SO IT COULD BE DELETED WITH NO ERROR");
         // }
         // IF YOU NEED RESTART UNCOMMENT THIS LINE
 
-        llava_core::ProgramFiles::init_in_base().expect("failed creating program pahts")
-    };
+    //     llava_core::ProgramFiles::init_in_base().expect("failed creating program pahts")
+    // };
     let user_db =
         llava_core::connect_or_create_local_login_db(&program_paths.local_login_database_path)
             .expect("error while creating locla login db");
@@ -47,7 +50,7 @@ pub fn main() {
     // let mut notes_db =
     //     llava_core::get_connection(&program_paths).expect("Error while creating database for user");
     // state.connection = std::sync::Mutex::from(Some(notes_db));
-
+    // ! how program paths now which user path to create
     state.paths = std::sync::Mutex::from(Some(program_paths));
     // this line shall be done again after logging/register
 
@@ -65,7 +68,8 @@ pub fn main() {
             commands::commands::log_with_code,
             commands::commands::check_login_on_start,
             commands::commands::get_username_from_uuid,
-            commands::commands::local_logout_command
+            commands::commands::local_logout_command,
+            commands::commands::get_dashboard_data
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

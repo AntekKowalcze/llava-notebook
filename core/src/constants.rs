@@ -166,6 +166,16 @@ pub const NOTE_DB_SCHEMA: &str = r#"
         PRIMARY KEY (note_local_id, tag_id)
     );
 
+   CREATE TABLE IF NOT EXISTS user_activity (
+    id       INTEGER PRIMARY KEY,
+    note_id  TEXT,
+    date     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (note_id) REFERENCES notes(local_id) ON DELETE SET NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_user_activity_date ON user_activity(date);
+    CREATE INDEX IF NOT EXISTS idx_user_activity_note ON user_activity(note_id, date);
+
     CREATE INDEX IF NOT EXISTS idx_note_tags_tag ON note_tags(tag_id);
 
     CREATE TABLE IF NOT EXISTS sync_metadata (
@@ -215,3 +225,21 @@ pub const LOCAL_LOGIN_DB_SCHEMA: &str = r#" CREATE TABLE IF NOT EXISTS users_dat
                         FOREIGN KEY(user_id) REFERENCES users_data(user_id) ON DELETE CASCADE);
                               
                         "#;
+
+//list of local settings:
+// local/online mode -> default off
+// encryption -> on/off default on
+// change password -> button
+// change username -> button
+// danger zone:
+// logout -> button
+// delete local files permanently -> button
+// delete account -> button
+// export notes -> button
+// import notes -> button
+// sync -> if online mode yes -> default yes else disabled
+//online
+// change password via email
+// connected devices
+// ai summary -> on/off default on
+// show app logs -> button

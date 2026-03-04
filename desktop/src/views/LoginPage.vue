@@ -30,6 +30,7 @@ async function submitLogin() {
             username: username.value,
             password: password.value
         })
+        console.log(userId)
         toast.success("Logged in successfully");
         authStore.$patch({
             loggedIn: true,
@@ -37,7 +38,7 @@ async function submitLogin() {
             loggedInUserId: userId
         })
 
-        router.replace({ name: "loading" })
+        router.replace({ name: "main" })
 
     } catch (err: any) {
         if (err == "WrongPassword") {

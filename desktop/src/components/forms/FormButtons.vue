@@ -33,7 +33,7 @@ const props = defineProps<{
         border-note-ivory/5 bg-black/10 text-note-ivory/20
         cursor-not-allowed
         grayscale opacity-50
-        pointer-events-none /* Fizycznie blokuje kliknięcie */
+        pointer-events-none /* blocks clicking */
       `
     ]">{{ props.content }}</div>
 </template>

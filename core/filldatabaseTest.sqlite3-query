@@ -1,0 +1,242 @@
+-- database: ../../.local/share/llava/users/ac19595c-c43f-4868-94b9-6e52667b4a5e/note.sqlite
+-- Wyczyść dane testowe
+-- 1. NOTATKI
+INSERT INTO
+    notes (
+        local_id,
+        mongo_id,
+        owner_id,
+        name,
+        title,
+        summary,
+        content_path,
+        created_at,
+        updated_at,
+        deleted_at,
+        version,
+        cloud_version,
+        sync_state,
+        is_deleted,
+        encrypted,
+        crypto_meta
+    )
+VALUES
+    (
+        'note-1',
+        NULL,
+        'ac19595c-c43f-4868-94b9-6e52667b4a5e',
+        'Note One',
+        'First note',
+        'Short summary 1',
+        'notes/note-1.md',
+        1700000000,
+        1700000100,
+        NULL,
+        1,
+        NULL,
+        'LocalOnly',
+        0,
+        0,
+        NULL
+    ),
+    (
+        'note-2',
+        NULL,
+        'ac19595c-c43f-4868-94b9-6e52667b4a5e',
+        'Note Two',
+        'Second note',
+        'Short summary 2',
+        'notes/note-2.md',
+        1700000200,
+        1700000300,
+        NULL,
+        1,
+        NULL,
+        'LocalOnly',
+        0,
+        1,
+        NULL
+    ),
+    (
+        'note-3',
+        NULL,
+        'ac19595c-c43f-4868-94b9-6e52667b4a5e',
+        'Note Three',
+        'Third note',
+        'Short summary 3',
+        'notes/note-3.md',
+        1700000400,
+        1700000500,
+        NULL,
+        2,
+        NULL,
+        'LocalOnly',
+        0,
+        1,
+        NULL
+    ),
+    (
+        'note-4',
+        NULL,
+        'ac19595c-c43f-4868-94b9-6e52667b4a5e',
+        'Note Four',
+        'Fourth note',
+        'Short summary 4',
+        'notes/note-4.md',
+        1700000600,
+        1700000700,
+        NULL,
+        1,
+        NULL,
+        'LocalOnly',
+        0,
+        0,
+        NULL
+    ),
+    (
+        'note-5-deleted',
+        NULL,
+        'ac19595c-c43f-4868-94b9-6e52667b4a5e',
+        'Deleted Note',
+        'Deleted',
+        'Should not count',
+        'notes/note-5.md',
+        1700000800,
+        1700000900,
+        1700001000,
+        1,
+        NULL,
+        'LocalOnly',
+        1,
+        1,
+        NULL
+    );
+
+-- 2. TAGI
+INSERT INTO
+    tags (tag_id, owner_id, name, color, created_at)
+VALUES
+    (
+        'tag-1',
+        'ac19595c-c43f-4868-94b9-6e52667b4a5e',
+        'work',
+        '#3B82F6',
+        1700000000
+    ),
+    (
+        'tag-2',
+        'ac19595c-c43f-4868-94b9-6e52667b4a5e',
+        'personal',
+        '#EF4444',
+        1700000000
+    ),
+    (
+        'tag-3',
+        'ac19595c-c43f-4868-94b9-6e52667b4a5e',
+        'ideas',
+        '#10B981',
+        1700000000
+    ),
+    (
+        'tag-4',
+        'ac19595c-c43f-4868-94b9-6e52667b4a5e',
+        'archive',
+        '#6B7280',
+        1700000000
+    ),
+    (
+        'tag-5',
+        'ac19595c-c43f-4868-94b9-6e52667b4a5e',
+        'urgent',
+        '#F97316',
+        1700000000
+    );
+
+-- 3. NOTE_TAGS (bez duplikatów par (note_local_id, tag_id))
+INSERT INTO
+    note_tags (note_local_id, tag_id, created_at)
+VALUES
+    -- note-1
+    ('note-1', 'tag-1', 1700000100),
+    ('note-1', 'tag-2', 1700000200),
+    ('note-1', 'tag-5', 1700000300),
+    -- note-2
+    ('note-2', 'tag-1', 1700000400),
+    ('note-2', 'tag-2', 1700001600),
+    ('note-2', 'tag-3', 1700000500),
+    ('note-2', 'tag-5', 1700001800),
+    -- note-3
+    ('note-3', 'tag-1', 1700000600),
+    ('note-3', 'tag-2', 1700001700),
+    ('note-3', 'tag-3', 1700000700),
+    ('note-3', 'tag-5', 1700000800),
+    -- note-4
+    ('note-4', 'tag-1', 1700001400),
+    ('note-4', 'tag-2', 1700000900),
+    ('note-4', 'tag-4', 1700001000),
+    ('note-4', 'tag-5', 1700001900),
+    -- note-5-deleted (nie wejdzie do favourite_tags przez is_deleted = 1)
+    ('note-5-deleted', 'tag-1', 1700001100);
+
+-- 4. USER_ACTIVITY (pod activity_vec i last_three_edited)
+INSERT INTO
+    user_activity (note_id, date)
+VALUES
+    -- styczeń 2026
+    ('note-1', '2026-01-01 09:00:00'),
+    ('note-1', '2026-01-01 10:15:00'),
+    ('note-2', '2026-01-02 11:30:00'),
+    ('note-3', '2026-01-03 14:45:00'),
+    ('note-4', '2026-01-04 08:05:00'),
+    ('note-2', '2026-01-05 16:20:00'),
+    ('note-3', '2026-01-06 19:40:00'),
+    ('note-1', '2026-01-07 07:10:00'),
+    ('note-4', '2026-01-08 12:00:00'),
+    ('note-3', '2026-01-09 21:30:00'),
+    -- luty 2026
+    ('note-1', '2026-02-01 09:10:00'),
+    ('note-2', '2026-02-01 09:20:00'),
+    ('note-3', '2026-02-02 13:00:00'),
+    ('note-4', '2026-02-03 17:45:00'),
+    ('note-1', '2026-02-04 06:55:00'),
+    ('note-2', '2026-02-05 18:15:00'),
+    ('note-3', '2026-02-06 20:00:00'),
+    ('note-4', '2026-02-07 11:25:00'),
+    ('note-1', '2026-02-08 15:35:00'),
+    ('note-2', '2026-02-09 22:10:00'),
+    -- marzec 2026
+    ('note-1', '2026-03-01 08:00:00'),
+    ('note-2', '2026-03-01 08:30:00'),
+    ('note-3', '2026-03-01 09:00:00'),
+    ('note-4', '2026-03-01 09:30:00'),
+    ('note-1', '2026-03-02 10:00:00'),
+    ('note-2', '2026-03-02 10:30:00'),
+    ('note-3', '2026-03-02 11:00:00'),
+    ('note-4', '2026-03-02 11:30:00'),
+    ('note-1', '2026-03-03 12:00:00'),
+    ('note-2', '2026-03-03 12:30:00'),
+    ('note-3', '2026-03-03 13:00:00'),
+    ('note-4', '2026-03-03 13:30:00'),
+    -- kwiecień 2026
+    ('note-1', '2026-04-10 08:15:00'),
+    ('note-2', '2026-04-10 09:45:00'),
+    ('note-3', '2026-04-11 10:10:00'),
+    ('note-4', '2026-04-11 11:55:00'),
+    ('note-1', '2026-04-12 14:05:00'),
+    ('note-2', '2026-04-12 14:25:00'),
+    ('note-3', '2026-04-13 16:40:00'),
+    ('note-4', '2026-04-13 18:20:00'),
+    -- maj 2026
+    ('note-1', '2026-05-05 07:50:00'),
+    ('note-2', '2026-05-05 08:10:00'),
+    ('note-3', '2026-05-05 08:30:00'),
+    ('note-4', '2026-05-05 08:50:00'),
+    ('note-1', '2026-05-06 09:05:00'),
+    ('note-2', '2026-05-06 09:25:00'),
+    ('note-3', '2026-05-06 09:45:00'),
+    ('note-4', '2026-05-06 10:05:00'),
+    -- czerwiec 2026
+    ('note-1', '2026-06-15 13:00:00'),
+    ('note-2', '2026-06-15 13:20:00'),
+    ('note-3', '2026-06-15 13:40:00'),
+    ('note-4', '2026-06-15 14:00:00');

@@ -407,7 +407,7 @@ pub fn change_password(
 
     if let Some(mut decoded) = base32::decode(base32::Alphabet::Crockford, &code) {
         let argon2 = Argon2::default();
-        while let Ok(Some(row)) = handle.next() {
+        while let Some(row) = handle.next().context("failed to get next row")? {
             let  hash: String = row.get(0).context("failed to get hash")?;
             let phc: PasswordHash<'_> =
                 argon2::PasswordHash::new(&hash).context("failed to parse hash from db to phc")?;

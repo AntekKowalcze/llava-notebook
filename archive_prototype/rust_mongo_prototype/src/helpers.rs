@@ -40,10 +40,7 @@ where
         Err("No connection".to_string())
     }
 }
-//dalej dodać aby wyświetlał z tego vectora found tytuł oraz summary i dawał opcje wyboru po indexie + 1 vectora, i tą właśnie notatke przekazywa… do closure z funckją która ma być wykonywana, tyle że
-//przy update i remove trzeba znaleźć identyczną notatke w db przez find i działać na niej/
 
-//dodac że jeśli nie znalazło, vector jest pusty to daje błąd
 pub async fn find_note_by_title(
     coll: Arc<RwLock<Option<Collection<Note>>>>,
     note_vec: Arc<RwLock<Vec<crate::models::Note>>>,

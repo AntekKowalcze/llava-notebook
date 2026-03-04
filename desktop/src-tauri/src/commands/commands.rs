@@ -1,4 +1,4 @@
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use llava_core::{services::auth::logging::SessionState, AppState};
 use zeroize::Zeroizing;
 
@@ -36,11 +36,11 @@ pub async fn register_command(
             users_db,
         )?
     };
-    crate::commands::command_helpers::chagne_state_after_login(
+    crate::commands::command_helpers::change_state_after_login(
         &state, new_uuid, users_db, new_paths, username,
     )?;
 
-    println!("{:#?}", state);
+    // println!("{:#?}", state);
 
     Ok((codes, new_uuid.to_string()))
 }
@@ -84,7 +84,7 @@ pub async fn login_command(
                         }
                     }
                     llava_core::Error::UserNotExists => {
-                        println!("👤 User not found");
+                        // println!("👤 User not found");
                         return llava_core::Error::UserNotExists;
                     }
                     _ => {
@@ -102,10 +102,10 @@ pub async fn login_command(
     let users_db: &mut rusqlite::Connection =
         conn_guard.as_mut().ok_or(llava_core::Error::FatalError)?;
     llava_core::zero_error_count(users_db, &new_uuid)?;
-    crate::commands::command_helpers::chagne_state_after_login(
+    crate::commands::command_helpers::change_state_after_login(
         &state, new_uuid, notes_conn, new_paths, username,
     )?;
-    println!("{:#?}", state);
+    // println!("{:#?}", state);
 
     Ok(new_uuid.to_string())
 }
@@ -171,13 +171,13 @@ pub async fn log_with_code(
     let (paths, notes_conn, one_code) =
         llava_core::log_with_code(&paths, code, users_db, user_uuid)?;
 
-    crate::commands::command_helpers::chagne_state_after_login(
+    crate::commands::command_helpers::change_state_after_login(
         &state, user_uuid, notes_conn, paths, username,
     )?;
 
     Ok((user_uuid.to_string(), one_code))
 }
-
+//po znalezieniu kodu, zapisać do active user zalogowanego użytkownika,  stworzyć pliki dla tego użytkownika, wziąć baze danych dla uzytkownika
 #[tauri::command]
 pub async fn change_password(
     username: String,
@@ -200,6 +200,7 @@ pub async fn change_password(
 }
 
 #[tauri::command]
+//TODO zapytać perplexity co to za pierdolnik sie tu dzieje ze to nie działa
 pub async fn check_login_on_start(
     state: tauri::State<'_, AppState>,
 ) -> Result<SessionState, llava_core::Error> {
@@ -210,7 +211,37 @@ pub async fn check_login_on_start(
     let users_db = user_db_guard
         .as_ref()
         .ok_or(llava_core::Error::FatalError)?;
-    let is_logged_in = llava_core::check_if_user_logged_in(users_db)?;
+    let program_files = {
+        let program_files_guard = state
+            .paths
+            .lock()
+            .map_err(|_| anyhow!("Couldnt get program filesguard"))?;
+        program_files_guard
+            .as_ref()
+            .ok_or(llava_core::Error::FatalError)?
+            .clone() // ProgramFiles: Clone
+    };
+    let is_logged_in: SessionState = llava_core::check_if_user_logged_in(users_db, &program_files)?;
+
+    if let SessionState::LoggedIn { user_id } = &is_logged_in {
+        let parsed_user_uuid =
+            uuid::Uuid::parse_str(&user_id).context("Failed to parse user_id to string")?;
+
+        let updated_paths =
+            llava_core::get_paths(program_files.app_home.clone(), &parsed_user_uuid)?;
+
+        let notes_db = llava_core::get_connection(&updated_paths)?;
+
+        let username = llava_core::get_username_from_uuid(users_db, user_id.clone())?;
+
+        crate::commands::command_helpers::change_state_after_login(
+            &state,
+            parsed_user_uuid,
+            notes_db,
+            updated_paths.clone(),
+            username,
+        )?;
+    }
     Ok(is_logged_in)
 }
 
@@ -262,4 +293,34 @@ pub async fn local_logout_command(
     let paths = paths_guard.as_ref().ok_or(llava_core::Error::FatalError)?;
     llava_core::local_logout(user_uuid, users_db, paths)?;
     Ok(())
+}
+
+#[tauri::command]
+pub async fn get_dashboard_data(
+    user_uuid: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<llava_core::DashboardData, llava_core::Error> {
+    let users_db_guard: std::sync::MutexGuard<'_, Option<rusqlite::Connection>> = state
+        .users_db
+        .lock()
+        .map_err(|_| anyhow!("error while gettnig users_db from state"))?;
+
+    let users_db = users_db_guard
+        .as_ref()
+        .ok_or(llava_core::Error::FatalError)?;
+    println!("{:#?}", state);
+
+    let notes_db_guard = state
+        .notes_db
+        .lock()
+        .map_err(|_| anyhow!("Couldnt edit notes db in state"))?;
+    println!("{:?}", notes_db_guard);
+    let notes_db = notes_db_guard
+        .as_ref()
+        .ok_or(llava_core::Error::FatalError)?;
+
+    return Ok(llava_core::get_dashboard_stats(
+        user_uuid, &notes_db, &users_db,
+    )?);
+    //przetworzyć return na dashboard data
 }
