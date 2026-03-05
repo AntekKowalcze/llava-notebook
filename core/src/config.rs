@@ -119,7 +119,7 @@ impl ProgramFiles {
         };
 
         let program_paths = get_paths(program_home_path.clone(), &user_uuid)?;
-        write_config(&program_paths)?;
+        // write_config(&program_paths)?;
         Ok(program_paths)
     }
 
@@ -142,7 +142,7 @@ impl ProgramFiles {
         };
 
         let program_paths = get_paths(program_home_path.clone(), &user_uuid)?; //function users uuid also, its to add
-        write_config(&program_paths)?;
+        // write_config(&program_paths)?;
         Ok(program_paths)
     }
 }

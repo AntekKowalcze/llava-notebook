@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import {
-    CloudOff, CloudUpload, CloudCheck,
-    RefreshCw, Lock, LockOpen,
-    HardDrive, Server
+    CloudOff,
+   LockOpen,
+    HardDrive,
 } from 'lucide-vue-next'
-
+//, CloudUpload, CloudCheck, RefreshCw, Lock, Server
 defineProps<{ version: string, synced: string }>()
 </script>
 

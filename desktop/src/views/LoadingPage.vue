@@ -29,7 +29,7 @@ async function logout() {
 </script>
 
 <template>
-    <IconComponent></IconComponent>
+    <IconComponent :height="'44'" :width="'44'"></IconComponent>
     <LoadingCircle />
     <!-- LOGOUT -->
     <FormButtons :disabled="false" :content="buttonContent" @click="logout"></FormButtons>

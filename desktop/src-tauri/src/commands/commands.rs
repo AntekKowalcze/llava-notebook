@@ -324,3 +324,20 @@ pub async fn get_dashboard_data(
     )?);
     //przetworzyć return na dashboard data
 }
+
+#[tauri::command]
+pub async fn get_config_data( state: tauri::State<'_, AppState>) -> Result<llava_core::UserConfig ,llava_core::Error>{
+
+    let paths_guard = state
+            .paths
+            .lock()
+            .map_err(|_| anyhow!("failed to lock AppState.paths"))?;
+
+        let paths: &llava_core::config::ProgramFiles =
+            paths_guard.as_ref().ok_or(llava_core::Error::FatalError)?;
+
+        let user_config: llava_core::UserConfig = llava_core::get_config(&paths)?;
+        println!("{:?}", user_config);
+        Ok(user_config)
+
+}

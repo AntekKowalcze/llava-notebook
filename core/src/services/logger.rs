@@ -89,7 +89,7 @@ fn rename_log_file(logger_file_path: &PathBuf) -> Result<(), crate::errors::Erro
 
 #[test]
 fn log_test() {
-    let paths = ProgramFiles::init_in_base().unwrap();
+    let paths = crate::config::ProgramFiles::init_in_base().unwrap();
     let _guard = configure_logger(&paths.logs_path).unwrap();
     tracing::info!("event bez spanu");
     let span = tracing::info_span!("login", user = "test_user");

@@ -208,7 +208,7 @@ fn validate_note_name(
 fn check_if_file_is_created() {
     let path = crate::config::ProgramFiles::init_in_base().unwrap();
     let name = "test".to_owned();
-    let file_content = fs::read_to_string(&path.active_user_path).unwrap();
+    let file_content = std::fs::read_to_string(&path.active_user_path).unwrap();
     let json: serde_json::Value = serde_json::from_str(&file_content).unwrap();
     let owner_id: uuid::Uuid = serde_json::from_value(json["user_uuid"].clone()).unwrap();
 
@@ -223,7 +223,7 @@ fn add_to_db() {
     let path = crate::config::ProgramFiles::init_in_base().unwrap();
     let mut notes_db = crate::services::storage::db_creation::get_connection(&path).unwrap();
     let name = "tttsss".to_owned();
-    let file_content = fs::read_to_string(&path.active_user_path).unwrap();
+    let file_content = std::fs::read_to_string(&path.active_user_path).unwrap();
     let json: serde_json::Value = serde_json::from_str(&file_content)
         .context("failed to parse json of active_user.json file")
         .unwrap();
@@ -238,7 +238,7 @@ fn note_validator_test() {
     let path = crate::config::ProgramFiles::init_in_base().unwrap();
     let notes_db = crate::services::storage::db_creation::get_connection(&path).unwrap();
     let note_name = "ttt";
-    let file_content = fs::read_to_string(&path.active_user_path).unwrap();
+    let file_content = std::fs::read_to_string(&path.active_user_path).unwrap();
     let json: serde_json::Value = serde_json::from_str(&file_content).unwrap();
     let owner_id: uuid::Uuid = serde_json::from_value(json["user_uuid"].clone()).unwrap();
     validate_note_name(note_name, &notes_db, &owner_id).unwrap();

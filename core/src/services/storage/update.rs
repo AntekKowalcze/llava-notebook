@@ -64,7 +64,7 @@ pub fn update_md(
 #[test]
 
 fn update_test() {
-    let paths = ProgramFiles::init_in_base().unwrap();
+    let paths = crate::config::ProgramFiles::init_in_base().unwrap();
     let name = "tttsss".to_string();
     let written_string =
         "this is test string which have to be written and now it will not overwrite".to_string();
@@ -73,7 +73,7 @@ fn update_test() {
     update_md(
         &sqlite_connection,
         name,
-        uuid::Uuid::from_str("45943af4-6163-4816-8108-06330841e1ea").unwrap(), // this is why this test might be failing, write fucntion getting note id from name
+        uuid::Uuid::parse_str("45943af4-6163-4816-8108-06330841e1ea").unwrap(), // this is why this test might be failing, write fucntion getting note id from name
         written_string,
         &paths,
         title,

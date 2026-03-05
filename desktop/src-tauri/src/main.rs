@@ -69,7 +69,8 @@ pub fn main() {
             commands::commands::check_login_on_start,
             commands::commands::get_username_from_uuid,
             commands::commands::local_logout_command,
-            commands::commands::get_dashboard_data
+            commands::commands::get_dashboard_data,
+            commands::commands::get_config_data,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

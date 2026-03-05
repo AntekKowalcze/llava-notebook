@@ -30,7 +30,7 @@ uuid = { version = "1", features = ["v4", "serde"] }
 zeroize = "1"
 tracing = "0.1.43"
 
-tauri-plugin-devtools = "2.0.0-rc"
+tauri-plugin-devtools = "2"
 anyhow = "1.0.100"
 rusqlite = "0.38.0"
 

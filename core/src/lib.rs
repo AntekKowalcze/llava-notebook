@@ -27,6 +27,8 @@ pub use services::storage::delete::delete_note;
 pub use services::storage::init_note::add_note_to_database;
 pub use services::storage::read::read_note_content;
 pub use services::storage::update::update_md;
+pub use services::user_settings::settings::UserConfig;
+pub use services::user_settings::settings::get_config;
 pub use services::user_stats::dashboard_stats::DashboardData;
 pub use services::user_stats::dashboard_stats::get_dashboard_stats;
 pub use utils::get_time;

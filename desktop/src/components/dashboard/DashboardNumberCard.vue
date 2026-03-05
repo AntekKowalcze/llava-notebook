@@ -3,7 +3,7 @@
         <div class="flex flex-col items-start select-none ">
             <!-- label over the card -->
             <p class="mb-2 text-sm font-medium uppercase tracking-widest text-note-pumice/70 ">
-                {{ text }}
+                {{ props.text }}
             </p>
 
             <div class="h-32 w-64 rounded-xl border-2 border-note-pumice/40 bg-note-graphite/60
@@ -14,7 +14,7 @@
                 </div>
 
                 <span class="text-5xl font-semibold text-note-paprika">
-                    {{ count }}
+                    {{ props.count }}
                 </span>
             </div>
         </div>

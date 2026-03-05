@@ -14,5 +14,5 @@ pub fn read_note_content(
 fn read_test() {
     let paths = crate::config::ProgramFiles::init_in_base().unwrap();
     let name = "tttsss".to_string();
-    let content = read_note_content(&paths, name).unwrap();
+    let _content = read_note_content(&paths, name).unwrap();
 }

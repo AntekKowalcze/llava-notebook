@@ -558,7 +558,7 @@ fn generate_codes() {
         )
         .unwrap();
 
-    let u_uuid = uuid::Uuid::parse_str(&u_uuid).unwrap();
+    let _u_uuid = uuid::Uuid::parse_str(&u_uuid).unwrap();
     let keys = recovery_code_handling("tescik", &users_db, "ToJestTest!").unwrap();
     println!("keys: {:#?}", keys);
 }

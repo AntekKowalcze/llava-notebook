@@ -4,24 +4,40 @@ import { ArrowBigLeftDash } from 'lucide-vue-next';
 import ScreenDeviderHorizontal from '../components/dashboard/ScreenDeviderHorizontal.vue';
 import { useAuthStore } from '../stores/auth';
 import { useRouter } from 'vue-router';
+import { invoke } from '@tauri-apps/api/core';
+import { onMounted } from 'vue';
 
-type inputType = "switch" | "button" | "text" | "select"
+type InputType =
+  | "switch"
+  | "button"
+  | "text"
+  | "select"
+  | "number"
+  | "info"
 
 type Setting = {
-    show: boolean,
-    settingName: string,
-    label: string,
-    description: string,
-    settingType: inputType,
-    value: boolean | string,
+  id: string
+  settingName: string
+  label: string
+  description: string
+  currentValue: string
+  inputType: InputType
+
+  show: boolean // frontend only
 }
 
 type Section = {
-    show: boolean,
-    sectionName: string,
-    sectionOptions: Setting[]
+  id: string
+  sectionName: string
+  sectionSettings: Setting[]
+  subsections?: Section[]
+
+  show: boolean // frontend only
 }
 
+type UserConfig = {
+  sections: Section[]
+}
 
 const authStore = useAuthStore();
 const router = useRouter();
@@ -46,6 +62,11 @@ function search() {
 function redirect() {
     router.replace("/main/");
 }
+//TODO important keyring not working on windows think about this
+onMounted(async ()=>{
+    let settings: UserConfig = await invoke<UserConfig>("get_config_data")
+        console.log(settings)
+})
 
 function showFilters() {
     // TODO
