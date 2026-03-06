@@ -14,7 +14,7 @@ const props = defineProps<{
       select-none
     " :class="props.disabled
         ? 'border-note-ivory/10 bg-black/20 text-note-ivory/30 cursor-not-allowed opacity-60'
-        : 'border-note-ivory/20 bg-black/30 text-note-ivory/80 hover:border-note-paprika/50 hover:bg-black/40 hover:text-note-ivory active:scale-95'
+        : 'border-note-ivory/20 bg-black/30 text-note-ivory/80 hover:border-note-paprika hover:bg-black/40 hover:text-note-ivory active:scale-95'
         ">
         {{ props.content }}
     </button>
