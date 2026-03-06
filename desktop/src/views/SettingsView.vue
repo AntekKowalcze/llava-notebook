@@ -6,11 +6,6 @@ import { useAuthStore } from '../stores/auth';
 import { useRouter } from 'vue-router';
 import { invoke } from '@tauri-apps/api/core';
 import { onMounted } from 'vue';
-import CheckboxInput from '../components/settings/CheckboxInput.vue';
-import InfoText from '../components/settings/InfoText.vue';
-import SelectInput from '../components/settings/SelectInput.vue';
-import SetButton from '../components/settings/SetButton.vue';
-import SwitchInput from '../components/settings/SwitchInput.vue';
 
 type InputType =
   | "switch"
@@ -101,10 +96,10 @@ function showFilters() {
                 <!-- Search bar: sits at bottom of left column = same height as card bottom -->
                 <span class="flex items-center bg-black/40 border-note-pumice/50 border-2 w-80 h-10 p-2 rounded-md
                              transition duration-1000 ease-out focus-within:border-note-paprika/80
-                             focus-within:bg-black/40">
+                             focus-within:bg-black/60">
                     <input class="bg-note-graphite text-note-ivory outline-none transition duration-1000 ease-out
                                focus:outline-none focus:ring-0 focus:border-transparent focus:shadow-none
-                               focus:bg-black/40 placeholder:text-note-pumice/70 select-none w-[90%]" type="text"
+                               focus:bg-black/50 placeholder:text-note-pumice/70 select-none w-[90%]" type="text"
                         placeholder="Search..." @input="search" />
                     <Search class="ml-2 text-note-paprika shrink-0" />
                 </span>
@@ -145,15 +140,8 @@ function showFilters() {
         <Funnel class="text-note-pumice/90 transition duration-500 ease-out hover:text-note-paprika mt-8 shrink-0"
             @click="showFilters" />
 
-        <div class="w-full h-[55%] min-h-40  bg-black/40 rounded-xl border border-note-pumice/40 mt-4 mb-6 overflow-hidden" >
-            <!-- <CheckboxInput :checked="true"></CheckboxInput> -->
-            <InfoText></InfoText>
-            <SelectInput></SelectInput>
-            <SetButton :content="'set'" ></SetButton>
-            <SwitchInput></SwitchInput>
-           
-            
-        </div>
+        <div
+            class="w-full h-[55%] min-h-40  bg-black/40 rounded-xl border border-note-pumice/40 mt-4 mb-6 overflow-hidden" />
 
     </div>
 </template>

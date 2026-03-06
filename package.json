@@ -1,6 +1,5 @@
 {
   "dependencies": {
-    "primevue": "^4.5.4",
     "vue-toastification": "^2.0.0-rc.5"
   }
 }
