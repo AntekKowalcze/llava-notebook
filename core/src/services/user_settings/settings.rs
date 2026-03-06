@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 
-use anyhow::Context;
-use serde::{Deserialize, Serialize};
-//TODO add here camel case #[serde(rename_all = "camelCase")] before structs
 use crate::{
     ProgramFiles,
     services::user_settings::settings_constants::{SECTIONS_META, SETTINGS_META, default_config},
     utils::log_helper,
 };
+use anyhow::Context;
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
@@ -160,8 +159,6 @@ fn parse_config(config: &UserConfig) -> WriteConfig {
         sections: sections_vec,
     };
 }
-
-// TODO write parse config fucntion again, but recursively its much easier, think about mapping settings from iterator to hashMap
 
 fn parse_section_recursevly(section: &Section) -> WriteSection {
     let section_id = section.id.clone();

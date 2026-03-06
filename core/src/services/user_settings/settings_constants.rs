@@ -1,6 +1,5 @@
 use crate::services::user_settings::settings::SettingInputType;
 use crate::services::user_settings::settings::{Section, Setting, UserConfig};
-use std::collections::HashMap; //TODO debug why keyring is not working on windows
 //TODO Add buttons so i can preview my dashboard and settings on release, add function to display settings in vue
 pub const SETTING_NAME_LIST: &[&str] = &[
     "local.mode",

@@ -62,7 +62,6 @@ function search() {
 function redirect() {
     router.replace("/main/");
 }
-//TODO important keyring not working on windows think about this
 onMounted(async ()=>{
     let settings: UserConfig = await invoke<UserConfig>("get_config_data")
         console.log(settings)
