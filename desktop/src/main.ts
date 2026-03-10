@@ -7,8 +7,9 @@ import '@fontsource/outfit/400.css';
 import '@fontsource/outfit/700.css';
 import Toast from "vue-toastification";
 import "vue-toastification/dist/index.css";
-
+import PrimeVue from 'primevue/config'
 const app = createApp(App);
+app.use(PrimeVue)
 app.use(createPinia());
 app.use(router);
 

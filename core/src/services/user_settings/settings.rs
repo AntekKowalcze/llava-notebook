@@ -13,8 +13,7 @@ use serde::{Deserialize, Serialize};
 pub enum SettingInputType {
     Switch,
     Button,
-    Text,
-    Select,
+    Select, //TODO make here so select have possible options described in every select as array of strings, also change constants
     Number,
     Info,
 }

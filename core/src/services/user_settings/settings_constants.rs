@@ -98,7 +98,7 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
                 "Data directory".to_string(),
                 "Location of your local database and files.".to_string(),
                 default_data_dir.to_string(),
-                SettingInputType::Text,
+                SettingInputType::Info,
             ),
         ],
     );
@@ -284,7 +284,7 @@ pub static SETTINGS_META: phf::Map<&'static str, SettingMeta> = phf_map! {
         field: "dataDirectory",
         label: "Data directory",
         description: "Location of your local database and files.",
-        input_type: SettingInputType::Text,
+        input_type: SettingInputType::Info,
     },
 
     "local.logout" => SettingMeta {

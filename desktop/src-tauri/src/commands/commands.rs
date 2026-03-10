@@ -70,7 +70,9 @@ pub async fn login_command(
             paths_guard.as_ref().ok_or(llava_core::Error::FatalError)?;
         llava_core::local_log_in(username.clone(), password_zeroized, users_db, paths).map_err(
             |e| {
+              
                 match &e {
+                    
                     llava_core::Error::WrongPassword => {
                         if let Ok(user_uuid) = llava_core::get_user_uuid(users_db, &username) {
                             if let Ok(end_of_timeout) =
@@ -83,10 +85,7 @@ pub async fn login_command(
                             }
                         }
                     }
-                    llava_core::Error::UserNotExists => {
-                        // println!("👤 User not found");
-                        return llava_core::Error::UserNotExists;
-                    }
+                 //USER not exists handled in checing timeouts
                     _ => {
                         return llava_core::Error::FatalError;
                     }
@@ -122,18 +121,22 @@ pub async fn check_timeout_before_submit(
         .map_err(|_| anyhow!("failed to lock AppState.connection"))?;
     let users_db = conn_guard.as_ref().ok_or(llava_core::Error::FatalError)?;
 
-    if let Ok(user_uuid) = llava_core::get_user_uuid(users_db, &username) {
-        if let Ok(end_of_timeout) = llava_core::get_timeout(users_db, &user_uuid) {
-            println!("{}", end_of_timeout);
+
+ let user_uuid = llava_core::get_user_uuid(users_db, &username).map_err(|e| match e {
+        llava_core::Error::UserNotExists => llava_core::Error::UserNotExists,
+        _ => llava_core::Error::FatalError,
+    })?;
+
+    match llava_core::get_timeout(users_db, &user_uuid) {
+        Ok(end_of_timeout) => {
             if end_of_timeout > llava_core::get_time() {
-                let timeout_duration = end_of_timeout - llava_core::get_time();
-                return Ok(timeout_duration);
+                Ok(end_of_timeout - llava_core::get_time())
             } else {
-                return Ok(0); // No timeout, return 0 instead of error
+                Ok(0)
             }
         }
+        Err(_) => Err(llava_core::Error::FatalError),
     }
-    Err(llava_core::Error::FatalError)
 }
 
 #[tauri::command]
@@ -200,7 +203,6 @@ pub async fn change_password(
 }
 
 #[tauri::command]
-//TODO zapytać perplexity co to za pierdolnik sie tu dzieje ze to nie działa
 pub async fn check_login_on_start(
     state: tauri::State<'_, AppState>,
 ) -> Result<SessionState, llava_core::Error> {

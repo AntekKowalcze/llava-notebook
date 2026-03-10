@@ -45,8 +45,7 @@ pub fn get_user_uuid(
         .context("rusqlite error")?;
 
     let uuid_str: String = uuid_str_opt.ok_or(crate::errors::Error::UserNotExists)?;
-
-    // Try to parse the UUID
+    println!("{:?} uuid String", uuid_str);
     let uuid = uuid::Uuid::parse_str(&uuid_str).context("failed to parse uuid")?;
 
     Ok(uuid)

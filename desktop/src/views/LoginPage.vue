@@ -38,9 +38,10 @@ async function submitLogin() {
             loggedInUserId: userId
         })
 
-        router.replace({ name: "main" })
+        router.replace("/main/")
 
     } catch (err: any) {
+        console.log(err)
         if (err == "WrongPassword") {
             console.log(err)
             toast.warning("Wrong Password", {
