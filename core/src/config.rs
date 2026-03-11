@@ -72,6 +72,7 @@ pub struct AppState {
 
     pub username: Mutex<Option<String>>,
     pub paths: Mutex<Option<ProgramFiles>>,
+    pub user_config: Mutex<Option<std::collections::HashMap<String, String>>>,
 }
 
 impl AppState {
@@ -83,6 +84,7 @@ impl AppState {
             notes_db: Mutex::new(None),
             username: Mutex::new(None),
             paths: Mutex::new(None), //login will return current user
+            user_config: Mutex::new(None),
         })
     }
 }

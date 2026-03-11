@@ -12,7 +12,9 @@ import SectionComp from '../components/settings/SectionComp.vue';
 import {ref} from 'vue'
 const authStore = useAuthStore();
 const router = useRouter();
-const settingList = ref<UserConfig | null>(null);
+const settingList = ref<UserConfig | null>(null); //TODO is not it better to hold it in store and before going to this /settings/ load it with this   settingList.value = await invoke<UserConfig>("get_config_data"); and then change already store value and send to backend store value, also load it on app start
+  //TODO write recursive fuction for setting lookup with changing current value and automaticly after changes send userconfig to backend and write it to config
+  //add UserConfig to Rust AppState but i think as Hashmap flatten to just all option, i think it will be most useful
 const cardSettings: string[] = [
     'important setting',
     'second important',
@@ -20,10 +22,10 @@ const cardSettings: string[] = [
     'important setting',
     'second important',
 ];
-
+//TODO write on backed fuction parsing WriteConfig from file to hashMap which will be hold in tauri state, mayby it should be done on app launch (like in main.rs on tauri site but function may live in library and then put phc map in state)
 const username = authStore.loggedInUsername;
 const id = authStore.loggedInUserId;
-
+//TODO okay so my flow -> get config from file ->  parse it and load it to map on tauri state-> give it to frontend UserConfig in store -> display current settings -> on change -> change setting in state -> send to backend user config -> parse to write config -> write to config
 function search() {
     // TODO: Implement Metaphone algorithm
 }
@@ -35,6 +37,7 @@ function redirect() {
 onMounted(async ()=>{
     try {
        settingList.value = await invoke<UserConfig>("get_config_data");
+        console.log(settingList.value.sections.flat(), "flatt")
       console.log(settingList)
     } catch (e) {
       console.warn("get_config_data failed:", e);
@@ -44,6 +47,7 @@ onMounted(async ()=>{
 function showFilters() {
     // TODO
 }
+
 
 
 </script>

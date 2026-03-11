@@ -7,12 +7,14 @@ import '@fontsource/outfit/400.css';
 import '@fontsource/outfit/700.css';
 import Toast from "vue-toastification";
 import "vue-toastification/dist/index.css";
-import PrimeVue from 'primevue/config'
+import PrimeVue from 'primevue/config';
+import { useUserConfigStore } from './stores/userConfig'
+
 const app = createApp(App);
 app.use(PrimeVue)
 app.use(createPinia());
 app.use(router);
-
+useUserConfigStore();
 app.use(Toast as any, {
     transition: "Vue-Toastification__bounce",
     maxToasts: 20,

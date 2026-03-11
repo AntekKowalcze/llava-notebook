@@ -6,6 +6,7 @@ pub fn change_state_after_login(
     notes_conn: rusqlite::Connection,
     paths: llava_core::ProgramFiles,
     username: String,
+    user_config: std::collections::HashMap<String, String>,
 ) -> Result<(), llava_core::Error> {
     *state
         .current_user
@@ -26,5 +27,9 @@ pub fn change_state_after_login(
         .username
         .lock()
         .map_err(|_| anyhow!("Couldnt edit username in state"))? = Some(username);
+    *state
+        .user_config
+        .lock()
+        .map_err(|_| anyhow!("Couldnt edit user_config in state"))? = Some(user_config);
     Ok(())
 }

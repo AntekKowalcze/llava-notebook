@@ -1,5 +1,12 @@
 <script setup lang="ts">
+import { computed } from 'vue';
+import { useUserConfigStore } from '../stores/userConfig';
+const userConfig = useUserConfigStore();
+const encrypted = computed(()=>{
+    return userConfig.config["local.encryption"]
+})
 import {
+    Lock,
     CloudOff,
    LockOpen,
     HardDrive,
@@ -7,7 +14,7 @@ import {
 //, CloudUpload, CloudCheck, RefreshCw, Lock, Server
 defineProps<{ version: string, synced: string }>()
 </script>
-
+<!-- TODO add v-ifs for other config parts, and add config manipulation -->
 <template>
     <div
         class="flex flex-row items-center justify-between px-4 w-full h-7 text-xs select-none bg-black/40 border-t border-white/5">
@@ -47,12 +54,12 @@ defineProps<{ version: string, synced: string }>()
             <div class="w-px h-3 bg-white/10" />
 
             <!-- encrypted -->
-            <!-- <div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-note-glow/10 text-note-glow">
+            <div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-note-glow/10 text-note-glow" v-if="encrypted=='on'">
                 <Lock :size="11" /><span>Encrypted</span>
-            </div> -->
+            </div>
 
             <!-- unencrypted -->
-            <div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-note-garnet/10 text-note-garnet">
+            <div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-note-garnet/10 text-note-garnet" v-else>
                 <LockOpen :size="11" /><span>Unencrypted</span>
             </div>
 

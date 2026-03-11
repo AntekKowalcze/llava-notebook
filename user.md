@@ -90,3 +90,4 @@ Generate AI summary of note
 toggle theme
 
 Show app logs and errors (in dev mode)
+

@@ -43,6 +43,7 @@ pub fn main() {
     state.users_db = std::sync::Mutex::from(Some(user_db));
     state.device_id = std::sync::Mutex::from(Some(device_id));
 
+
     // state.current_user = std::sync::Mutex::from(Some(
     //     llava_core::config::read_current_user(&program_paths.active_user_path)
     //         .expect("error while reading current user"),

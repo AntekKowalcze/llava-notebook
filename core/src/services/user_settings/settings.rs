@@ -106,7 +106,7 @@ pub fn get_config(paths: &ProgramFiles) -> Result<UserConfig, crate::errors::Err
             );
             if content.trim().is_empty() {
                 return Ok(write_default_config(paths)?);
-            } //TODO add here checking if all config sections and settings are written, if not, write them as default | flat settings and iterate, same with sections
+            }
             let json: serde_json::Value =
                 serde_json::from_str(&content).context("Failed to serialize config content")?;
             let user_config: WriteConfig =
@@ -123,6 +123,43 @@ pub fn get_config(paths: &ProgramFiles) -> Result<UserConfig, crate::errors::Err
                 "Error while reading config, fallback creation of default config"
             );
             Ok(write_default_config(paths)?)
+        }
+    }
+}
+pub fn get_config_for_state(
+    paths: &ProgramFiles,
+) -> Result<std::collections::HashMap<String, String>, crate::errors::Error> {
+    let config_content = std::fs::read_to_string(paths.config_path.clone());
+    match config_content {
+        Ok(content) => {
+            log_helper(
+                "getting config",
+                "success",
+                None::<crate::utils::Format<String>>,
+                "successfully readed users config",
+            );
+            if content.trim().is_empty() {
+                write_default_config(paths)?;
+                return Ok(get_config_for_state(paths)?);
+            }
+            //TODO delete checking in get_config, do it here (earlier in program lifetime) (frontend version) add here checking if all config sections and settings are written, if not, write them as default | flat settings and iterate, same with sections
+            let json: serde_json::Value =
+                serde_json::from_str(&content).context("Failed to serialize config content")?;
+            let user_config: WriteConfig =
+                serde_json::from_value(json).context("failed to deserialize user config")?;
+            let state_config: std::collections::HashMap<String, String> =
+                parse_config_to_state_hash_map(user_config);
+            Ok(state_config)
+        }
+        Err(err) => {
+            tracing::error!(
+                task = "getting config",
+                status = "erorr",
+                error= ?err,
+                "Error while reading config, fallback creation of default config"
+            );
+            write_default_config(paths)?;
+            return Ok(get_config_for_state(paths)?);
         }
     }
 }
@@ -236,4 +273,38 @@ fn parse_settings(settings: HashMap<String, String>) -> Vec<Setting> {
         })
     }
     return_settings
+}
+
+fn parse_config_to_state_hash_map(
+    readed_config: WriteConfig,
+) -> std::collections::HashMap<String, String> {
+    let mut return_map = std::collections::HashMap::new();
+    for section in readed_config.sections {
+        return_map.extend(handle_write_sections(section));
+    }
+    return_map
+}
+
+fn handle_write_sections(section: WriteSection) -> std::collections::HashMap<String, String> {
+    let mut collect_map: HashMap<String, String> = HashMap::new();
+    collect_map.extend(section.settings);
+    if let Some(subsection) = section.write_sections {
+        for s in subsection {
+            collect_map.extend(handle_write_sections(s));
+        }
+    }
+    collect_map
+}
+
+#[test]
+
+fn state_hash_map_test() {
+    let write_config = parse_config(
+        &crate::services::user_settings::settings_constants::default_config(
+            "C:\\Users\\Jakub\\AppData\\Local\\llava/users/ffcd2a2c-2de2-4864-9b8c-326e240bf385/",
+        ),
+    );
+    let parsed = parse_config_to_state_hash_map(write_config);
+    println!("{:#?}", parsed);
+    assert_eq!(parsed.len(), 18); //change value depending on number of setting on the list!!
 }
