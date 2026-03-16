@@ -1,4 +1,3 @@
-
 <script setup lang="ts">
 import { Funnel, InfoIcon, Search } from 'lucide-vue-next';
 import { ArrowBigLeftDash } from 'lucide-vue-next';
@@ -7,48 +6,71 @@ import { useAuthStore } from '../stores/auth';
 import { useRouter } from 'vue-router';
 import { invoke } from '@tauri-apps/api/core';
 import { onMounted } from 'vue';
-import { UserConfig } from '../types/settingTypes';
+import { Section, UserConfig } from '../types/settingTypes';
 import SectionComp from '../components/settings/SectionComp.vue';
-import {ref} from 'vue'
+import { ref } from 'vue'
+import { useToast } from 'vue-toastification';
+const toast = useToast()
 const authStore = useAuthStore();
 const router = useRouter();
-const settingList = ref<UserConfig | null>(null); //TODO is not it better to hold it in store and before going to this /settings/ load it with this   settingList.value = await invoke<UserConfig>("get_config_data"); and then change already store value and send to backend store value, also load it on app start
-  //TODO write recursive fuction for setting lookup with changing current value and automaticly after changes send userconfig to backend and write it to config
-  //add UserConfig to Rust AppState but i think as Hashmap flatten to just all option, i think it will be most useful
+const settingList = ref<UserConfig | null>(null);
 const cardSettings: string[] = [
-    'important setting',
-    'second important',
-    'third ',
-    'important setting',
-    'second important',
-];
-//TODO write on backed fuction parsing WriteConfig from file to hashMap which will be hold in tauri state, mayby it should be done on app launch (like in main.rs on tauri site but function may live in library and then put phc map in state)
+  'important setting',
+  'second important',
+  'third ',
+  'important setting',
+  'second important',
+]; //pass as prop choosen userConfig setting (like settingsList][0][0] etc and it will change contents automaticly)
 const username = authStore.loggedInUsername;
 const id = authStore.loggedInUserId;
-//TODO okay so my flow -> get config from file ->  parse it and load it to map on tauri state-> give it to frontend UserConfig in store -> display current settings -> on change -> change setting in state -> send to backend user config -> parse to write config -> write to config
 function search() {
-    // TODO: Implement Metaphone algorithm
+  // TODO: Implement Metaphone algorithm
 }
-
 function redirect() {
-    router.replace("/main/");
+  router.replace("/main/");
 }
 
-onMounted(async ()=>{
-    try {
-       settingList.value = await invoke<UserConfig>("get_config_data");
-        console.log(settingList.value.sections.flat(), "flatt")
-      console.log(settingList)
-    } catch (e) {
-      console.warn("get_config_data failed:", e);
-    }
+onMounted(async () => {
+  try {
+    settingList.value = await invoke<UserConfig>("get_config_data");
+  } catch (e) {
+
+    console.warn("get_config_data failed:", e);
+    toast.error("failed to get current config")
+  }
 })
 
 function showFilters() {
-    // TODO
+  // TODO here use checkboxes with labels
+}
+async function handleChange(id: string, value: string) {
+  console.log("updating")
+  if (!settingList.value) return
+  findAndUpdate(settingList.value.sections, id, value)
+  console.log(settingList)
+  console.log("updated")
+  try {
+    await invoke('update_settings', { userConfig: settingList.value })
+
+  } catch (err) {
+    toast.error("Failed to save config")
+  }
 }
 
-
+function findAndUpdate(sections: Section[], id: string, value: string): boolean {
+  for (const section of sections) {
+    for (const setting of section.sectionSettings) {
+      if (setting.id === id) {
+        setting.currentValue = value
+        return true
+      }
+    }
+    if (section.subsections) {
+      if (findAndUpdate(section.subsections, id, value)) return true
+    }
+  }
+  return false
+}
 
 </script>
 
@@ -76,15 +98,13 @@ function showFilters() {
                        focus-within:bg-black/60">
             <input class="bg-note-graphite text-note-ivory outline-none transition duration-1000 ease-out
                          focus:outline-none focus:ring-0 focus:border-transparent focus:shadow-none
-                         focus:bg-black/50 placeholder:text-note-pumice/70 select-none w-[90%]"
-                   type="text"
-                   placeholder="Search..."
-                   @input="search" />
+                         focus:bg-black/50 placeholder:text-note-pumice/70 select-none w-[90%]" type="text"
+              placeholder="Search..." @input="search" />
             <Search class="ml-2 text-note-paprika shrink-0" />
           </span>
         </div>
 
-       
+
         <div class="flex flex-col shrink-0 bg-note-graphite/80 border border-note-pumice/20 rounded-xl
                     px-4 py-4 w-[28%] min-w-56 h-[27vh] min-h-60">
           <div class="flex items-center gap-2 mb-4">
@@ -119,18 +139,18 @@ function showFilters() {
 
     <div class="shrink-0 my-2">
       <Funnel class="text-note-pumice/90 transition duration-500 ease-out hover:text-note-paprika"
-              @click="showFilters" />
+        @click="showFilters" />
     </div>
 
-  
+
     <main class="flex-1 min-h-0 flex flex-col gap-4 pb-6 my-4">
       <div
-        class="flex-1 min-h-0 w-full bg-black/40 rounded-xl border border-note-pumice/40 overflow-y-auto scrollbar-none p-4"
-      >
-      <SectionComp v-if="settingList" v-for="section in settingList.sections" :section="section">
+        class="flex-1 min-h-0 w-full bg-black/40 rounded-xl border border-note-pumice/40 overflow-y-auto scrollbar-none p-4">
+        <SectionComp v-if="settingList" v-for="section in settingList.sections" :section="section"
+          @setting-changed="handleChange">
 
-      </SectionComp>
-     
+        </SectionComp>
+
       </div>
     </main>
 
@@ -141,12 +161,15 @@ function showFilters() {
 .scrollbar-none {
   scrollbar-width: none;
 }
+
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
 
 @media (max-width: 768px) {
-  .min-h-60 { min-height: 15rem; } 
+  .min-h-60 {
+    min-height: 15rem;
+  }
 }
 </style>
 

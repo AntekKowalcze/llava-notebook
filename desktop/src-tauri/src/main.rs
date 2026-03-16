@@ -42,7 +42,7 @@ pub fn main() {
 
     state.users_db = std::sync::Mutex::from(Some(user_db));
     state.device_id = std::sync::Mutex::from(Some(device_id));
-
+    
 
     // state.current_user = std::sync::Mutex::from(Some(
     //     llava_core::config::read_current_user(&program_paths.active_user_path)
@@ -72,6 +72,7 @@ pub fn main() {
             commands::commands::local_logout_command,
             commands::commands::get_dashboard_data,
             commands::commands::get_config_data,
+            commands::commands::update_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

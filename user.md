@@ -19,7 +19,7 @@ Change password / reset password
 Export / import user data (backup or migration)
 
 Manage connected devices (if multi-device sync)
-//TODO delete account,  Remove local data, dashboard, po dashboard dopiero notatki
+//TODO delete account,  Remove local data,
 
 Create a note (Markdown or plaintext)
 

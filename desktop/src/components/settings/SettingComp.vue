@@ -5,19 +5,15 @@ import InfoText from './InfoText.vue';
 import SelectInput from './SelectInput.vue';
 import SetButton from './SetButton.vue';
 import SwitchInput from './SwitchInput.vue';
-
 const props = defineProps<{
   setting: Setting,
 
 }>()
 
-console.log(props.setting.currentValue, props.setting.inputType)
-const checked = computed(()=>{
-if (props.setting.currentValue == "on"){
-  return true
-}else return false
+const emit = defineEmits<{ (e: 'setting-changed', id: string, value: string): void }>()
 
-})
+console.log(props.setting.currentValue, props.setting.inputType)
+
 </script>
 
 <template>
@@ -50,21 +46,20 @@ if (props.setting.currentValue == "on"){
       ">
         {{ props.setting.label }}
       </p>
-      <p
-        v-if="props.setting.description"
-        class="text-[11px] text-note-pumice/35 mt-0.5 leading-tight select-none"
-      >
+      <p v-if="props.setting.description" class="text-[11px] text-note-pumice/35 mt-0.5 leading-tight select-none">
         {{ props.setting.description }}
       </p>
     </div>
 
     <!-- Input -->
     <div class="shrink-0 ml-6">
-      
-      <SelectInput v-if="props.setting.inputType === 'select'" :options="[]"/>
-      <SetButton   v-else-if="props.setting.inputType === 'button'" content="Set" />
-      <InfoText    v-else-if="props.setting.inputType === 'info'"   :content="props.setting.currentValue" />
-      <SwitchInput v-else-if="props.setting.inputType === 'switch'" :state="checked"   />
+      <SelectInput v-if="props.setting.inputType === 'select'" :options="props.setting.options!" :id="props.setting.id"
+        @setting-changed="(id, value) => emit('setting-changed', id, value)"
+        :current-value="props.setting.currentValue" />
+      <SetButton v-else-if="props.setting.inputType === 'button'" :content="props.setting.buttonLabel!" />
+      <InfoText v-else-if="props.setting.inputType === 'info'" :content="props.setting.currentValue" />
+      <SwitchInput v-else-if="props.setting.inputType === 'switch'" :current-value="props.setting.currentValue"
+        :id="props.setting.id" @setting-changed="(id, value) => emit('setting-changed', id, value)" />
     </div>
 
   </div>

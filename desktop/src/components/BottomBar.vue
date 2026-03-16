@@ -2,19 +2,28 @@
 import { computed } from 'vue';
 import { useUserConfigStore } from '../stores/userConfig';
 const userConfig = useUserConfigStore();
-const encrypted = computed(()=>{
+const encrypted = computed(() => {
     return userConfig.config["local.encryption"]
+})
+const local = computed(() => {
+    console.log(userConfig.config["local.mode"])
+    if (userConfig.config["local.mode"] == "on") {
+        return true
+    } else {
+        return false
+    }
 })
 import {
     Lock,
     CloudOff,
-   LockOpen,
+    LockOpen,
     HardDrive,
+    Server
 } from 'lucide-vue-next'
-//, CloudUpload, CloudCheck, RefreshCw, Lock, Server
+//, CloudUpload, CloudCheck, RefreshCw, 
 defineProps<{ version: string, synced: string }>()
 </script>
-<!-- TODO add v-ifs for other config parts, and add config manipulation -->
+
 <template>
     <div
         class="flex flex-row items-center justify-between px-4 w-full h-7 text-xs select-none bg-black/40 border-t border-white/5">
@@ -54,7 +63,8 @@ defineProps<{ version: string, synced: string }>()
             <div class="w-px h-3 bg-white/10" />
 
             <!-- encrypted -->
-            <div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-note-glow/10 text-note-glow" v-if="encrypted=='on'">
+            <div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-note-glow/10 text-note-glow"
+                v-if="encrypted == 'on'">
                 <Lock :size="11" /><span>Encrypted</span>
             </div>
 
@@ -66,14 +76,14 @@ defineProps<{ version: string, synced: string }>()
             <div class="w-px h-3 bg-white/10" />
 
             <!-- local -->
-            <div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/5 text-note-pumice">
+            <div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/5 text-note-pumice" v-if="local">
                 <HardDrive :size="11" /><span>Local</span>
             </div>
 
             <!-- cloud -->
-            <!-- <div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-note-paprika/10 text-note-paprika">
+            <div class="flex items-center gap-1 px-1.5 py-0.5 rounded bg-note-paprika/10 text-note-paprika" v-else>
                 <Server :size="11" /><span>Cloud</span>
-            </div> -->
+            </div>
 
             <div class="w-px h-3 bg-white/10" />
 

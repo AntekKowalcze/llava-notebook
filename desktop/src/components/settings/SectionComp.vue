@@ -5,6 +5,7 @@ import SettingComp from './SettingComp.vue';
 const props = defineProps<{
   section: Section,
 }>()
+const emit = defineEmits<{ (e: 'setting-changed', id: string, value: string): void }>()
 </script>
 
 <template>
@@ -28,9 +29,12 @@ const props = defineProps<{
     </div>
 
     <!-- Settings list -->
-    <div class="flex flex-col px-4 pb-2"> 
-     <SectionComp v-if="props.section.subsections" v-for="sec in props.section.subsections" :key="sec.id" :section="sec"></SectionComp>
-     <SettingComp v-if="props.section.sectionSettings.length > 0" v-for="setting in props.section.sectionSettings" :key="setting.id" :setting="setting"></SettingComp>
+    <div class="flex flex-col px-4 pb-2">
+      <SectionComp v-if="props.section.subsections" v-for="sec in props.section.subsections" :key="sec.id"
+        :section="sec" @setting-changed="(id, value) => emit('setting-changed', id, value)"></SectionComp>
+      <SettingComp v-if="props.section.sectionSettings.length > 0" v-for="setting in props.section.sectionSettings"
+        :key="setting.id" :setting="setting" @setting-changed="(id, value) => emit('setting-changed', id, value)">
+      </SettingComp>
     </div>
 
     <!-- Bottom spacer / divider -->

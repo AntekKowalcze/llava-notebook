@@ -35,6 +35,7 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
                 "Work fully offline on this device only.".to_string(),
                 "off".to_string(),
                 SettingInputType::Switch,
+                None,
             ),
             Setting::new(
                 "local.encryption".to_string(),
@@ -43,6 +44,7 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
                 "Encrypt your notes and settings on this device.".to_string(),
                 "on".to_string(),
                 SettingInputType::Switch,
+                None,
             ),
             Setting::new(
                 "local.sync".to_string(),
@@ -51,6 +53,7 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
                 "Enable background sync when online mode is active.".to_string(),
                 "off".to_string(),
                 SettingInputType::Switch,
+                None,
             ),
             Setting::new(
                 "local.showLogs".to_string(),
@@ -59,6 +62,7 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
                 "Open a view with recent application logs.".to_string(),
                 "idle".to_string(),
                 SettingInputType::Button,
+                Some("Show".to_string()),
             ),
             Setting::new(
                 "local.exportNotes".to_string(),
@@ -67,6 +71,7 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
                 "Export all notes to a backup file on this device.".to_string(),
                 "idle".to_string(),
                 SettingInputType::Button,
+                Some("Export".to_string()),
             ),
             Setting::new(
                 "local.importNotes".to_string(),
@@ -75,6 +80,7 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
                 "Import notes from a local backup file.".to_string(),
                 "idle".to_string(),
                 SettingInputType::Button,
+                Some("Import".to_string()),
             ),
             Setting::new(
                 "local.autoBackup".to_string(),
@@ -83,6 +89,7 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
                 "Create automatic backups of your notes.".to_string(),
                 "on".to_string(),
                 SettingInputType::Switch,
+                None,
             ),
             Setting::new(
                 "local.backupFrequency".to_string(),
@@ -91,6 +98,7 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
                 "How often automatic backups are created.".to_string(),
                 "daily".to_string(),
                 SettingInputType::Select,
+                None,
             ),
             Setting::new(
                 "local.dataDirectory".to_string(),
@@ -99,6 +107,7 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
                 "Location of your local database and files.".to_string(),
                 default_data_dir.to_string(),
                 SettingInputType::Info,
+                None,
             ),
         ],
     );
@@ -114,6 +123,7 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
                 "Sign out from this account on this device.".to_string(),
                 "idle".to_string(),
                 SettingInputType::Button,
+                Some("Logout".to_string()),
             ),
             Setting::new(
                 "local.deleteLocalFiles".to_string(),
@@ -122,6 +132,7 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
                 "Permanently delete all local notes and settings on this device.".to_string(),
                 "idle".to_string(),
                 SettingInputType::Button,
+                Some("Delete".to_string()),
             ),
             Setting::new(
                 "local.deleteAccount".to_string(),
@@ -130,6 +141,7 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
                 "Permanently delete your account and all synced data.".to_string(),
                 "idle".to_string(),
                 SettingInputType::Button,
+                Some("Delete".to_string()),
             ),
         ],
     );
@@ -146,6 +158,7 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
                 "Connect this device to your online account.".to_string(),
                 "off".to_string(),
                 SettingInputType::Switch,
+                None,
             ),
             Setting::new(
                 "online.sync".to_string(),
@@ -154,6 +167,7 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
                 "Automatically sync notes across all connected devices.".to_string(),
                 "on".to_string(),
                 SettingInputType::Switch,
+                None,
             ),
             Setting::new(
                 "online.connectedDevices".to_string(),
@@ -162,6 +176,7 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
                 "View and manage devices connected to your account.".to_string(),
                 "0".to_string(),
                 SettingInputType::Info,
+                None,
             ),
             Setting::new(
                 "online.changePasswordEmail".to_string(),
@@ -170,6 +185,7 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
                 "Send a password change link to your email address.".to_string(),
                 "idle".to_string(),
                 SettingInputType::Button,
+                Some("Change".to_string()),
             ),
             Setting::new(
                 "online.changeUsername".to_string(),
@@ -178,6 +194,7 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
                 "Update your online account username.".to_string(),
                 "idle".to_string(),
                 SettingInputType::Button,
+                Some("Change".to_string()),
             ),
         ],
     );
@@ -193,6 +210,7 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
             "Generate AI summaries for your notes.".to_string(),
             "on".to_string(),
             SettingInputType::Switch,
+            None,
         )],
     );
 
@@ -219,6 +237,8 @@ pub struct SettingMeta {
     pub label: &'static str,
     pub description: &'static str,
     pub input_type: SettingInputType,
+    pub options: Option<&'static [&'static str]>,
+    pub button_label: Option<&'static str>,
 }
 
 use phf_macros::phf_map;
@@ -229,6 +249,9 @@ pub static SETTINGS_META: phf::Map<&'static str, SettingMeta> = phf_map! {
         label: "Local / offline mode",
         description: "Work fully offline on this device only.",
         input_type: SettingInputType::Switch,
+        options: None,
+        button_label: None
+
     },
 
     "local.encryption" => SettingMeta {
@@ -236,6 +259,9 @@ pub static SETTINGS_META: phf::Map<&'static str, SettingMeta> = phf_map! {
         label: "Encrypt local data",
         description: "Encrypt your notes and settings on this device.",
         input_type: SettingInputType::Switch,
+        options: None,
+        button_label: None
+
     },
 
     "local.sync" => SettingMeta {
@@ -243,6 +269,9 @@ pub static SETTINGS_META: phf::Map<&'static str, SettingMeta> = phf_map! {
         label: "Sync in local mode",
         description: "Enable background sync when online mode is active.",
         input_type: SettingInputType::Switch,
+        options: None,
+        button_label: None
+
     },
 
     "local.showLogs" => SettingMeta {
@@ -250,6 +279,10 @@ pub static SETTINGS_META: phf::Map<&'static str, SettingMeta> = phf_map! {
         label: "Show application logs",
         description: "Open a view with recent application logs.",
         input_type: SettingInputType::Button,
+        options: None,
+        button_label: Some("Show"),
+
+
     },
 
     "local.exportNotes" => SettingMeta {
@@ -257,6 +290,10 @@ pub static SETTINGS_META: phf::Map<&'static str, SettingMeta> = phf_map! {
         label: "Export notes",
         description: "Export all notes to a backup file on this device.",
         input_type: SettingInputType::Button,
+        options: None,
+        button_label: Some("Export")
+
+
     },
 
     "local.importNotes" => SettingMeta {
@@ -264,6 +301,10 @@ pub static SETTINGS_META: phf::Map<&'static str, SettingMeta> = phf_map! {
         label: "Import notes",
         description: "Import notes from a local backup file.",
         input_type: SettingInputType::Button,
+        options: None,
+        button_label: Some("Import")
+
+
     },
 
     "local.autoBackup" => SettingMeta {
@@ -271,6 +312,8 @@ pub static SETTINGS_META: phf::Map<&'static str, SettingMeta> = phf_map! {
         label: "Automatic backups",
         description: "Create automatic backups of your notes.",
         input_type: SettingInputType::Switch,
+        options: None,
+        button_label: None
     },
 
     "local.backupFrequency" => SettingMeta {
@@ -278,6 +321,8 @@ pub static SETTINGS_META: phf::Map<&'static str, SettingMeta> = phf_map! {
         label: "Backup frequency",
         description: "How often automatic backups are created.",
         input_type: SettingInputType::Select,
+        options: Some(&["daily", "weekly", "monthly"]),
+        button_label: None
     },
 
     "local.dataDirectory" => SettingMeta {
@@ -285,13 +330,19 @@ pub static SETTINGS_META: phf::Map<&'static str, SettingMeta> = phf_map! {
         label: "Data directory",
         description: "Location of your local database and files.",
         input_type: SettingInputType::Info,
-    },
+        options: None,
+        button_label: None
 
+    },
+// TODO add setting for generating next recovery codes
     "local.logout" => SettingMeta {
         field: "logout",
         label: "Log out",
         description: "Sign out from this account on this device.",
         input_type: SettingInputType::Button,
+        options: None,
+        button_label: Some("Logout")
+
     },
 
     "local.deleteLocalFiles" => SettingMeta {
@@ -299,6 +350,9 @@ pub static SETTINGS_META: phf::Map<&'static str, SettingMeta> = phf_map! {
         label: "Delete local files",
         description: "Permanently delete all local notes and settings on this device.",
         input_type: SettingInputType::Button,
+        options: None,
+        button_label: Some("Delete")
+
     },
 
     "local.deleteAccount" => SettingMeta {
@@ -306,6 +360,9 @@ pub static SETTINGS_META: phf::Map<&'static str, SettingMeta> = phf_map! {
         label: "Delete account",
         description: "Permanently delete your account and all synced data.",
         input_type: SettingInputType::Button,
+        options: None,
+        button_label: Some("Delete")
+
     },
 
     "online.mode" => SettingMeta {
@@ -313,6 +370,10 @@ pub static SETTINGS_META: phf::Map<&'static str, SettingMeta> = phf_map! {
         label: "Online mode",
         description: "Connect this device to your online account.",
         input_type: SettingInputType::Switch,
+        options: None,
+        button_label: None
+
+
     },
 
     "online.sync" => SettingMeta {
@@ -320,6 +381,9 @@ pub static SETTINGS_META: phf::Map<&'static str, SettingMeta> = phf_map! {
         label: "Sync notes across devices",
         description: "Automatically sync notes across all connected devices.",
         input_type: SettingInputType::Switch,
+        options: None,
+        button_label: None
+
     },
 
     "online.connectedDevices" => SettingMeta {
@@ -327,6 +391,9 @@ pub static SETTINGS_META: phf::Map<&'static str, SettingMeta> = phf_map! {
         label: "Connected devices",
         description: "View and manage devices connected to your account.",
         input_type: SettingInputType::Info,
+        options: None,
+        button_label: None
+
     },
 
     "online.changePasswordEmail" => SettingMeta {
@@ -334,6 +401,9 @@ pub static SETTINGS_META: phf::Map<&'static str, SettingMeta> = phf_map! {
         label: "Change password via email",
         description: "Send a password change link to your email address.",
         input_type: SettingInputType::Button,
+        options: None,
+        button_label: Some("Change")
+
     },
 
     "online.changeUsername" => SettingMeta {
@@ -341,6 +411,10 @@ pub static SETTINGS_META: phf::Map<&'static str, SettingMeta> = phf_map! {
         label: "Change username",
         description: "Update your online account username.",
         input_type: SettingInputType::Button,
+        options: None,
+        button_label: Some("Change")
+
+
     },
 
     "online.aiSummary" => SettingMeta {
@@ -348,6 +422,9 @@ pub static SETTINGS_META: phf::Map<&'static str, SettingMeta> = phf_map! {
         label: "AI summaries",
         description: "Generate AI summaries for your notes.",
         input_type: SettingInputType::Switch,
+        options: None,
+        button_label:None
+
     },
 
 };

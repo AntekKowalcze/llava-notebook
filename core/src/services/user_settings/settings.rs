@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 use crate::{
     ProgramFiles,
-    services::user_settings::settings_constants::{SECTIONS_META, SETTINGS_META, default_config},
+    services::user_settings::settings_constants::{SECTIONS_META, SETTINGS_META},
     utils::log_helper,
 };
 use anyhow::Context;
@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 pub enum SettingInputType {
     Switch,
     Button,
-    Select, //TODO make here so select have possible options described in every select as array of strings, also change constants
+    Select,
     Number,
     Info,
 }
@@ -27,6 +27,8 @@ pub struct Setting {
     pub description: String,
     pub current_value: String,
     pub input_type: SettingInputType,
+    pub options: Option<Vec<String>>,
+    pub button_label: Option<String>,
 }
 
 impl Setting {
@@ -37,6 +39,7 @@ impl Setting {
         description: String,
         current_value: String,
         input_type: SettingInputType,
+        button_label: Option<String>,
     ) -> Setting {
         return Setting {
             id,
@@ -45,6 +48,8 @@ impl Setting {
             description,
             current_value,
             input_type,
+            options: None,
+            button_label,
         };
     }
 }
@@ -270,6 +275,10 @@ fn parse_settings(settings: HashMap<String, String>) -> Vec<Setting> {
             description: setting_meta.description.to_string(),
             current_value: value,
             input_type: setting_meta.input_type,
+            options: setting_meta
+                .options
+                .map(|o| o.iter().map(|s| s.to_string()).collect()),
+            button_label: setting_meta.button_label.map(|s| s.to_string()),
         })
     }
     return_settings
@@ -294,6 +303,26 @@ fn handle_write_sections(section: WriteSection) -> std::collections::HashMap<Str
         }
     }
     collect_map
+}
+
+pub fn save_config(
+    config: &UserConfig,
+    config_path: PathBuf,
+) -> Result<std::collections::HashMap<String, String>, crate::errors::Error> {
+    let parsed_config = parse_config(&config);
+    let config_content = serde_json::to_string_pretty(&parsed_config)
+        .inspect_err(|err| {
+            tracing::error!(
+                task = "getting config",
+                status = "error",
+                error = ?err,
+                "Error while parsing changed config"
+            );
+        })
+        .context("failed to parse UserConfig to json")?;
+    let hash_config = parse_config_to_state_hash_map(parsed_config);
+    std::fs::write(config_path, config_content)?;
+    Ok(hash_config)
 }
 
 #[test]

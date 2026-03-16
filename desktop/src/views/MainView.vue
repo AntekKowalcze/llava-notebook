@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import BottomBar from '../components/BottomBar.vue';
-//TODO add logic for status bar, piniaStore,
 </script>
 
 <template>
