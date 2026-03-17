@@ -17,6 +17,8 @@ export type Setting = {
   inputType: InputType
   options: string[] | null
   buttonLabel: string | null
+
+
   show: boolean // frontend only
 }
 
@@ -26,6 +28,7 @@ export type Section = {
   sectionSettings: Setting[]
   subsections?: Section[]
 
+  scrollPosition: number
   show: boolean // frontend only
 }
 

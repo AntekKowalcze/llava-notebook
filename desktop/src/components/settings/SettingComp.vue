@@ -17,7 +17,7 @@ console.log(props.setting.currentValue, props.setting.inputType)
 </script>
 
 <template>
-  <div class="
+  <div :id="props.setting.id" class="
     group
     relative flex items-center justify-between
     px-4 py-3 rounded-lg

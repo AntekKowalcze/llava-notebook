@@ -6,7 +6,7 @@ import { useAuthStore } from '../stores/auth';
 import { useRouter } from 'vue-router';
 import { invoke } from '@tauri-apps/api/core';
 import { onMounted } from 'vue';
-import { Section, UserConfig } from '../types/settingTypes';
+import { Section, Setting, UserConfig } from '../types/settingTypes';
 import SectionComp from '../components/settings/SectionComp.vue';
 import { ref } from 'vue'
 import { useToast } from 'vue-toastification';
@@ -14,13 +14,7 @@ const toast = useToast()
 const authStore = useAuthStore();
 const router = useRouter();
 const settingList = ref<UserConfig | null>(null);
-const cardSettings: string[] = [
-  'important setting',
-  'second important',
-  'third ',
-  'important setting',
-  'second important',
-]; //pass as prop choosen userConfig setting (like settingsList][0][0] etc and it will change contents automaticly)
+const cardSettings = ref<Setting[]>([])
 const username = authStore.loggedInUsername;
 const id = authStore.loggedInUserId;
 function search() {
@@ -33,12 +27,18 @@ function redirect() {
 onMounted(async () => {
   try {
     settingList.value = await invoke<UserConfig>("get_config_data");
-  } catch (e) {
+    let cardSettingsIdList: string[] = ["local.mode", "local.encryption", "local.logout", "online.sync", "local.showLogs", "local.deleteLocalFiles"]
+    for (let setting of cardSettingsIdList) {
+      const found = findSetting(settingList.value.sections, setting)
+      if (found) cardSettings.value.push(found)
 
+    }
+  } catch (e) {
     console.warn("get_config_data failed:", e);
     toast.error("failed to get current config")
   }
 })
+
 
 function showFilters() {
   // TODO here use checkboxes with labels
@@ -71,6 +71,27 @@ function findAndUpdate(sections: Section[], id: string, value: string): boolean 
   }
   return false
 }
+function findSetting(sections: Section[], id: string) {
+  for (const section of sections) {
+    for (const setting of section.sectionSettings) {
+      if (setting.id === id) {
+        return setting
+      }
+    }
+    if (section.subsections) {
+      return findSetting(section.subsections, id)
+    }
+  }
+}
+
+
+
+function goToSetting(id: string) {
+  const el = document.getElementById(id)
+  el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
+}
+
 
 </script>
 
@@ -122,11 +143,12 @@ function findAndUpdate(sections: Section[], id: string, value: string): boolean 
 
           <div class="flex-1 rounded-lg bg-black/40 border border-note-pumice/10
                       px-3 py-2 flex flex-col justify-between overflow-hidden">
-            <button v-for="setting in cardSettings" :key="setting" type="button" class="flex items-center rounded-md px-2 py-1.5 text-xs text-note-pumice/80
+            <button v-for="setting in cardSettings" :key="setting.id" type="button" class="flex items-center rounded-md px-2 py-1.5 text-xs text-note-pumice/80
                            hover:text-note-ivory hover:bg-black/50 transition-colors w-full">
-              <span class="flex-1 flex justify-start">{{ setting }}</span>
-              <span class="flex-1 flex justify-center">value</span>
-              <span class="flex-1 flex justify-end text-note-paprika text-[11px] tracking-wide uppercase">
+              <span class="flex-1 flex justify-start">{{ setting.settingName }}</span>
+              <span class="flex-1 flex justify-center">{{ setting.currentValue }}</span>
+              <span @click="goToSetting(setting.id)"
+                class="flex-1 flex justify-end text-note-paprika text-[11px] tracking-wide uppercase">
                 go to setting
               </span>
             </button>
