@@ -495,7 +495,7 @@ pub fn session_operations(
         base32::Alphabet::Crockford,
         &Sha256::digest(session_uuid.to_string().as_bytes()),
     );
-    let expires_at = crate::utils::get_time() / 100 + crate::constants::SESSION_TOKEN_TIME_ALIVE;
+    let expires_at = crate::utils::get_time() / 1000 + crate::constants::SESSION_TOKEN_TIME_ALIVE;
     let mut stmt = users_db
         .prepare("INSERT INTO session_data(hashed_token, user_id, expires_at) VALUES (:session_hash, :uid, :expires);")
         .inspect_err(|e| tracing::error!(

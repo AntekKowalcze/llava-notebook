@@ -9,7 +9,7 @@ const emit = defineEmits<{ (e: 'setting-changed', id: string, value: string): vo
 </script>
 
 <template>
-  <div class="w-full flex flex-col">
+  <div class="w-full flex flex-col" v-show="props.section.show">
 
     <!-- Section Header -->
     <div class="flex items-center gap-3 px-6 py-3">
@@ -30,12 +30,15 @@ const emit = defineEmits<{ (e: 'setting-changed', id: string, value: string): vo
 
     <!-- Settings list -->
     <div class="flex flex-col px-4 pb-2">
-      <SettingComp v-if="props.section.sectionSettings.length > 0" v-for="setting in props.section.sectionSettings"
-        :key="setting.id" :setting="setting" @setting-changed="(id, value) => emit('setting-changed', id, value)">
-      </SettingComp>
-      <SectionComp v-if="props.section.subsections" v-for="sec in props.section.subsections" :key="sec.id"
-        :section="sec" @setting-changed="(id, value) => emit('setting-changed', id, value)"></SectionComp>
+      <template v-if="props.section.sectionSettings.length > 0">
+        <SettingComp v-for="setting in props.section.sectionSettings" :key="setting.id" :setting="setting"
+          @setting-changed="(id, value) => emit('setting-changed', id, value)" />
+      </template>
 
+      <template v-if="props.section.subsections">
+        <SectionComp v-for="sec in props.section.subsections" :key="sec.id" :section="sec"
+          @setting-changed="(id, value) => emit('setting-changed', id, value)" />
+      </template>
     </div>
 
     <!-- Bottom spacer / divider -->

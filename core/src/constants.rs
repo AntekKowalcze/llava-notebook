@@ -68,7 +68,7 @@ pub const KEY_ENCRYPTED_KEY_LENGTH: usize = 32;
 pub const MINIMAL_PASSWORD_LENGTH: usize = 8;
 pub const RECOVERY_CODE_LENGTH: usize = 16;
 pub const NUMBER_OF_KEYS: usize = 8;
-pub const SESSION_TOKEN_TIME_ALIVE: i64 = 60 * 60 * 24 * 30; //60 sekund * 60 minut * 24 godziny * 30 dni
+pub const SESSION_TOKEN_TIME_ALIVE: i64 = 60 * 60 * 24 * 30; //60 seconds* 60 minutes * 24 hours * 30 days
 //init_note.rs
 //extensions
 pub const NOTE_EXTENSION: &str = "md";

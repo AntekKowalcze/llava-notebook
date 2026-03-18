@@ -10,6 +10,7 @@ import { Section, Setting, UserConfig } from '../types/settingTypes';
 import SectionComp from '../components/settings/SectionComp.vue';
 import { ref } from 'vue'
 import { useToast } from 'vue-toastification';
+import CheckboxInput from '../components/settings/CheckboxInput.vue';
 const toast = useToast()
 const authStore = useAuthStore();
 const router = useRouter();
@@ -17,16 +18,38 @@ const settingList = ref<UserConfig | null>(null);
 const cardSettings = ref<Setting[]>([])
 const username = authStore.loggedInUsername;
 const id = authStore.loggedInUserId;
+const showFilter = ref<boolean>(false)
+let filters = ["local", "local.core", "local.danger", "online", "online.core", "online.ai"]
+const searchText = ref<string>("")
+const previousSearchText: string = ""
+let methaphoneCache: Setting[][] = []
+
 function search() {
-  // TODO: Implement Metaphone algorithm
+
+}
+
+
+
+
+
+
+
+function changeSettingVisibility(section: Section[], settingId: string) {
+
 }
 function redirect() {
   router.replace("/main/");
 }
-
+function initVisibility(sections: Section[]) {
+  for (const section of sections) {
+    if (section.show === undefined) section.show = true
+    if (section.subsections) initVisibility(section.subsections)
+  }
+}
 onMounted(async () => {
   try {
     settingList.value = await invoke<UserConfig>("get_config_data");
+    initVisibility(settingList.value.sections)
     let cardSettingsIdList: string[] = ["local.mode", "local.encryption", "local.logout", "online.sync", "local.showLogs", "local.deleteLocalFiles"]
     for (let setting of cardSettingsIdList) {
       const found = findSetting(settingList.value.sections, setting)
@@ -39,16 +62,12 @@ onMounted(async () => {
   }
 })
 
-
 function showFilters() {
-  // TODO here use checkboxes with labels
+  showFilter.value = !showFilter.value
 }
 async function handleChange(id: string, value: string) {
-  console.log("updating")
   if (!settingList.value) return
   findAndUpdate(settingList.value.sections, id, value)
-  console.log(settingList)
-  console.log("updated")
   try {
     await invoke('update_settings', { userConfig: settingList.value })
 
@@ -83,14 +102,47 @@ function findSetting(sections: Section[], id: string) {
     }
   }
 }
-
-
-
 function goToSetting(id: string) {
   const el = document.getElementById(id)
   el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-
 }
+function changeSectionVisibility(sections: Section[], id: string, value: boolean) {
+  for (let section of sections) {
+    if (section.id == id) {
+      section.show = value
+      return true
+
+    }
+    if (section?.subsections) {
+      if (changeSectionVisibility(section.subsections, id, value)) return true
+    }
+
+  }
+  return false
+}
+
+function handleVisibilityChange(id: string, value: boolean) {
+  if (!settingList.value) return
+
+
+  changeSectionVisibility(settingList.value.sections, id, value);
+}
+
+function getElementVisibility(sections: Section[], id: string): boolean | undefined {
+  for (let section of sections) {
+    if (section.id === id) {
+      return section.show
+    }
+
+    if (section.subsections) {
+      const val = getElementVisibility(section.subsections, id)
+      if (val !== undefined) return val
+    }
+  }
+  return undefined
+}
+
+
 
 
 </script>
@@ -120,7 +172,7 @@ function goToSetting(id: string) {
             <input class="bg-note-graphite text-note-ivory outline-none transition duration-1000 ease-out
                          focus:outline-none focus:ring-0 focus:border-transparent focus:shadow-none
                          focus:bg-black/50 placeholder:text-note-pumice/70 select-none w-[90%]" type="text"
-              placeholder="Search..." @input="search" />
+              placeholder="Search..." @input="search" v-model="searchText" />
             <Search class="ml-2 text-note-paprika shrink-0" />
           </span>
         </div>
@@ -145,7 +197,7 @@ function goToSetting(id: string) {
                       px-3 py-2 flex flex-col justify-between overflow-hidden">
             <button v-for="setting in cardSettings" :key="setting.id" type="button" class="flex items-center rounded-md px-2 py-1.5 text-xs text-note-pumice/80
                            hover:text-note-ivory hover:bg-black/50 transition-colors w-full">
-              <span class="flex-1 flex justify-start">{{ setting.settingName }}</span>
+              <span class="flex-1 flex justify-start">{{ setting.label }}</span>
               <span class="flex-1 flex justify-center">{{ setting.currentValue }}</span>
               <span @click="goToSetting(setting.id)"
                 class="flex-1 flex justify-end text-note-paprika text-[11px] tracking-wide uppercase">
@@ -159,9 +211,17 @@ function goToSetting(id: string) {
 
     <ScreenDeviderHorizontal class="shrink-0" />
 
-    <div class="shrink-0 my-2">
+    <div class="shrink-0 mb-2 mt-4 flex">
       <Funnel class="text-note-pumice/90 transition duration-500 ease-out hover:text-note-paprika"
         @click="showFilters" />
+      <template v-if="showFilter">
+        <div v-for="filter in filters" :key="filter" class="flex w-44 h-fit ml-4  border-note-ivory ">
+          <CheckboxInput :checked="getElementVisibility(settingList!.sections, filter) ?? true" :id="filter"
+            @visibility-changed="(id, value) => { handleVisibilityChange(id, value) }">
+          </CheckboxInput>
+        </div>
+      </template>
+
     </div>
 
 

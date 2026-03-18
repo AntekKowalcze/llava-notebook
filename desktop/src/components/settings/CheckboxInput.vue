@@ -1,16 +1,21 @@
 <script setup lang="ts">
-const props = defineProps<{ checked: boolean, name: string }>()
-
+import { ref } from 'vue';
+const props = defineProps<{ checked: boolean, id: string }>()
+const emit = defineEmits<{ (e: 'visibility-changed', id: string, value: boolean): void }>()
+const checkboxState = ref<boolean>(props.checked)
+function test() {
+  checkboxState.value = !checkboxState.value
+  emit('visibility-changed', props.id, checkboxState.value)
+}
 </script>
 
 
 <template>
 
-  <div class="inline-flex items-center">
+  <div class="inline-flex items-center text-note-ivory gap-4">
     <label class="flex items-center cursor-pointer relative">
-      <input type="checkbox" :checked="checked"
-        class="peer h-5 w-5 cursor-pointer transition-all appearance-none rounded  border-2 border-note-ivory/20   checked:bg-black/40 checked:border-note-paprika"
-        id="check" />
+      <input type="checkbox" :checked="props.checked" @change="test"
+        class="peer h-5 w-5 cursor-pointer transition-all appearance-none rounded  border-2 border-note-ivory/20   checked:bg-black/40 checked:border-note-paprika" />
       <span
         class="absolute text-white opacity-0 peer-checked:opacity-100 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="#F97316" stroke="#F97316"
@@ -20,7 +25,9 @@ const props = defineProps<{ checked: boolean, name: string }>()
             clip-rule="evenodd"></path>
         </svg>
       </span>
+
     </label>
+    {{ props.id }}
   </div>
 
 </template>

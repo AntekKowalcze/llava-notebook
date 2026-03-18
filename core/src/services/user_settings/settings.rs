@@ -1,4 +1,7 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 
 use crate::{
     ProgramFiles,
@@ -324,6 +327,343 @@ pub fn save_config(
     std::fs::write(config_path, config_content)?;
     Ok(hash_config)
 }
+fn create_metaphone_map() -> HashMap<String, Vec<String>> {
+    // use a temporary map to dedupe entries using HashSet
+    let mut temp: HashMap<String, HashSet<String>> = HashMap::new();
+
+    for (key, value) in
+        crate::services::user_settings::settings_constants::PHONETIC_CORPUS.entries()
+    {
+        // normalize key: remove dots and non-alphanumeric characters before metaphoning
+        let normalized_key: String = key.chars().filter(|c| c.is_alphanumeric()).collect();
+        let metaphone_key = metaphone(&normalized_key);
+        if !metaphone_key.is_empty() {
+            temp.entry(metaphone_key)
+                .or_insert_with(HashSet::new)
+                .insert(key.to_string());
+        }
+
+        for &word in *value {
+            // normalize corpus word similarly for metaphone computation
+            let normalized_word: String = word.chars().filter(|c| c.is_alphanumeric()).collect();
+            let m_key = metaphone(&normalized_word);
+            if !m_key.is_empty() {
+                temp.entry(m_key)
+                    .or_insert_with(HashSet::new)
+                    .insert(key.to_string());
+            }
+        }
+    }
+
+    // convert HashSet values back to Vec<String>
+    let mut return_map: HashMap<String, Vec<String>> = HashMap::new();
+    for (k, set) in temp {
+        let mut v: Vec<String> = set.into_iter().collect();
+        v.sort();
+        return_map.insert(k, v);
+    }
+
+    return_map
+}
+
+fn metaphone(entry: &str) -> String {
+    let entry = entry.trim().to_lowercase();
+    let vovel_arr = ['a', 'e', 'i', 'o', 'u'];
+    let mut output = String::new();
+
+    let mut entry_worker = String::new();
+
+    if let Some(first_char) = entry.chars().next() {
+        entry_worker.push(first_char);
+    }
+
+    for (p, c) in entry.chars().zip(entry.chars().skip(1)) {
+        if p != c && p != 'c' {
+            entry_worker.push(c);
+        }
+    }
+
+    if entry_worker.starts_with("kn")
+        || entry_worker.starts_with("gn")
+        || entry_worker.starts_with("pn")
+        || entry_worker.starts_with("ae")
+        || entry_worker.starts_with("wr")
+    {
+        entry_worker = entry_worker.chars().skip(1).collect();
+    }
+
+    if entry_worker.ends_with("mb") {
+        entry_worker.pop();
+    }
+
+    if let Some(prefix) = entry_worker.strip_suffix("gned") {
+        entry_worker = format!("{}{}", prefix, "ned");
+    } else if let Some(prefix) = entry_worker.strip_suffix("gn") {
+        entry_worker = format!("{}{}", prefix, "n");
+    } else if entry_worker.ends_with('g') {
+        entry_worker.pop();
+    }
+
+    let chars_arr: Vec<char> = entry_worker.chars().collect();
+    let mut index = 0;
+    while index < chars_arr.len() {
+        match chars_arr[index] {
+            's' => {
+                // s before c to catch sch before matching 'c'
+                if index + 2 < chars_arr.len() {
+                    if chars_arr[index + 1] == 'c' && chars_arr[index + 2] == 'h' {
+                        output.push('k');
+                        index += 3;
+                        continue;
+                    }
+                    if chars_arr[index + 1] == 'i'
+                        && (chars_arr[index + 2] == 'o' || chars_arr[index + 2] == 'a')
+                    {
+                        output.push('x');
+                        index += 3;
+                        continue;
+                    }
+                }
+                if index + 1 < chars_arr.len() {
+                    if chars_arr[index + 1] == 'h' {
+                        output.push('x');
+                        index += 2;
+                        continue;
+                    }
+                }
+
+                output.push('s');
+                index += 1;
+                continue;
+            }
+            't' => {
+                if index + 2 < chars_arr.len() {
+                    if chars_arr[index + 1] == 'i'
+                        && (chars_arr[index + 2] == 'o' || chars_arr[index + 2] == 'a')
+                    {
+                        output.push('x');
+                        index += 3;
+                        continue;
+                    }
+
+                    if chars_arr[index + 1] == 'c' && chars_arr[index + 2] == 'h' {
+                        index += 3;
+                        continue;
+                    }
+                }
+
+                if index + 1 < chars_arr.len() {
+                    if chars_arr[index + 1] == 'h' {
+                        output.push('0');
+                        index += 2;
+                        continue;
+                    }
+                }
+                output.push('t');
+                index += 1;
+            }
+
+            'p' => {
+                if index + 1 < chars_arr.len() {
+                    if chars_arr[index + 1] == 'h' {
+                        output.push('f');
+                        index += 2;
+                        continue;
+                    }
+                }
+
+                output.push('p');
+                index += 1;
+                continue;
+            }
+
+            'k' => {
+                if index > 0 {
+                    if chars_arr[index - 1] == 'c' {
+                        output.push('k');
+                        index += 1;
+                        continue;
+                    }
+                }
+
+                output.push('k');
+                index += 1;
+                continue;
+            }
+            'c' => {
+                if index + 2 < chars_arr.len() {
+                    if chars_arr[index + 1] == 'i' && chars_arr[index + 2] == 'a' {
+                        output.push('x');
+                        index += 3;
+                        continue;
+                    }
+                }
+                if index < chars_arr.len() - 1 {
+                    match chars_arr[index + 1] {
+                        'h' => {
+                            output.push('x');
+                            index += 2;
+                            continue;
+                        }
+                        'i' | 'e' | 'y' => {
+                            output.push('s');
+                            index += 2
+                        }
+                        _ => {
+                            output.push('k');
+                            index += 1
+                        }
+                    }
+                } else {
+                    output.push(chars_arr[index]);
+                    index += 1;
+                }
+            }
+            'd' => {
+                if index + 2 < chars_arr.len() {
+                    if chars_arr[index + 1] == 'g'
+                        && (chars_arr[index + 2] == 'e'
+                            || chars_arr[index + 2] == 'y'
+                            || chars_arr[index + 2] == 'i')
+                    {
+                        output.push('j');
+                        index += 3;
+                        continue;
+                    } else {
+                        output.push('t');
+                        index += 1;
+                        continue;
+                    }
+                } else {
+                    output.push('t');
+                    index += 1;
+                    continue;
+                }
+            }
+            'g' => {
+                if index + 1 < chars_arr.len() {
+                    if chars_arr[index + 1] == 'h'
+                        && index + 2 < chars_arr.len()
+                        && !vovel_arr.contains(&chars_arr[index + 2])
+                    {
+                        index += 1;
+                        continue;
+                    }
+
+                    if (chars_arr[index + 1] == 'i'
+                        || chars_arr[index + 1] == 'e'
+                        || chars_arr[index + 1] == 'y')
+                        && (index == 0 || chars_arr[index - 1] != 'g')
+                    {
+                        output.push('j');
+                        index += 2;
+                        continue;
+                    }
+
+                    output.push('k');
+                    index += 1;
+                    continue;
+                } //should g be dropped at the end?
+
+                output.push('k');
+                index += 1;
+                continue;
+            }
+            'h' => {
+                if index > 0 && index + 1 < chars_arr.len() {
+                    if vovel_arr.contains(&chars_arr[index - 1])
+                        && !vovel_arr.contains(&chars_arr[index + 1])
+                    {
+                        index += 1;
+                        continue;
+                    } else {
+                        output.push('h');
+                        index += 1;
+                        continue;
+                    }
+                }
+
+                index += 1;
+                continue;
+            }
+            'q' => {
+                output.push('k');
+                index += 1;
+                continue;
+            }
+            'v' => {
+                output.push('f');
+                index += 1;
+                continue;
+            }
+            'w' => {
+                if index == 0 && index + 1 < chars_arr.len() && chars_arr[index + 1] == 'h' {
+                    output.push('w');
+                    index += 2;
+                    continue;
+                }
+                if index + 1 < chars_arr.len() {
+                    if vovel_arr.contains(&chars_arr[index + 1]) {
+                        output.push('w');
+                        index += 1;
+                        continue;
+                    } else {
+                        index += 1;
+                        continue;
+                    }
+                }
+
+                index += 1;
+                continue;
+            }
+            'x' => {
+                if index == 0 {
+                    output.push('s');
+                    index += 1;
+                    continue;
+                } else {
+                    output.push('k');
+                    output.push('s');
+                    index += 1;
+                    continue;
+                }
+            }
+            'y' => {
+                if index + 1 < chars_arr.len() {
+                    if vovel_arr.contains(&chars_arr[index + 1]) {
+                        output.push('y');
+                        index += 1;
+                        continue;
+                    } else {
+                        index += 1;
+                        continue;
+                    }
+                }
+
+                index += 1;
+                continue;
+            }
+            'z' => {
+                output.push('s');
+                index += 1;
+                continue;
+            }
+            'a' | 'e' | 'i' | 'u' | 'o' => {
+                if index == 0 {
+                    output.push(chars_arr[index]);
+                    index += 1;
+                    continue;
+                }
+                index += 1;
+                continue;
+            }
+
+            _ => index += 1,
+        } //for sure something because it iterates over length
+    }
+
+    output
+}
 
 #[test]
 
@@ -337,3 +677,52 @@ fn state_hash_map_test() {
     println!("{:#?}", parsed);
     assert_eq!(parsed.len(), 18); //change value depending on number of setting on the list!!
 }
+#[test]
+fn test_metaphone() {
+    assert_eq!(metaphone("test"), "tst");
+}
+
+#[test]
+fn test_metaphone_short_inputs_do_not_panic() {
+    assert_eq!(metaphone(""), "");
+    assert_eq!(metaphone("a"), "a");
+    assert_eq!(metaphone("x"), "s");
+    assert_eq!(metaphone("v"), "f");
+}
+
+#[test]
+fn test_metaphone_two_char_rules() {
+    assert_eq!(metaphone("sh"), "x");
+    assert_eq!(metaphone("th"), "0");
+    assert_eq!(metaphone("ph"), "f");
+}
+
+#[test]
+fn print_phonetic_corpus_metaphones() {
+    use crate::services::user_settings::settings_constants::PHONETIC_CORPUS;
+    for (key, words) in PHONETIC_CORPUS.entries() {
+        println!("# {}", key);
+        for &w in *words {
+            println!("{} -> {}", w, metaphone(w));
+        }
+    }
+}
+
+#[test]
+fn check_real_usecases() {
+    assert_eq!(metaphone("delete"), "tt");
+    assert_eq!(metaphone("local"), "k");
+    assert_eq!(metaphone("encrypt"), "espt");
+    assert_eq!(metaphone("logs"), "ks");
+    assert_eq!(metaphone("password"), "pswt");
+    assert_eq!(metaphone("sync"), "sc");
+    assert_eq!(metaphone("export"), "ekspt");
+    assert_eq!(metaphone("ai"), "a");
+}
+
+#[test]
+fn see_real_corpus() {
+    let map = create_metaphone_map();
+    println!("{:#?}", map);
+}
+//TODO impolement methaphone on frontend and add filtration

@@ -29,7 +29,7 @@ async function checkCode() {
             pendingCode: code.value
         })
         toast.success("Code correct, logged in successfully")
-        router.replace({ path: '/ChangePassword' })
+        router.replace({ path: '/changePassword' })
     } catch (err: any) {
         console.log(err)
         if (err == "WrongPassword") {
