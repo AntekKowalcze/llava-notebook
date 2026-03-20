@@ -72,7 +72,8 @@ pub fn main() {
             commands::commands::local_logout_command,
             commands::commands::get_dashboard_data,
             commands::commands::get_config_data,
-            commands::commands::update_settings
+            commands::commands::update_settings,
+            commands::commands::get_methapone_map,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

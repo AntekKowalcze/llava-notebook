@@ -11,6 +11,7 @@ import SectionComp from '../components/settings/SectionComp.vue';
 import { ref } from 'vue'
 import { useToast } from 'vue-toastification';
 import CheckboxInput from '../components/settings/CheckboxInput.vue';
+import metaphone from '../lib/metaphone'
 const toast = useToast()
 const authStore = useAuthStore();
 const router = useRouter();
@@ -21,34 +22,91 @@ const id = authStore.loggedInUserId;
 const showFilter = ref<boolean>(false)
 let filters = ["local", "local.core", "local.danger", "online", "online.core", "online.ai"]
 const searchText = ref<string>("")
-const previousSearchText: string = ""
-let methaphoneCache: Setting[][] = []
-
+let settingsToShow: string[] //list of setting ids got from metaphone
+let previousSearchTextLength: number = 0
+let metaphoneCache: string[][] = []
+let metaphoneMap: Record<string, string[]>;
 function search() {
+  if (settingList.value == null) return
+  if (searchText.value.length == 0) {
+    initSettingVisibilityOnInputEnter(settingList.value.sections) //set all to false 
+    metaphoneCache = []
+  }
+  if (searchText.value.length > 0 && searchText.value.length < previousSearchTextLength) {
+    metaphoneCache.pop(); //if length was 5 and we went to 4 pop this 5 searech because there is sall change same letter will be written
+    console.log(metaphoneCache)
+    settingsToShow = metaphoneCache[searchText.value.length - 1]
+    for (let settingId of settingsToShow) {
+      changeSettingVisibility(settingList.value.sections, settingId)
+    }
+    return
+  }
+  previousSearchTextLength = searchText.value.length
+  let processedString = metaphone(searchText.value)
+  settingsToShow = metaphoneMap[processedString]
+  if (settingsToShow == undefined) {
+    settingsToShow = []
+  }
+  console.log(settingsToShow)
+  for (let settingId of settingsToShow) {
+    changeSettingVisibility(settingList.value.sections, settingId)
+  }
+  metaphoneCache.push(settingsToShow);
 
+  return
 }
 
 
+function initSettingVisibilityOnInputEnter(sections: Section[]) {
+  for (let section of sections) {
+    for (let setting of section.sectionSettings) {
+      setting.show = false
+    }
+    if (section.subsections) {
+      initSettingVisibilityOnInputEnter(section.subsections)
+    }
+  }
+}
 
+function changeSettingVisibility(sections: Section[], settingId: string): boolean {
+  for (const section of sections) {
+    for (const setting of section.sectionSettings) {
+      if (setting.id === settingId) {
+        setting.show = true;
+        return true;
+      }
+    }
 
+    if (section.subsections) {
+      if (changeSettingVisibility(section.subsections, settingId)) return true;
+    }
+  }
 
-
-
-function changeSettingVisibility(section: Section[], settingId: string) {
-
+  return false;
 }
 function redirect() {
   router.replace("/main/");
 }
 function initVisibility(sections: Section[]) {
   for (const section of sections) {
-    if (section.show === undefined) section.show = true
-    if (section.subsections) initVisibility(section.subsections)
+    if (section.show === undefined) section.show = true;
+    if (section.subsections) initVisibility(section.subsections);
+  }
+}
+function initSettingVisibility(sections: Section[], state: boolean) {
+  for (const section of sections) {
+    for (const setting of section.sectionSettings) {
+      setting.show = state;
+    }
+    if (section.subsections) initSettingVisibility(section.subsections, state);
   }
 }
 onMounted(async () => {
   try {
+
+    metaphoneMap = await invoke<Record<string, string[]>>('get_methapone_map')
     settingList.value = await invoke<UserConfig>("get_config_data");
+    initSettingVisibility(settingList.value.sections, true)
     initVisibility(settingList.value.sections)
     let cardSettingsIdList: string[] = ["local.mode", "local.encryption", "local.logout", "online.sync", "local.showLogs", "local.deleteLocalFiles"]
     for (let setting of cardSettingsIdList) {
@@ -143,7 +201,19 @@ function getElementVisibility(sections: Section[], id: string): boolean | undefi
 }
 
 
+function handleBlur() {
+  if (settingList.value == null) return
+  if (searchText.value.length == 0) {
+    initSettingVisibility(settingList.value.sections, true)
+  }
+}
+function hide() {
+  if (settingList.value == null) return
+  if (searchText.value.length == 0) {
+    initSettingVisibility(settingList.value.sections, false)
 
+  }
+}
 
 </script>
 
@@ -172,7 +242,7 @@ function getElementVisibility(sections: Section[], id: string): boolean | undefi
             <input class="bg-note-graphite text-note-ivory outline-none transition duration-1000 ease-out
                          focus:outline-none focus:ring-0 focus:border-transparent focus:shadow-none
                          focus:bg-black/50 placeholder:text-note-pumice/70 select-none w-[90%]" type="text"
-              placeholder="Search..." @input="search" v-model="searchText" />
+              placeholder="Search..." @input="search" @blur="handleBlur" v-model="searchText" @focus="hide" />
             <Search class="ml-2 text-note-paprika shrink-0" />
           </span>
         </div>

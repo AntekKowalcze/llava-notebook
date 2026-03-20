@@ -25,7 +25,7 @@ console.log(props.setting.currentValue, props.setting.inputType)
     transition-all duration-300 ease-out
     hover:bg-black/30
     hover:border-note-pumice/10
-  ">
+  " v-show="props.setting.show">
 
     <!-- Left accent line — revealed on hover -->
     <div class="

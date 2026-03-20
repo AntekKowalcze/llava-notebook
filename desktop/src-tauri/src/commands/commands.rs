@@ -1,3 +1,5 @@
+use std::collections;
+
 use anyhow::{anyhow, Context};
 use llava_core::{services::auth::logging::SessionState, AppState};
 use tauri::AppHandle;
@@ -401,4 +403,9 @@ pub async fn update_settings(
         .lock()
         .map_err(|_| anyhow!("Couldnt edit user_config in state"))? = Some(hash_config);
     Ok(())
+}
+
+#[tauri::command]
+pub async fn get_methapone_map() -> collections::HashMap<String, Vec<String>> {
+    llava_core::create_metaphone_map()
 }

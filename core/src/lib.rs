@@ -28,6 +28,7 @@ pub use services::storage::init_note::add_note_to_database;
 pub use services::storage::read::read_note_content;
 pub use services::storage::update::update_md;
 pub use services::user_settings::settings::UserConfig;
+pub use services::user_settings::settings::create_metaphone_map;
 pub use services::user_settings::settings::get_config;
 pub use services::user_settings::settings::get_config_for_state;
 pub use services::user_settings::settings::save_config;

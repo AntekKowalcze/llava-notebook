@@ -589,7 +589,7 @@ pub fn check_if_user_logged_in(
 
     match result {
         Ok((user_id, expires_at)) => {
-            if expires_at > (crate::utils::get_time() / 100) {
+            if expires_at > (crate::utils::get_time() / 1000) {
                 crate::utils::log_helper(
                     "check session",
                     "success",

@@ -1,7 +1,3 @@
-Here's the full architecture document translated to English with fixed markdown formatting:
-
-***
-
 # 🧱 Llava Architecture
 
 ## 🎯 Project Goals

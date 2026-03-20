@@ -17,6 +17,7 @@
 use crate::constants::LOCAL_LOGIN_DB_SCHEMA;
 use crate::utils::{Format, log_helper};
 use anyhow::Context;
+// TODO check keyring
 //llava/users/local_login_db.sqlite
 pub fn connect_or_create_local_login_db(
     local_login_db_path: &std::path::Path,

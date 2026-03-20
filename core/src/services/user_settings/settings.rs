@@ -327,7 +327,7 @@ pub fn save_config(
     std::fs::write(config_path, config_content)?;
     Ok(hash_config)
 }
-fn create_metaphone_map() -> HashMap<String, Vec<String>> {
+pub fn create_metaphone_map() -> HashMap<String, Vec<String>> {
     // use a temporary map to dedupe entries using HashSet
     let mut temp: HashMap<String, HashSet<String>> = HashMap::new();
 
@@ -378,7 +378,7 @@ fn metaphone(entry: &str) -> String {
     }
 
     for (p, c) in entry.chars().zip(entry.chars().skip(1)) {
-        if p != c && p != 'c' {
+        if p != c || c == 'c' {
             entry_worker.push(c);
         }
     }
@@ -478,14 +478,6 @@ fn metaphone(entry: &str) -> String {
             }
 
             'k' => {
-                if index > 0 {
-                    if chars_arr[index - 1] == 'c' {
-                        output.push('k');
-                        index += 1;
-                        continue;
-                    }
-                }
-
                 output.push('k');
                 index += 1;
                 continue;
@@ -500,6 +492,12 @@ fn metaphone(entry: &str) -> String {
                 }
                 if index < chars_arr.len() - 1 {
                     match chars_arr[index + 1] {
+                        'k' => {
+                            output.push('k');
+                            index += 2;
+                            continue;
+                        }
+
                         'h' => {
                             output.push('x');
                             index += 2;
@@ -658,7 +656,10 @@ fn metaphone(entry: &str) -> String {
                 continue;
             }
 
-            _ => index += 1,
+            _ => {
+                output.push(chars_arr[index]);
+                index += 1;
+            }
         } //for sure something because it iterates over length
     }
 
@@ -698,6 +699,19 @@ fn test_metaphone_two_char_rules() {
 }
 
 #[test]
+fn check_real_usecases() {
+    assert_eq!(metaphone("delete"), "tlt");
+    assert_eq!(metaphone("local"), "lkl");
+    assert_eq!(metaphone("encrypt"), "enkrpt");
+    assert_eq!(metaphone("logs"), "lks");
+    assert_eq!(metaphone("password"), "pswrt");
+    assert_eq!(metaphone("sync"), "snc");
+    assert_eq!(metaphone("export"), "eksprt");
+    assert_eq!(metaphone("ai"), "a");
+}
+
+#[test]
+
 fn print_phonetic_corpus_metaphones() {
     use crate::services::user_settings::settings_constants::PHONETIC_CORPUS;
     for (key, words) in PHONETIC_CORPUS.entries() {
@@ -709,20 +723,7 @@ fn print_phonetic_corpus_metaphones() {
 }
 
 #[test]
-fn check_real_usecases() {
-    assert_eq!(metaphone("delete"), "tt");
-    assert_eq!(metaphone("local"), "k");
-    assert_eq!(metaphone("encrypt"), "espt");
-    assert_eq!(metaphone("logs"), "ks");
-    assert_eq!(metaphone("password"), "pswt");
-    assert_eq!(metaphone("sync"), "sc");
-    assert_eq!(metaphone("export"), "ekspt");
-    assert_eq!(metaphone("ai"), "a");
-}
-
-#[test]
 fn see_real_corpus() {
     let map = create_metaphone_map();
     println!("{:#?}", map);
 }
-//TODO impolement methaphone on frontend and add filtration
