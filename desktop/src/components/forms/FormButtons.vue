@@ -35,5 +35,7 @@ const props = defineProps<{
         grayscale opacity-50
         pointer-events-none /* blocks clicking */
       `
-    ]">{{ props.content }}</div>
+
+    ]" role="button" tabindex="0" @keydown.enter.prevent="$emit('click')" @keydown.space.prevent="$emit('click')">{{
+      props.content }}</div>
 </template>

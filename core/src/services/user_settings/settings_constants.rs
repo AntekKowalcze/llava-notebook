@@ -460,7 +460,6 @@ pub static SECTIONS_META: phf::Map<&'static str, SectionMeta> = phf_map! {
 
 };
 //Metaphone algoritm index, update on setting content change
-//TODO use this
 pub static PHONETIC_CORPUS: phf::Map<&'static str, &'static [&'static str]> = phf_map! {
     "local.mode" => &["local", "offline", "mode", "device", "work"],
     "local.encryption" => &["encrypt", "encryption", "secure", "security", "protect", "protection", "private", "privacy", "data", "notes"],

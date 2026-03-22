@@ -6,7 +6,7 @@ defineProps<{
 </script>
 <template>
     <div>
-        <img src="/icon.png" class=" drop-shadow-ember" :class="[width, height]" alt="" draggable="false">
+        <img src="/icon.png" class=" drop-shadow-ember select-none" :class="[width, height]" alt="" draggable="false">
     </div>
 </template>
 
