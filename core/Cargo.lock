@@ -564,6 +564,7 @@ dependencies = [
  "chrono",
  "dirs-next",
  "features",
+ "indexmap",
  "keyring",
  "phf",
  "phf_macros",

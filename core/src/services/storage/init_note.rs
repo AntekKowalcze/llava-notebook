@@ -12,7 +12,7 @@ use std::path::PathBuf;
 ///this note init note struct and creates md file
 //TODO every note should be encrypted on disk, with same key as in database, title as plaintext should be deleted from sql schema, it should be deriven from constatnt not editable # as first sign in md file (title sign and first line content is title) and name of the note should be changed to uuid of note, to getting note file content should be just export,
 // TODO after function which saves note content manually there should be command which increents activity number in sql database
-// TODO TREAT CRETING NOTE AS EDITING SO RUN ADDING ACTIVITY COUNT AFTER CREATION AND DELETATION
+// TODO TREAT CRETING NOTE AS EDITING SO RUN ADDING ACTIVITY COUNT AFTER CREATION AND DELETATION look at queries in dashboard to create good insert queries in adding note
 fn init_note(
     owner_id: uuid::Uuid, //get it from current user file
     path: &PathBuf,       //path of notes

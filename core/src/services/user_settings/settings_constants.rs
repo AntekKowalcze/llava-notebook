@@ -1,28 +1,38 @@
 use crate::services::user_settings::settings::SettingInputType;
 use crate::services::user_settings::settings::{Section, Setting, UserConfig};
 //TODO Add buttons so i can preview my dashboard and settings on release, add function to display settings in vue
+pub struct SettingMeta {
+    pub field: &'static str,
+    pub label: &'static str,
+    pub description: &'static str,
+    pub input_type: SettingInputType,
+    pub options: Option<&'static [&'static str]>,
+    pub button_label: Option<&'static str>,
+}
+
 pub const SETTING_NAME_LIST: &[&str] = &[
     "local.mode",
     "local.encryption",
     "local.sync",
-    "local.showLogs",
-    "local.exportNotes",
-    "local.importNotes",
     "local.autoBackup",
     "local.backupFrequency",
+    "local.exportNotes",
+    "local.importNotes",
     "local.dataDirectory",
+    "local.generateRecoveryCodes",
+    "local.loadConfigBackup",
+    "local.showLogs",
     "local.logout",
     "local.deleteLocalFiles",
     "local.deleteAccount",
     "online.mode",
     "online.sync",
     "online.connectedDevices",
-    "online.changePasswordEmail",
     "online.changeUsername",
+    "online.changePasswordEmail",
     "online.aiSummary",
 ];
 pub const NUMBER_OF_SETTINGS: i64 = SETTING_NAME_LIST.len() as i64;
-//todo organise commands better
 pub fn default_config(default_data_dir: &str) -> UserConfig {
     let local_core = Section::new(
         "local.core".to_string(),
@@ -57,13 +67,22 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
                 None,
             ),
             Setting::new(
-                "local.showLogs".to_string(),
-                "showAppLogs".to_string(),
-                "Show application logs".to_string(),
-                "Open a view with recent application logs.".to_string(),
-                "idle".to_string(),
-                SettingInputType::Button,
-                Some("Show".to_string()),
+                "local.autoBackup".to_string(),
+                "autoBackupEnabled".to_string(),
+                "Automatic backups".to_string(),
+                "Create automatic backups of your notes.".to_string(),
+                "on".to_string(),
+                SettingInputType::Switch,
+                None,
+            ),
+            Setting::new(
+                "local.backupFrequency".to_string(),
+                "backupFrequency".to_string(),
+                "Backup frequency".to_string(),
+                "How often automatic backups are created.".to_string(),
+                "daily".to_string(),
+                SettingInputType::Select,
+                None,
             ),
             Setting::new(
                 "local.exportNotes".to_string(),
@@ -84,24 +103,6 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
                 Some("Import".to_string()),
             ),
             Setting::new(
-                "local.autoBackup".to_string(),
-                "autoBackupEnabled".to_string(),
-                "Automatic backups".to_string(),
-                "Create automatic backups of your notes.".to_string(),
-                "on".to_string(),
-                SettingInputType::Switch,
-                None,
-            ),
-            Setting::new(
-                "local.backupFrequency".to_string(),
-                "backupFrequency".to_string(),
-                "Backup frequency".to_string(),
-                "How often automatic backups are created.".to_string(),
-                "daily".to_string(),
-                SettingInputType::Select,
-                None,
-            ),
-            Setting::new(
                 "local.dataDirectory".to_string(),
                 "dataDirectory".to_string(),
                 "Data directory".to_string(),
@@ -110,8 +111,36 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
                 SettingInputType::Info,
                 None,
             ),
+            Setting::new(
+                "local.generateRecoveryCodes".to_string(),
+                "generateRecoveryCodes".to_string(),
+                "Recovery codes".to_string(),
+                "Generate a new set of recovery codes.".to_string(),
+                "idle".to_string(),
+                SettingInputType::Button,
+                Some("Generate new codes".to_string()),
+            ),
+            Setting::new(
+                "local.loadConfigBackup".to_string(),
+                "loadConfigBackup".to_string(),
+                "Load backup config".to_string(),
+                "If you edited config.json and broke it, load last working version.".to_string(),
+                "idle".to_string(),
+                SettingInputType::Button,
+                Some("Load backup".to_string()),
+            ),
+            Setting::new(
+                "local.showLogs".to_string(),
+                "showAppLogs".to_string(),
+                "Show application logs".to_string(),
+                "Open a view with recent application logs.".to_string(),
+                "idle".to_string(),
+                SettingInputType::Button,
+                Some("Show".to_string()),
+            ),
         ],
     );
+
     let local_danger = Section::new(
         "local.danger".to_string(),
         "Danger zone".to_string(),
@@ -180,19 +209,19 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
                 None,
             ),
             Setting::new(
-                "online.changePasswordEmail".to_string(),
-                "changePasswordEmail".to_string(),
-                "Change password via email".to_string(),
-                "Send a password change link to your email address.".to_string(),
+                "online.changeUsername".to_string(),
+                "changeUsernameOnline".to_string(),
+                "Change username".to_string(),
+                "Update your online account username.".to_string(),
                 "idle".to_string(),
                 SettingInputType::Button,
                 Some("Change".to_string()),
             ),
             Setting::new(
-                "online.changeUsername".to_string(),
-                "changeUsernameOnline".to_string(),
-                "Change username".to_string(),
-                "Update your online account username.".to_string(),
+                "online.changePasswordEmail".to_string(),
+                "changePasswordEmail".to_string(),
+                "Change password via email".to_string(),
+                "Send a password change link to your email address.".to_string(),
                 "idle".to_string(),
                 SettingInputType::Button,
                 Some("Change".to_string()),
@@ -232,16 +261,6 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
         ],
     }
 }
-
-pub struct SettingMeta {
-    pub field: &'static str,
-    pub label: &'static str,
-    pub description: &'static str,
-    pub input_type: SettingInputType,
-    pub options: Option<&'static [&'static str]>,
-    pub button_label: Option<&'static str>,
-}
-
 use phf_macros::phf_map;
 pub static SETTINGS_META: phf::Map<&'static str, SettingMeta> = phf_map! {
 
@@ -335,7 +354,25 @@ pub static SETTINGS_META: phf::Map<&'static str, SettingMeta> = phf_map! {
         button_label: None
 
     },
-// TODO add setting for generating next recovery codes
+
+    "local.generateRecoveryCodes" => SettingMeta {
+        field: "generateRecoveryCodes",
+        label: "Recovery codes",
+        description: "Generate a new set of recovery codes.",
+        input_type: SettingInputType::Button,
+        options: None,
+        button_label: Some("Generate new codes"),
+    },
+
+    "local.loadConfigBackup" => SettingMeta {
+        field: "loadConfigBackup",
+        label: "Load backup config",
+        description: "If you eddited config.json file and broke it, load last working version.",
+        input_type: SettingInputType::Button,
+        options: None,
+        button_label: Some("Load backup"),
+    },
+
     "local.logout" => SettingMeta {
         field: "logout",
         label: "Log out",

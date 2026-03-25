@@ -2438,6 +2438,7 @@ dependencies = [
  "chrono",
  "dirs-next",
  "features",
+ "indexmap 2.13.0",
  "keyring",
  "phf 0.13.1",
  "phf_macros 0.13.1",

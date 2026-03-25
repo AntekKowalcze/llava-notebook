@@ -1,5 +1,3 @@
-use std::{collections::HashMap, path::PathBuf};
-
 use crate::{
     ProgramFiles,
     services::{
@@ -9,7 +7,9 @@ use crate::{
     utils::log_helper,
 };
 use anyhow::Context;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, path::PathBuf};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
@@ -20,7 +20,7 @@ pub enum SettingInputType {
     Number,
     Info,
 }
-//Structs for sending config to frontend
+//Structs for sending cosnfig to frontend
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Setting {
@@ -93,7 +93,7 @@ pub struct UserConfig {
 pub struct WriteSection {
     pub section_id: String,
     pub write_sections: Option<Vec<WriteSection>>,
-    pub settings: std::collections::HashMap<String, String>,
+    pub settings: IndexMap<String, String>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -256,7 +256,7 @@ fn parse_config(config: &UserConfig) -> WriteConfig {
 fn parse_section_recursevly(section: &Section) -> WriteSection {
     let section_id = section.id.clone();
 
-    let mut settings_map = std::collections::HashMap::new();
+    let mut settings_map = IndexMap::new();
     for setting in &section.section_settings {
         settings_map.insert(setting.id.clone(), setting.current_value.clone());
     }
@@ -316,7 +316,7 @@ fn parse_write_sections_recursevly(section: WriteSection) -> Section {
     }
 }
 
-fn parse_settings(settings: HashMap<String, String>) -> Vec<Setting> {
+fn parse_settings(settings: IndexMap<String, String>) -> Vec<Setting> {
     let mut return_settings: Vec<Setting> = Vec::new();
     for (key, value) in settings {
         let setting_meta = SETTINGS_META.get(&key).unwrap(); //unwrap because values are hardcoded 
@@ -418,10 +418,10 @@ fn state_hash_map_test() {
 #[test]
 fn detect_duplicate_settings_by_length() {
     // Create a WriteConfig with duplicated setting keys across sections
-    let mut s1 = std::collections::HashMap::new();
+    let mut s1 = std::collections::IndexMap::new();
     s1.insert("local.mode".to_string(), "true".to_string());
 
-    let mut s2 = std::collections::HashMap::new();
+    let mut s2 = std::collections::IndexMap::new();
     // duplicate key intentionally
     s2.insert("local.mode".to_string(), "false".to_string());
 
