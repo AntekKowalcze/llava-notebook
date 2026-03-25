@@ -226,21 +226,3 @@ pub const LOCAL_LOGIN_DB_SCHEMA: &str = r#" CREATE TABLE IF NOT EXISTS users_dat
                         FOREIGN KEY(user_id) REFERENCES users_data(user_id) ON DELETE CASCADE);
                               
                         "#;
-
-//list of local settings:
-// local/online mode -> default off
-// encryption -> on/off default on
-// change password -> button
-// change username -> button
-// danger zone:
-// logout -> button
-// delete local files permanently -> button
-// delete account -> button
-// export notes -> button
-// import notes -> button
-// sync -> if online mode yes -> default yes else disabled
-//online
-// change password via email
-// connected devices
-// ai summary -> on/off default on
-// show app logs -> button

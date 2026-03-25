@@ -22,7 +22,7 @@ pub const SETTING_NAME_LIST: &[&str] = &[
     "online.aiSummary",
 ];
 pub const NUMBER_OF_SETTINGS: i64 = SETTING_NAME_LIST.len() as i64;
-
+//todo organise commands better
 pub fn default_config(default_data_dir: &str) -> UserConfig {
     let local_core = Section::new(
         "local.core".to_string(),

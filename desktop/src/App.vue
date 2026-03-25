@@ -115,13 +115,11 @@
 //     is_deleted: true,
 //     deleted_at: 1728086400000,
 //   },
-  
+
 // ]);
-
-
 </script>
 <template>
-<div class="min-h-dvh w-full bg-note-graphite bg-cover bg-center flex flex-col">
+  <div class="flex min-h-dvh w-full flex-col bg-note-graphite bg-cover bg-center">
     <router-view />
   </div>
 </template>

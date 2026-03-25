@@ -1,13 +1,13 @@
 //! # Local user register module
-//! **Purpose**: This module is responsible for all actions taken while creating local account.   
+//! **Purpose**: This module is responsible for all actions taken while creating local account.
 //! It handles saving account data to database, create and encrypt keys and hash passwords, it also handles keyring logged in account saving
-//!  ## Exported functions 
+//!  ## Exported functions
 //! * [register_user_offline] - Full registration flow from validating password and username to encryption to changing state of the app
 //! * [recovery_code_handling] - Function responsible for generating and handling recovery keys database
 //! * [after_validation] - Function responsible for changing physical state of the app (paths)
 //! * [change_password] - Function responsible for changing password, reencrypting notes key, rehashing etc.
 //! ## Key design decisions
-//! Password is entry for all kdf, notes key is random, encrypted and wrapped with KEK. All important data is zeroized. 
+//! Password is entry for all kdf, notes key is random, encrypted and wrapped with KEK. All important data is zeroized.
 //! Recovery key behaves as password, after use user is logged in, and its needed for password change, every key reencrypts notes key
 //! ## Dependencies
 //! - `argon2` — Password hashing and KEK derivation
@@ -127,7 +127,7 @@ fn generate_enctypted_keys(
     let password_hash = argon2
         .hash_password(password.as_bytes(), &salt)
         .context("Couldnt hash a password in registering a user")?
-        .to_string(); //hasing password 
+        .to_string(); //hasing password
     log_helper(
         "password encryption",
         "success",
@@ -140,12 +140,14 @@ fn generate_enctypted_keys(
     let nonce_for_key_wrap = ChaCha20Poly1305::generate_nonce(&mut OsRng); //get nonce (value which makes every chachapoly different)
     let encrypted_notes_key = kek
         .encrypt(&nonce_for_key_wrap, notes_key.as_ref())
-        .inspect_err(|e| tracing::error!(
-        task = "password encryption",
-        status = "error",
-        error = %e,
-        "failed to encrypt notes key with KEK"
-    ))
+        .inspect_err(|e| {
+            tracing::error!(
+                task = "password encryption",
+                status = "error",
+                error = %e,
+                "failed to encrypt notes key with KEK"
+            )
+        })
         .context("Couldnt encrypt key encrypted key while registering a user")?; //encrypt notes key with nonce and kek (kek is key for chachapoly we are encrypting with)
 
     kek_bytes.zeroize();
@@ -182,28 +184,37 @@ pub fn recovery_code_handling(
     let mut kek_bytes = [0u8; 32]; //create kek bytes empty array
     Argon2::default()
         .hash_password_into(password.as_bytes(), kek_salt.as_bytes(), &mut kek_bytes)
-         .inspect_err(|e| tracing::error!(
-        task = "recovery code handling",
-        status = "error",
-        error = %e,
-        "failed to derive KEK from password"
-    ))
+        .inspect_err(|e| {
+            tracing::error!(
+                task = "recovery code handling",
+                status = "error",
+                error = %e,
+                "failed to derive KEK from password"
+            )
+        })
         .context("Failed to derive kek")?; //recreate kek_bytes from password and salt from db
 
     let kek = ChaCha20Poly1305::new(&kek_bytes.into()); //create chachapoly instance with kek_bytes as key
     let nonce_arr = chacha20poly1305::Nonce::from_slice(&nonce); //recreate nonce from slice
     let mut decrypted_notes_key = kek
         .decrypt(nonce_arr, notes_key.as_ref())
-         .inspect_err(|e| tracing::error!(
-        task = "recovery code handling",
-        status = "error",
-        error = %e,
-        "failed to decrypt notes key"
-    ))
+        .inspect_err(|e| {
+            tracing::error!(
+                task = "recovery code handling",
+                status = "error",
+                error = %e,
+                "failed to decrypt notes key"
+            )
+        })
         .map_err(|_| anyhow::anyhow!("Failed to decrypt notes_key"))
         .context("notes_key decryption failed")?; //get notes key for next steps
     kek_bytes.zeroize();
-        crate::utils::log_helper("recovery code handling", "success", None::<Format<String>>, "successfully decrypted notes key");
+    crate::utils::log_helper(
+        "recovery code handling",
+        "success",
+        None::<Format<String>>,
+        "successfully decrypted notes key",
+    );
     for _ in 0..NUMBER_OF_KEYS {
         let (mut key, user_readable, wrapped_key, nonce, kdf_salt) =
             generate_recovery_code(&arg, &decrypted_notes_key)?;
@@ -214,7 +225,7 @@ pub fn recovery_code_handling(
                 ":id": user_uuid.to_string(),
                 ":hash": key,
                 ":wnk": wrapped_key, //notes key encrypted with recovery code (shorthand)
-                ":wnkn": nonce, 
+                ":wnkn": nonce,
                 ":rks": kdf_salt //salt for getting kek bytes
             },
         ).inspect_err(|_| log_helper("handling recovery codes", "error", None::<Format<String>>, "Failed generating recovery keys")).context("failed to insert key into db")?;
@@ -253,35 +264,39 @@ fn generate_recovery_code(
             kdf_salt.as_str().as_bytes(),
             &mut recovery_kek_bytes,
         )
-         .inspect_err(|e| tracing::error!(
-        task = "generate recovery code",
-        status = "error",
-        error = %e,
-        "failed to hash recovery code"
-    ))
+        .inspect_err(|e| {
+            tracing::error!(
+                task = "generate recovery code",
+                status = "error",
+                error = %e,
+                "failed to hash recovery code"
+            )
+        })
         .context("failed to derive recovery KEK")?; //creating key for chachapoly instance
 
     let recovery_kek = ChaCha20Poly1305::new(&recovery_kek_bytes.into()); //create chachapoly instance with recovery kek bytes as key
     let nonce = ChaCha20Poly1305::generate_nonce(&mut OsRng);
     let wrapped_key = recovery_kek
         .encrypt(&nonce, notes_key)
-         .inspect_err(|e| tracing::error!(
-        task = "generate recovery code",
-        status = "error",
-        error = %e,
-        "failed to wrap notes key with recovery KEK"
-    ))
+        .inspect_err(|e| {
+            tracing::error!(
+                task = "generate recovery code",
+                status = "error",
+                error = %e,
+                "failed to wrap notes key with recovery KEK"
+            )
+        })
         .context("failed to wrap notes_key")?; //notes_key encrypted with KEK derived from raw code bytes via Argon2
 
     recovery_kek_bytes.zeroize();
     let readable_code = base32::encode(base32::Alphabet::Crockford, &code_bytes); //make bytes to letters and numbers
     code_bytes.zeroize();
     log_helper(
-    "generate recovery code",
-    "success",
-    None::<Format<String>>,
-    "recovery code generated successfully",
-);
+        "generate recovery code",
+        "success",
+        None::<Format<String>>,
+        "recovery code generated successfully",
+    );
     Ok((
         code_hashed,
         readable_code,
@@ -316,7 +331,7 @@ fn password_validation(
         None::<Format<String>>,
         "Password validated successfully",
     );
-    
+
     Ok(())
 }
 fn validate_username(username: &str, users_db: &Connection) -> Result<(), crate::errors::Error> {
@@ -349,18 +364,22 @@ pub fn after_validation(
     user_uuid: &uuid::Uuid,
     paths: &crate::config::ProgramFiles,
 ) -> Result<ProgramFiles, crate::errors::Error> {
-    change_active_user(&user_uuid, paths).inspect_err(|e| tracing::error!(
-        task = "after validation",
-        status = "error",
-        error = ?e,
-        "failed to change active user"
-    ))?;
-    let paths = crate::config::get_paths(paths.app_home.clone(), user_uuid).inspect_err(|e| tracing::error!(
-        task = "after validation",
-        status = "error",
-        error = ?e,
-        "failed to get paths for new user"
-    ))?;
+    change_active_user(&user_uuid, paths).inspect_err(|e| {
+        tracing::error!(
+            task = "after validation",
+            status = "error",
+            error = ?e,
+            "failed to change active user"
+        )
+    })?;
+    let paths = crate::config::get_paths(paths.app_home.clone(), user_uuid).inspect_err(|e| {
+        tracing::error!(
+            task = "after validation",
+            status = "error",
+            error = ?e,
+            "failed to get paths for new user"
+        )
+    })?;
 
     let tmp_nil_path = paths
         .app_home
@@ -408,7 +427,7 @@ pub fn change_password(
     if let Some(mut decoded) = base32::decode(base32::Alphabet::Crockford, &code) {
         let argon2 = Argon2::default();
         while let Some(row) = handle.next().context("failed to get next row")? {
-            let  hash: String = row.get(0).context("failed to get hash")?;
+            let hash: String = row.get(0).context("failed to get hash")?;
             let phc: PasswordHash<'_> =
                 argon2::PasswordHash::new(&hash).context("failed to parse hash from db to phc")?;
             if argon2.verify_password(&decoded, &phc).is_ok() {
@@ -424,84 +443,93 @@ pub fn change_password(
                     .context("Failed to mark code as used")?;
             }
 
-           
             code.zeroize();
             if found > 0 {
-                 let (wrapped_key, nonce, kdf_salt) = users_db.query_row("SELECT wrapped_notes_key, wrapped_notes_key_nonce, recovery_kdf_salt FROM recovery_keys WHERE code_hash = :hash", named_params! {
+                let (wrapped_key, nonce, kdf_salt) = users_db.query_row("SELECT wrapped_notes_key, wrapped_notes_key_nonce, recovery_kdf_salt FROM recovery_keys WHERE code_hash = :hash", named_params! {
             ":hash": hash
         }, |row|{
-    
-       let wrapped_key: Vec<u8> = row.get(0)?;
+           let wrapped_key: Vec<u8> = row.get(0)?;
                 let nonce: Vec<u8> = row.get(1)?;
                 let kdf_salt: String = row.get(2)?;
                 Ok((wrapped_key, nonce, kdf_salt))
         }
-    
+
     ).context("failed to obtain crypto meta for used code")?;
-    //For decryption
-let mut kek_bytes = [0u8; 32];
- Argon2::default()
-        .hash_password_into(&decoded, kdf_salt.as_bytes(), &mut kek_bytes)
-         .inspect_err(|e| tracing::error!(
-        task = "change password",
-        status = "error",
-        error = %e,
-        "failed to derive KEK from recovery code"
-    ))
-        .context("Failed to derive kek")?;
-    
-     decoded.zeroize();
-let nonce = chacha20poly1305::Nonce::from_slice(&nonce);
-let kek = ChaCha20Poly1305::new(&kek_bytes.into()); //create chachapoly instance with kek_bytes as key
- let mut decrypted_notes_key = kek
-        .decrypt(nonce, wrapped_key.as_ref())
-         .inspect_err(|e| tracing::error!(
-        task = "change password",
-        status = "error",
-        error = %e,
-        "failed to decrypt notes key"
-    ))
-        .map_err(|_| anyhow::anyhow!("Failed to decrypt notes_key"))
-        .context("notes_key decryption failed while changing password")?; //get notes key for next steps
-    kek_bytes.zeroize();
-//NEW VALUES
-let mut new_kek_bytes =[0u8; 32];
-let new_kdf_salt = SaltString::generate(&mut OsRng);
-argon2.hash_password_into(password.as_bytes(), new_kdf_salt.as_str().as_bytes(), &mut new_kek_bytes).context("failed to fill kek bytes with new password")?;
-let password_salt = SaltString::generate(&mut OsRng);
-let hashed_password = argon2.hash_password(password.as_bytes(), &password_salt).context("failed to hash password")?;
-let new_kek = ChaCha20Poly1305::new(&new_kek_bytes.into());
-let new_nonce = ChaCha20Poly1305::generate_nonce(&mut OsRng);
-let wrapped_key = new_kek
-            .encrypt(&new_nonce, decrypted_notes_key.as_ref())
-            .context("failed to wrap notes_key")?;
-    new_kek_bytes.zeroize(); 
-let mut stmt = users_db.prepare("UPDATE users_data SET password_hash = :ph, notes_key = :nk, nonce_notes_key = :nnk, kek_salt = :kdf_salt, password_errors = 0 WHERE user_id = :uuid").context("failed to prepare update after changing password")?;
-stmt.execute(named_params! {
-    ":ph": &hashed_password.to_string(),
-    ":nk": wrapped_key,
-    ":nnk": new_nonce.to_vec(),
-    ":kdf_salt": new_kdf_salt.to_string(),
-    ":uuid": user_uuid.to_string()
-}).context("failed updating users data table after changing password")?;
-log_helper(
-    "change password",
-    "success",
-    None::<Format<String>>,
-    "password changed successfully, user data updated",
-);
-decrypted_notes_key.zeroize();
-break;
+                //For decryption
+                let mut kek_bytes = [0u8; 32];
+                Argon2::default()
+                    .hash_password_into(&decoded, kdf_salt.as_bytes(), &mut kek_bytes)
+                    .inspect_err(|e| {
+                        tracing::error!(
+                            task = "change password",
+                            status = "error",
+                            error = %e,
+                            "failed to derive KEK from recovery code"
+                        )
+                    })
+                    .context("Failed to derive kek")?;
+
+                decoded.zeroize();
+                let nonce = chacha20poly1305::Nonce::from_slice(&nonce);
+                let kek = ChaCha20Poly1305::new(&kek_bytes.into()); //create chachapoly instance with kek_bytes as key
+                let mut decrypted_notes_key = kek
+                    .decrypt(nonce, wrapped_key.as_ref())
+                    .inspect_err(|e| {
+                        tracing::error!(
+                            task = "change password",
+                            status = "error",
+                            error = %e,
+                            "failed to decrypt notes key"
+                        )
+                    })
+                    .map_err(|_| anyhow::anyhow!("Failed to decrypt notes_key"))
+                    .context("notes_key decryption failed while changing password")?; //get notes key for next steps
+                kek_bytes.zeroize();
+                //NEW VALUES
+                let mut new_kek_bytes = [0u8; 32];
+                let new_kdf_salt = SaltString::generate(&mut OsRng);
+                argon2
+                    .hash_password_into(
+                        password.as_bytes(),
+                        new_kdf_salt.as_str().as_bytes(),
+                        &mut new_kek_bytes,
+                    )
+                    .context("failed to fill kek bytes with new password")?;
+                let password_salt = SaltString::generate(&mut OsRng);
+                let hashed_password = argon2
+                    .hash_password(password.as_bytes(), &password_salt)
+                    .context("failed to hash password")?;
+                let new_kek = ChaCha20Poly1305::new(&new_kek_bytes.into());
+                let new_nonce = ChaCha20Poly1305::generate_nonce(&mut OsRng);
+                let wrapped_key = new_kek
+                    .encrypt(&new_nonce, decrypted_notes_key.as_ref())
+                    .context("failed to wrap notes_key")?;
+                new_kek_bytes.zeroize();
+                let mut stmt = users_db.prepare("UPDATE users_data SET password_hash = :ph, notes_key = :nk, nonce_notes_key = :nnk, kek_salt = :kdf_salt, password_errors = 0 WHERE user_id = :uuid").context("failed to prepare update after changing password")?;
+                stmt.execute(named_params! {
+                    ":ph": &hashed_password.to_string(),
+                    ":nk": wrapped_key,
+                    ":nnk": new_nonce.to_vec(),
+                    ":kdf_salt": new_kdf_salt.to_string(),
+                    ":uuid": user_uuid.to_string()
+                })
+                .context("failed updating users data table after changing password")?;
+                log_helper(
+                    "change password",
+                    "success",
+                    None::<Format<String>>,
+                    "password changed successfully, user data updated",
+                );
+                decrypted_notes_key.zeroize();
+                break;
             }
         }
 
         //getting code bytes
         //
-       
+
         // let argon2 = Argon2::default();
     }
-
-    
 
     Ok(())
 }
@@ -517,7 +545,7 @@ fn test_password_validation() {
 fn register_test() {
     let paths = ProgramFiles::init_in_base().unwrap();
     let home_path = std::env::temp_dir().join(LOCAL_USERS_DB);
-       let mut users_db = rusqlite::Connection::open_in_memory().unwrap();
+    let mut users_db = rusqlite::Connection::open_in_memory().unwrap();
     users_db.execute_batch(LOCAL_LOGIN_DB_SCHEMA).unwrap();
     register_user_offline(
         "tescik".to_string(),

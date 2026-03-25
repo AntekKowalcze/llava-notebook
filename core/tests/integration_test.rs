@@ -11,11 +11,12 @@ fn program_flow() {
 
     let _logger_worker = llava_core::configure_logger(&program_paths.logs_path)
         .expect("failed creating logger guard");
-    let mut local_login_db_conn =
-        llava_core::connect_or_create_local_login_db(&program_paths.local_login_database_path)
-            .expect("failed creating local user db");
+    let mut local_login_db_conn = llava_core::auth::connect_or_create_local_login_db(
+        &program_paths.local_login_database_path,
+    )
+    .expect("failed creating local user db");
 
-    llava_core::register_user_offline(
+    llava_core::auth::register_user_offline(
         "test".to_string(),
         Zeroizing::from("ZAQ!2wsx".to_string()),
         Zeroizing::from("ZAQ!2wsx".to_string()),
@@ -36,7 +37,7 @@ fn program_flow() {
         .unwrap_or(false);
     assert!(user_exists, "User should exist in local DB");
 
-    let (current_user, program_paths, mut note_db_conn) = llava_core::local_log_in(
+    let (current_user, program_paths, mut note_db_conn) = llava_core::auth::local_log_in(
         "test".to_string(),
         Zeroizing::from("ZAQ!2wsx".to_string()),
         &mut local_login_db_conn,
@@ -54,7 +55,7 @@ fn program_flow() {
         .ok_or(crate::errors::Error::CurrentUserNotFound)
         .expect("failed to read owner_id");
 
-    llava_core::add_note_to_database(
+    llava_core::storage::add_note_to_database(
         &mut note_db_conn,
         &program_paths,
         note_name.clone(),
@@ -84,7 +85,7 @@ fn program_flow() {
         )
         .expect("failed to get id of note");
     let note_id = uuid::Uuid::parse_str(&note_id).expect("failed to parse uuid");
-    llava_core::update_md(
+    llava_core::storage::update_md(
         &note_db_conn,
         note_name.clone(),
         note_id,
@@ -107,11 +108,11 @@ fn program_flow() {
     assert_eq!(title, "integration test");
     assert!(!summary.is_empty());
 
-    let note_content = llava_core::read_note_content(&program_paths, note_name.clone())
+    let note_content = llava_core::storage::read_note_content(&program_paths, note_name.clone())
         .expect("failed to read content from file");
     assert!(!note_content.is_empty(), "Note content should not be empty");
 
-    llava_core::delete_note(
+    llava_core::storage::delete_note(
         &mut note_db_conn,
         note_name.clone(),
         note_id,

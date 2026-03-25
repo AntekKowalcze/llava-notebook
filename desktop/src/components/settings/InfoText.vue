@@ -1,20 +1,15 @@
 <script setup lang="ts">
 interface Props {
-  content: string
+  content: string;
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
 </script>
 
 <template>
-  <div class="
-    p-4 rounded-lg border-2 border-note-ivory/20
-    bg-black/40 backdrop-blur-sm shadow-md
-    max-w-sm
-    transition duration-500 ease-in-out
-    hover:border-note-paprika
-  ">
-    
-    <p class="text-xs text-note-ivory/70 leading-relaxed">{{ props.content }}</p>
+  <div
+    class="max-w-sm rounded-lg border-2 border-note-ivory/20 bg-black/40 p-4 shadow-md backdrop-blur-sm transition duration-500 ease-in-out hover:border-note-paprika"
+  >
+    <p class="text-xs leading-relaxed text-note-ivory/70">{{ props.content }}</p>
   </div>
 </template>

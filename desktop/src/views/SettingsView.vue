@@ -8,62 +8,61 @@ import { invoke } from '@tauri-apps/api/core';
 import { onMounted } from 'vue';
 import { Section, Setting, UserConfig } from '../types/settingTypes';
 import SectionComp from '../components/settings/SectionComp.vue';
-import { ref } from 'vue'
+import { ref } from 'vue';
 import { useToast } from 'vue-toastification';
 import CheckboxInput from '../components/settings/CheckboxInput.vue';
-import metaphone from '../lib/metaphone'
-const toast = useToast()
+import metaphone from '../lib/metaphone';
+const toast = useToast();
 const authStore = useAuthStore();
 const router = useRouter();
 const settingList = ref<UserConfig | null>(null);
-const cardSettings = ref<Setting[]>([])
+const cardSettings = ref<Setting[]>([]);
 const username = authStore.loggedInUsername;
 const id = authStore.loggedInUserId;
-const showFilter = ref<boolean>(false)
-let filters = ["local", "local.core", "local.danger", "online", "online.core", "online.ai"]
-const searchText = ref<string>("")
-let settingsToShow: string[] //list of setting ids got from metaphone
-let previousSearchTextLength: number = 0
-let metaphoneCache: string[][] = []
+const showFilter = ref<boolean>(false);
+let filters = ['local', 'local.core', 'local.danger', 'online', 'online.core', 'online.ai'];
+const searchText = ref<string>('');
+let settingsToShow: string[]; //list of setting ids got from metaphone
+let previousSearchTextLength: number = 0;
+let metaphoneCache: string[][] = [];
 let metaphoneMap: Record<string, string[]>;
 function search() {
-  if (settingList.value == null) return
+  if (settingList.value == null) return;
   if (searchText.value.length == 0) {
-    initSettingVisibilityOnInputEnter(settingList.value.sections) //set all to false 
-    metaphoneCache = []
+    initSettingVisibilityOnInputEnter(settingList.value.sections); //set all to false
+    metaphoneCache = [];
   }
   if (searchText.value.length > 0 && searchText.value.length < previousSearchTextLength) {
     metaphoneCache.pop(); //if length was 5 and we went to 4 pop this 5 searech because there is sall change same letter will be written
-    console.log(metaphoneCache)
-    settingsToShow = metaphoneCache[searchText.value.length - 1]
+    console.log(metaphoneCache);
+    settingsToShow = metaphoneCache[searchText.value.length - 1];
     for (let settingId of settingsToShow) {
-      changeSettingVisibility(settingList.value.sections, settingId)
+      changeSettingVisibility(settingList.value.sections, settingId);
     }
-    return
+    return;
   }
-  previousSearchTextLength = searchText.value.length
-  let processedString = metaphone(searchText.value)
-  settingsToShow = metaphoneMap[processedString]
+  previousSearchTextLength = searchText.value.length;
+  let processedString = metaphone(searchText.value);
+  settingsToShow = metaphoneMap[processedString];
   if (settingsToShow == undefined) {
-    settingsToShow = []
+    settingsToShow = [];
   }
-  console.log(settingsToShow)
+  console.log(settingsToShow);
   for (let settingId of settingsToShow) {
-    changeSettingVisibility(settingList.value.sections, settingId)
+    changeSettingVisibility(settingList.value.sections, settingId);
   }
   metaphoneCache.push(settingsToShow);
 
-  return
+  return;
 }
-
 
 function initSettingVisibilityOnInputEnter(sections: Section[]) {
   for (let section of sections) {
     for (let setting of section.sectionSettings) {
-      setting.show = false
+      setting.show = false;
     }
     if (section.subsections) {
-      initSettingVisibilityOnInputEnter(section.subsections)
+      initSettingVisibilityOnInputEnter(section.subsections);
     }
   }
 }
@@ -85,7 +84,7 @@ function changeSettingVisibility(sections: Section[], settingId: string): boolea
   return false;
 }
 function redirect() {
-  router.replace("/main/");
+  router.replace('/main/');
 }
 function initVisibility(sections: Section[]) {
   for (const section of sections) {
@@ -103,36 +102,43 @@ function initSettingVisibility(sections: Section[], state: boolean) {
 }
 onMounted(async () => {
   try {
-
-    metaphoneMap = await invoke<Record<string, string[]>>('get_methapone_map')
+    metaphoneMap = await invoke<Record<string, string[]>>('get_methapone_map');
     const [userConfig, isDefault] = await invoke<[UserConfig, boolean]>('get_config_data');
     settingList.value = userConfig;
-    if (isDefault) toast.info('Default config was written, you can restore last working version by restore option in settings');
-    initSettingVisibility(settingList.value.sections, true)
-    initVisibility(settingList.value.sections)
-    let cardSettingsIdList: string[] = ["local.mode", "local.encryption", "local.logout", "online.sync", "local.showLogs", "local.deleteLocalFiles"]
+    if (isDefault)
+      toast.info(
+        'Default config was written, you can restore last working version by restore option in settings'
+      );
+    initSettingVisibility(settingList.value.sections, true);
+    initVisibility(settingList.value.sections);
+    let cardSettingsIdList: string[] = [
+      'local.mode',
+      'local.encryption',
+      'local.logout',
+      'online.sync',
+      'local.showLogs',
+      'local.deleteLocalFiles',
+    ];
     for (let setting of cardSettingsIdList) {
-      const found = findSetting(settingList.value.sections, setting)
-      if (found) cardSettings.value.push(found)
-
+      const found = findSetting(settingList.value.sections, setting);
+      if (found) cardSettings.value.push(found);
     }
   } catch (e) {
-    console.warn("get_config_data failed:", e);
-    toast.error("failed to get current config")
+    console.warn('get_config_data failed:', e);
+    toast.error('failed to get current config');
   }
-})
+});
 
 function showFilters() {
-  showFilter.value = !showFilter.value
+  showFilter.value = !showFilter.value;
 }
 async function handleChange(id: string, value: string) {
-  if (!settingList.value) return
-  findAndUpdate(settingList.value.sections, id, value)
+  if (!settingList.value) return;
+  findAndUpdate(settingList.value.sections, id, value);
   try {
-    await invoke('update_settings', { userConfig: settingList.value })
-
+    await invoke('update_settings', { userConfig: settingList.value });
   } catch (err) {
-    toast.error("Failed to save config")
+    toast.error('Failed to save config');
   }
 }
 
@@ -140,50 +146,47 @@ function findAndUpdate(sections: Section[], id: string, value: string): boolean 
   for (const section of sections) {
     for (const setting of section.sectionSettings) {
       if (setting.id === id) {
-        setting.currentValue = value
-        return true
+        setting.currentValue = value;
+        return true;
       }
     }
     if (section.subsections) {
-      if (findAndUpdate(section.subsections, id, value)) return true
+      if (findAndUpdate(section.subsections, id, value)) return true;
     }
   }
-  return false
+  return false;
 }
 function findSetting(sections: Section[], id: string) {
   for (const section of sections) {
     for (const setting of section.sectionSettings) {
       if (setting.id === id) {
-        return setting
+        return setting;
       }
     }
     if (section.subsections) {
-      return findSetting(section.subsections, id)
+      return findSetting(section.subsections, id);
     }
   }
 }
 function goToSetting(id: string) {
-  const el = document.getElementById(id)
-  el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const el = document.getElementById(id);
+  el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 function changeSectionVisibility(sections: Section[], id: string, value: boolean) {
   for (let section of sections) {
     if (section.id == id) {
-      section.show = value
-      return true
-
+      section.show = value;
+      return true;
     }
     if (section?.subsections) {
-      if (changeSectionVisibility(section.subsections, id, value)) return true
+      if (changeSectionVisibility(section.subsections, id, value)) return true;
     }
-
   }
-  return false
+  return false;
 }
 
 function handleVisibilityChange(id: string, value: boolean) {
-  if (!settingList.value) return
-
+  if (!settingList.value) return;
 
   changeSectionVisibility(settingList.value.sections, id, value);
 }
@@ -191,73 +194,77 @@ function handleVisibilityChange(id: string, value: boolean) {
 function getElementVisibility(sections: Section[], id: string): boolean | undefined {
   for (let section of sections) {
     if (section.id === id) {
-      return section.show
+      return section.show;
     }
 
     if (section.subsections) {
-      const val = getElementVisibility(section.subsections, id)
-      if (val !== undefined) return val
+      const val = getElementVisibility(section.subsections, id);
+      if (val !== undefined) return val;
     }
   }
-  return undefined
+  return undefined;
 }
 
-
 function handleBlur() {
-  if (settingList.value == null) return
+  if (settingList.value == null) return;
   if (searchText.value.length == 0) {
-    initSettingVisibility(settingList.value.sections, true)
+    initSettingVisibility(settingList.value.sections, true);
   }
 }
 function hide() {
-  if (settingList.value == null) return
+  if (settingList.value == null) return;
   if (searchText.value.length == 0) {
-    initSettingVisibility(settingList.value.sections, false)
-
+    initSettingVisibility(settingList.value.sections, false);
   }
 }
-
 </script>
 
 <template>
-  <div class="relative h-screen overflow-hidden flex flex-col px-[10%]">
-
+  <div class="relative flex h-screen flex-col overflow-hidden px-[10%]">
     <ArrowBigLeftDash
-      class="text-note-paprika/80 absolute top-[93%] left-[2%] transition-transform duration-200 hover:scale-95"
-      @click="redirect" />
+      class="absolute left-[2%] top-[93%] text-note-paprika/80 transition-transform duration-200 hover:scale-95"
+      @click="redirect"
+    />
 
-    <header class="shrink-0 pt-8 pb-4">
-      <div class="flex justify-between items-start gap-8">
-        <div class="flex flex-col justify-between h-[27vh] min-h-60">
+    <header class="shrink-0 pb-4 pt-8">
+      <div class="flex items-start justify-between gap-8">
+        <div class="flex h-[27vh] min-h-60 flex-col justify-between">
           <div class="flex flex-col">
-            <h1 class="text-note-ivory text-4xl lg:text-5xl xl:text-6xl font-semibold tracking-tight">
-              Settings of <span class="text-note-paprika">{{ username }}</span>
+            <h1
+              class="text-4xl font-semibold tracking-tight text-note-ivory lg:text-5xl xl:text-6xl"
+            >
+              Settings of
+              <span class="text-note-paprika">{{ username }}</span>
             </h1>
-            <p class="text-note-pumice/25 text-xs tracking-widest mt-3">
-              #{{ id }}
-            </p>
+            <p class="mt-3 text-xs tracking-widest text-note-pumice/25">#{{ id }}</p>
           </div>
 
-          <span class="flex items-center bg-black/40 border-note-pumice/50 border-2 w-80 h-10 p-2 rounded-md
-                       transition duration-1000 ease-out focus-within:border-note-paprika/80
-                       focus-within:bg-black/60">
-            <input class="bg-note-graphite text-note-ivory outline-none transition duration-1000 ease-out
-                         focus:outline-none focus:ring-0 focus:border-transparent focus:shadow-none
-                         focus:bg-black/50 placeholder:text-note-pumice/70 select-none w-[90%]" type="text"
-              placeholder="Search..." @input="search" @blur="handleBlur" v-model="searchText" @focus="hide" />
-            <Search class="ml-2 text-note-paprika shrink-0" />
+          <span
+            class="flex h-10 w-80 items-center rounded-md border-2 border-note-pumice/50 bg-black/40 p-2 transition duration-1000 ease-out focus-within:border-note-paprika/80 focus-within:bg-black/60"
+          >
+            <input
+              class="w-[90%] select-none bg-note-graphite text-note-ivory outline-none transition duration-1000 ease-out placeholder:text-note-pumice/70 focus:border-transparent focus:bg-black/50 focus:shadow-none focus:outline-none focus:ring-0"
+              type="text"
+              placeholder="Search..."
+              @input="search"
+              @blur="handleBlur"
+              v-model="searchText"
+              @focus="hide"
+            />
+            <Search class="ml-2 shrink-0 text-note-paprika" />
           </span>
         </div>
 
-
-        <div class="flex flex-col shrink-0 bg-note-graphite/80 border border-note-pumice/20 rounded-xl
-                    px-4 py-4 w-[28%] min-w-56 h-[27vh] min-h-60">
-          <div class="flex items-center gap-2 mb-4">
-            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full
-                        bg-note-paprika/20 text-note-glow">
+        <div
+          class="flex h-[27vh] min-h-60 w-[28%] min-w-56 shrink-0 flex-col rounded-xl border border-note-pumice/20 bg-note-graphite/80 px-4 py-4"
+        >
+          <div class="mb-4 flex items-center gap-2">
+            <div
+              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-note-paprika/20 text-note-glow"
+            >
               <InfoIcon class="h-4 w-4" />
             </div>
-            <div class="flex flex-col min-w-0">
+            <div class="flex min-w-0 flex-col">
               <span class="text-sm font-semibold text-note-ivory">Account overview</span>
               <span class="text-xs text-note-pumice/70">
                 Quick access to your most important settings
@@ -265,14 +272,21 @@ function hide() {
             </div>
           </div>
 
-          <div class="flex-1 rounded-lg bg-black/40 border border-note-pumice/10
-                      px-3 py-2 flex flex-col justify-between overflow-hidden">
-            <button v-for="setting in cardSettings" :key="setting.id" type="button" class="flex items-center rounded-md px-2 py-1.5 text-xs text-note-pumice/80
-                           hover:text-note-ivory hover:bg-black/50 transition-colors w-full">
-              <span class="flex-1 flex justify-start">{{ setting.label }}</span>
-              <span class="flex-1 flex justify-center">{{ setting.currentValue }}</span>
-              <span @click="goToSetting(setting.id)"
-                class="flex-1 flex justify-end text-note-paprika text-[11px] tracking-wide uppercase">
+          <div
+            class="flex flex-1 flex-col justify-between overflow-hidden rounded-lg border border-note-pumice/10 bg-black/40 px-3 py-2"
+          >
+            <button
+              v-for="setting in cardSettings"
+              :key="setting.id"
+              type="button"
+              class="flex w-full items-center rounded-md px-2 py-1.5 text-xs text-note-pumice/80 transition-colors hover:bg-black/50 hover:text-note-ivory"
+            >
+              <span class="flex flex-1 justify-start">{{ setting.label }}</span>
+              <span class="flex flex-1 justify-center">{{ setting.currentValue }}</span>
+              <span
+                @click="goToSetting(setting.id)"
+                class="flex flex-1 justify-end text-[11px] uppercase tracking-wide text-note-paprika"
+              >
                 go to setting
               </span>
             </button>
@@ -283,31 +297,42 @@ function hide() {
 
     <ScreenDeviderHorizontal class="shrink-0" />
 
-    <div class="shrink-0 mb-2 mt-4 flex">
-      <Funnel class="text-note-pumice/90 transition duration-500 ease-out hover:text-note-paprika"
-        @click="showFilters" />
+    <div class="mb-2 mt-4 flex shrink-0">
+      <Funnel
+        class="text-note-pumice/90 transition duration-500 ease-out hover:text-note-paprika"
+        @click="showFilters"
+      />
       <template v-if="showFilter">
-        <div v-for="filter in filters" :key="filter" class="flex w-44 h-fit ml-4  border-note-ivory ">
-          <CheckboxInput :checked="getElementVisibility(settingList!.sections, filter) ?? true" :id="filter"
-            @visibility-changed="(id, value) => { handleVisibilityChange(id, value) }">
-          </CheckboxInput>
+        <div
+          v-for="filter in filters"
+          :key="filter"
+          class="ml-4 flex h-fit w-44 border-note-ivory"
+        >
+          <CheckboxInput
+            :checked="getElementVisibility(settingList!.sections, filter) ?? true"
+            :id="filter"
+            @visibility-changed="
+              (id, value) => {
+                handleVisibilityChange(id, value);
+              }
+            "
+          ></CheckboxInput>
         </div>
       </template>
-
     </div>
 
-
-    <main class="flex-1 min-h-0 flex flex-col gap-4 pb-6 my-4">
+    <main class="my-4 flex min-h-0 flex-1 flex-col gap-4 pb-6">
       <div
-        class="flex-1 min-h-0 w-full bg-black/40 rounded-xl border border-note-pumice/40 overflow-y-auto scrollbar-none p-4">
-        <SectionComp v-if="settingList" v-for="section in settingList.sections" :section="section"
-          @setting-changed="handleChange">
-
-        </SectionComp>
-
+        class="scrollbar-none min-h-0 w-full flex-1 overflow-y-auto rounded-xl border border-note-pumice/40 bg-black/40 p-4"
+      >
+        <SectionComp
+          v-if="settingList"
+          v-for="section in settingList.sections"
+          :section="section"
+          @setting-changed="handleChange"
+        ></SectionComp>
       </div>
     </main>
-
   </div>
 </template>
 
@@ -326,9 +351,5 @@ function hide() {
   }
 }
 </style>
-
-
-
-
 
 <!-- my idea for filtration / search, every element on list is v-if, and has its representation in js object like show, option, value,  fuzzy or mayby i should use Soundex or Methaphone, and i will use fuzzy in note content lookup words and parent and its in the representation of section which also has show, availabale options [list of previus described objects], fuzy words, then on filter we have checkboxes which after click is changin show to true or false and v-if is rendering or not, same with serach, serach returns list of "options or names"  that needs to be displayed and we check them to true, rest to false, also tell me should i store fuzzy words on backend or on frontend and pass them or maybe here and here, i will need to create rust struct also for better serialization-->
