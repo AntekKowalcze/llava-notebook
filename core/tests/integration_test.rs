@@ -1,7 +1,7 @@
-use llava_core::{models::note, *};
+use llava_core::*;
 use rusqlite::named_params;
 use rusqlite::*;
-use zeroize::{Zeroize, Zeroizing};
+use zeroize::Zeroizing;
 #[test]
 fn program_flow() {
     let _ = clear_tmp();
@@ -36,7 +36,7 @@ fn program_flow() {
         .unwrap_or(false);
     assert!(user_exists, "User should exist in local DB");
 
-    let (mut current_user, some, some_two) = llava_core::local_log_in(
+    let (current_user, program_paths, mut note_db_conn) = llava_core::local_log_in(
         "test".to_string(),
         Zeroizing::from("ZAQ!2wsx".to_string()),
         &mut local_login_db_conn,
@@ -46,8 +46,6 @@ fn program_flow() {
     let mut state = AppState::init().expect("failed creating app state");
 
     state.current_user = std::sync::Mutex::new(Some(current_user));
-    let mut note_db_conn =
-        llava_core::get_connection(&program_paths).expect("failed creating notes db");
 
     let owner_id = state
         .current_user
@@ -96,11 +94,9 @@ fn program_flow() {
     )
     .expect("failed to update note");
 
-    // Assert: content faktycznie się zmienił
     let updated_content = std::fs::read_to_string(&note_file_path).unwrap();
     assert!(updated_content.contains("this is content from integrated test"));
 
-    // Assert: title i summary w bazie
     let (title, summary): (String, String) = note_db_conn
         .query_row(
             "SELECT title, summary FROM notes WHERE local_id = :id",
@@ -113,6 +109,7 @@ fn program_flow() {
 
     let note_content = llava_core::read_note_content(&program_paths, note_name.clone())
         .expect("failed to read content from file");
+    assert!(!note_content.is_empty(), "Note content should not be empty");
 
     llava_core::delete_note(
         &mut note_db_conn,

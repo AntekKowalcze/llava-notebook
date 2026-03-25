@@ -105,7 +105,9 @@ onMounted(async () => {
   try {
 
     metaphoneMap = await invoke<Record<string, string[]>>('get_methapone_map')
-    settingList.value = await invoke<UserConfig>("get_config_data");
+    const [userConfig, isDefault] = await invoke<[UserConfig, boolean]>('get_config_data');
+    settingList.value = userConfig;
+    if (isDefault) toast.info('Default config was written, you can restore last working version by restore option in settings');
     initSettingVisibility(settingList.value.sections, true)
     initVisibility(settingList.value.sections)
     let cardSettingsIdList: string[] = ["local.mode", "local.encryption", "local.logout", "online.sync", "local.showLogs", "local.deleteLocalFiles"]

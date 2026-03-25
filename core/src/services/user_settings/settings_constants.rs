@@ -21,6 +21,7 @@ pub const SETTING_NAME_LIST: &[&str] = &[
     "online.changeUsername",
     "online.aiSummary",
 ];
+pub const NUMBER_OF_SETTINGS: i64 = SETTING_NAME_LIST.len() as i64;
 
 pub fn default_config(default_data_dir: &str) -> UserConfig {
     let local_core = Section::new(
@@ -458,25 +459,4 @@ pub static SECTIONS_META: phf::Map<&'static str, SectionMeta> = phf_map! {
         label: "AI & automation",
     },
 
-};
-//Metaphone algoritm index, update on setting content change
-pub static PHONETIC_CORPUS: phf::Map<&'static str, &'static [&'static str]> = phf_map! {
-    "local.mode" => &["local", "offline", "mode", "device", "work"],
-    "local.encryption" => &["encrypt", "encryption", "secure", "security", "protect", "protection", "private", "privacy", "data", "notes"],
-    "local.sync" => &["sync", "synchronize", "synchronization", "background", "local"],
-    "local.showLogs" => &["logs", "log", "show", "view", "application", "debug", "recent", "activity", "diagnostic"],
-    "local.exportNotes" => &["export", "notes", "backup", "file", "save", "download", "extract", "output"],
-    "local.importNotes" => &["import", "notes", "backup", "file", "restore", "load", "upload", "recover"],
-    "local.autoBackup" => &["automatic", "auto", "backup", "backups", "schedule", "scheduled", "notes"],
-    "local.backupFrequency" => &["frequency", "backup", "interval", "schedule", "daily", "weekly", "monthly", "repeat", "period"],
-    "local.dataDirectory" => &["data", "directory", "folder", "path", "location", "database", "files", "storage"],
-    "local.logout" => &["logout", "signout", "sign", "account", "session", "leave", "exit"],
-    "local.deleteLocalFiles" => &["delete", "local", "files", "remove", "permanent", "wipe", "clear", "purge", "erase", "reset"],
-    "local.deleteAccount" => &["delete", "account", "remove", "permanent", "wipe", "purge", "erase", "synced"],
-    "online.mode" => &["online", "mode", "connect", "connected", "cloud", "account", "network"],
-    "online.sync" => &["sync", "synchronize", "notes", "devices", "automatic", "cross", "connected", "cloud"],
-    "online.connectedDevices" => &["connected", "devices", "manage", "view", "account", "link", "linked"],
-    "online.changePasswordEmail" => &["password", "email", "change", "reset", "link", "send", "security", "credential"],
-    "online.changeUsername" => &["username", "name", "change", "update", "account", "profile", "rename"],
-    "online.aiSummary" => &["ai", "summary", "summaries", "generate", "notes", "intelligence", "automation", "smart"],
 };

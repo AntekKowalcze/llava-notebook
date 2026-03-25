@@ -47,7 +47,7 @@ use dirs_next::data_local_dir;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
-use std::{fs, path::PathBuf, sync::Mutex};
+use std::{path::PathBuf, sync::Mutex};
 #[derive(Debug, Clone)]
 pub struct ProgramFiles {
     pub base: PathBuf,
@@ -56,6 +56,7 @@ pub struct ProgramFiles {
     pub assets_path: PathBuf,
     pub logs_path: PathBuf,
     pub config_path: PathBuf,
+    pub config_backup_path: PathBuf,
     pub tmp_path: PathBuf,
     pub delete_tmp_path: PathBuf,
     pub local_login_database_path: PathBuf,
@@ -183,6 +184,7 @@ pub fn get_paths(
         assets_path: user_home_path.join("assets"),
         logs_path: program_home_path.join(LOGS_PATH),
         config_path: user_home_path.join(CONFIG_FILE),
+        config_backup_path: user_home_path.join(CONFIG_BACKUP_FILE),
         tmp_path: user_home_path.join("tmp"),
         delete_tmp_path: user_home_path.join("tmp_delete"),
         local_login_database_path: program_home_path.join(LOCAL_USERS_DB),
@@ -190,37 +192,6 @@ pub fn get_paths(
         active_user_path: program_home_path.join(ACTIVE_USER_JSON_PATH),
         app_home: program_home_path.clone(),
     })
-}
-
-fn write_config(program_paths: &ProgramFiles) -> Result<(), crate::errors::Error> {
-    let config_content = ConfigData {
-        data_dir: program_paths.base.to_path_buf(),
-    };
-    let content = serde_json::to_string_pretty(&config_content)
-        .inspect_err(|err| {
-            crate::services::logger::log_error(
-                "serializing error config will be empty string, error",
-                err,
-            )
-        })
-        .context("couldnt parse config content into json")?; //pretty
-    crate::services::logger::log_success("serialized config content");
-
-    fs::write(&program_paths.config_path, &content).inspect_err(|_err| {
-        tracing::error!(
-            task = "writing config to json",
-            status = "error",
-            "couldnt write config to json"
-        );
-    })?;
-
-    log_helper(
-        "writing config to json",
-        "success",
-        None::<Format<String>>,
-        "Written config to json",
-    );
-    Ok(())
 }
 
 pub fn get_device_id(
@@ -320,7 +291,7 @@ pub fn read_current_user(path: &PathBuf) -> Result<uuid::Uuid, crate::errors::Er
 fn init_test() {
     let paths = ProgramFiles::init_in_base().unwrap();
     println!("{:#?}", paths);
-    assert!(paths.config_path.exists())
+    assert!(paths.base.exists())
 }
 
 #[test]

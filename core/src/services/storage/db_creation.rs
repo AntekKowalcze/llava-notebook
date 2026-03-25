@@ -26,7 +26,7 @@ use anyhow::Context;
 use rusqlite::{Connection, Result};
 
 use crate::constants::NOTE_DB_SCHEMA;
-///This function gives connection to or returns db error and log it to user
+
 pub fn get_connection(
     paths: &crate::config::ProgramFiles,
 ) -> Result<Connection, crate::errors::Error> {
@@ -45,8 +45,16 @@ pub fn get_connection(
 fn creating_tables(
     paths: &crate::config::ProgramFiles,
 ) -> Result<Connection, crate::errors::Error> {
-    let mut notes_db = Connection::open(&paths.data_base_path)
-        .context("couldnt establish connection to notes database")?;
+    let notes_db_res = Connection::open(&paths.data_base_path);
+    if let Err(ref e) = notes_db_res {
+        tracing::error!(
+            task = "opening notes db",
+            path = ?paths.data_base_path,
+            error = ?e,
+            "Failed to open notes database file"
+        );
+    }
+    let mut notes_db = notes_db_res.context("couldnt establish connection to notes database")?;
 
     // ustawienia pragm
     notes_db
@@ -74,11 +82,36 @@ fn creating_tables(
     }
     let tx = notes_db
         .transaction()
+        .inspect_err(|e| {
+            tracing::error!(
+                task = "creating transaction",
+                path = ?paths.data_base_path,
+                error = ?e,
+                "failed to start transaction for notes db"
+            );
+        })
         .context("failed to create database for notes")?;
     let schema = NOTE_DB_SCHEMA;
     tx.execute_batch(schema)
+        .inspect_err(|e| {
+            tracing::error!(
+                task = "execute schema",
+                path = ?paths.data_base_path,
+                error = ?e,
+                "failed to execute notes DB schema"
+            );
+        })
         .context("Couldnt create notes database SQL ERROR")?;
-    tx.commit().context("failed to create database")?;
+    tx.commit()
+        .inspect_err(|e| {
+            tracing::error!(
+                task = "commit schema tx",
+                path = ?paths.data_base_path,
+                error = ?e,
+                "failed to commit notes DB schema transaction"
+            );
+        })
+        .context("failed to create database")?;
     log_helper(
         "ensuring notes db schema",
         "success",

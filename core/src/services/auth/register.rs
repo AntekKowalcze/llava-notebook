@@ -517,10 +517,8 @@ fn test_password_validation() {
 fn register_test() {
     let paths = ProgramFiles::init_in_base().unwrap();
     let home_path = std::env::temp_dir().join(LOCAL_USERS_DB);
-
-    let mut users_db =
-        crate::services::auth::database_creation::connect_or_create_local_login_db(&home_path)
-            .unwrap();
+       let mut users_db = rusqlite::Connection::open_in_memory().unwrap();
+    users_db.execute_batch(LOCAL_LOGIN_DB_SCHEMA).unwrap();
     register_user_offline(
         "tescik".to_string(),
         zeroize::Zeroizing::from("ToJestTest!".to_string()),

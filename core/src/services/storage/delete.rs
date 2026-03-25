@@ -54,24 +54,25 @@ pub fn delete_note(
     Ok(())
 }
 
-#[test]
-fn test_delte_note() {
-    let paths = crate::config::ProgramFiles::init_in_base().unwrap();
-    let name: String = "tttsss".to_string();
-    let sqlite_connection = crate::services::storage::db_creation::get_connection(&paths).unwrap();
-    delete_note(
-        &sqlite_connection,
-        name.clone(),
-        uuid::Uuid::parse_str("45943af4-6163-4816-8108-06330841e1ea").unwrap(),
-        &paths,
-    )
-    .unwrap();
-    std::fs::rename(
-        paths.delete_tmp_path.join(format!("{name}.md")),
-        paths.notes_path.join(format!("{name}.md")),
-    )
-    .unwrap();
-}
+//run test only with note id!``
+// #[test]
+// fn test_delte_note() {
+//     let paths = crate::config::ProgramFiles::init_in_base().unwrap();
+//     let name: String = "tttsss".to_string();
+//     let sqlite_connection = crate::services::storage::db_creation::get_connection(&paths).unwrap();
+//     delete_note(
+//         &sqlite_connection,
+//         name.clone(),
+//         uuid::Uuid::parse_str("45943af4-6163-4816-8108-06330841e1ea").unwrap(),
+//         &paths,
+//     )
+//     .unwrap();
+//     std::fs::rename(
+//         paths.delete_tmp_path.join(format!("{name}.md")),
+//         paths.notes_path.join(format!("{name}.md")),
+//     )
+//     .unwrap();
+// }
 //("45943af4-6163-4816-8108-06330841e1ea")
 
 //deletation not visible because its cleaning

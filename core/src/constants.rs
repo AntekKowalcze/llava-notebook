@@ -21,6 +21,7 @@ pub const USER_DIR_PATTERN: &str = "llava/users";
 pub const SUBDIRS: &[&str; 4] = &["notes", "assets", "tmp", "tmp_delete"];
 //jsons
 pub const CONFIG_FILE: &str = "config.json";
+pub const CONFIG_BACKUP_FILE: &str = "backup.json";
 pub const ACTIVE_USER_JSON_PATH: &str = "llava/active_user.json";
 pub const DEVICE_ID_FILE: &str = "llava/device_id.json";
 pub const DEVICE_ID_JSON_KEY: &str = "device_id";

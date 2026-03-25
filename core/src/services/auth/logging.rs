@@ -660,15 +660,26 @@ pub fn local_logout(
 
     Ok(())
 }
-
+//workds only after register test
 #[test]
 fn login_test() {
+    let mut users_db = rusqlite::Connection::open_in_memory().unwrap();
+    users_db
+        .execute_batch(crate::constants::LOCAL_LOGIN_DB_SCHEMA)
+        .unwrap();
+    let paths = crate::config::ProgramFiles::init_in_base().unwrap();
     let username = "twelth".to_string();
     let password = zeroize::Zeroizing::from("ToJestTest!".to_string());
+    let password_r = zeroize::Zeroizing::from("ToJestTest!".to_string());
+
+    crate::services::auth::register::register_user_offline(
+        username.clone(),
+        password.clone(),
+        password_r,
+        &paths,
+        &mut users_db,
+    );
+
     let home_path = std::env::temp_dir();
-    let mut users_db =
-        crate::services::auth::database_creation::connect_or_create_local_login_db(&home_path)
-            .unwrap();
-    let paths = crate::config::ProgramFiles::init_in_base().unwrap();
     local_log_in(username, password, &mut users_db, &paths).unwrap();
 }

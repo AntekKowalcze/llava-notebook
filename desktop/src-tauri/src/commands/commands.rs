@@ -368,7 +368,7 @@ pub async fn get_dashboard_data(
 #[tauri::command]
 pub async fn get_config_data(
     state: tauri::State<'_, AppState>,
-) -> Result<llava_core::UserConfig, llava_core::Error> {
+) -> Result<(llava_core::UserConfig, bool), llava_core::Error> {
     let paths_guard = state
         .paths
         .lock()
@@ -377,8 +377,9 @@ pub async fn get_config_data(
     let paths: &llava_core::config::ProgramFiles =
         paths_guard.as_ref().ok_or(llava_core::Error::FatalError)?;
 
-    let user_config: llava_core::UserConfig = llava_core::get_config(&paths)?;
-    Ok(user_config)
+    let (user_config, created_default): (llava_core::UserConfig, bool) =
+        llava_core::get_config(&paths)?;
+    Ok((user_config, created_default))
 }
 
 #[tauri::command]
@@ -394,7 +395,11 @@ pub async fn update_settings(
 
     let paths: &llava_core::config::ProgramFiles =
         paths_guard.as_ref().ok_or(llava_core::Error::FatalError)?;
-    let hash_config = llava_core::save_config(&user_config, paths.config_path.clone())?;
+    let hash_config = llava_core::save_config(
+        &user_config,
+        paths.config_path.clone(),
+        paths.config_backup_path.clone(),
+    )?;
     app_handle
         .emit("config-updated", &hash_config)
         .map_err(|_| llava_core::Error::FatalError)?;

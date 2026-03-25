@@ -1,8 +1,7 @@
 use std::fs;
 ///function responsible for reading notes content
 pub fn read_note_content(
-    //todo change to english
-    //możę zmienic z name na uuid i path wywalić do kosza i przepisać na query po id zeby zdobyć path
+    //change from name to uuid and throw path to trash, get name from database
     paths: &crate::config::ProgramFiles,
     name: String,
 ) -> Result<String, crate::errors::Error> {
@@ -10,9 +9,10 @@ pub fn read_note_content(
     Ok(display_content)
 }
 
-#[test]
-fn read_test() {
-    let paths = crate::config::ProgramFiles::init_in_base().unwrap();
-    let name = "tttsss".to_string();
-    let _content = read_note_content(&paths, name).unwrap();
-}
+//run when notes are created
+// #[test]
+// fn read_test() {
+//     let paths = crate::config::ProgramFiles::init_in_base().unwrap();
+//     let name = "tttsss".to_string();
+//     let _content = read_note_content(&paths, name).unwrap();
+// }
