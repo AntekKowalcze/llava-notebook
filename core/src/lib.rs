@@ -11,8 +11,8 @@ pub mod auth {
     pub use crate::services::auth::database_creation::connect_or_create_local_login_db;
     pub use crate::services::auth::logging::SessionState;
     pub use crate::services::auth::logging::{
-        change_last_login, check_error_count, check_if_user_logged_in, get_timeout, local_log_in,
-        local_logout, log_with_code, zero_error_count,
+        autorization, change_last_login, check_error_count, check_if_user_logged_in, get_timeout,
+        local_log_in, local_logout, log_with_code, zero_error_count,
     };
     pub use crate::services::auth::register::{
         change_password, recovery_code_handling, register_user_offline,
@@ -30,6 +30,8 @@ pub mod storage {
 
 pub mod settings {
     pub use crate::services::user_settings::metaphone::create_metaphone_map;
+    pub use crate::services::user_settings::setting_actions::{change_username, logfile_contents};
+    pub use crate::services::user_settings::settings::load_config_backup;
     pub use crate::services::user_settings::settings::{
         UserConfig, get_config, get_config_for_state, save_config,
     };

@@ -9,7 +9,7 @@ use crate::{
 use anyhow::Context;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
@@ -117,17 +117,14 @@ pub fn get_config(paths: &ProgramFiles) -> Result<(UserConfig, bool), crate::err
                 return Ok((write_default_config(paths)?, true));
             }
 
-            let json: Result<serde_json::Value, serde_json::Error> = serde_json::from_str(&content);
-            match json {
-                Ok(json) => {
-                    let write_config: WriteConfig = serde_json::from_value(json)
-                        .context("failed to deserialize user config")?;
+            let write_config: Result<WriteConfig, anyhow::Error> =
+                serde_json::from_str(&content).context("failed to deserialize user config");
+            match write_config {
+                Ok(write_config) => {
                     let user_config: UserConfig = parse_write_to_user_config(write_config);
-                    println!("{:?}", user_config);
                     return Ok((user_config, false));
                 }
                 Err(_err) => {
-                    // If parsing fails, fallback to defaults
                     return Ok((write_default_config(paths)?, true));
                 }
             }
@@ -139,10 +136,10 @@ pub fn get_config(paths: &ProgramFiles) -> Result<(UserConfig, bool), crate::err
                 error = ?err,
                 "Error while reading config, fallback creation of default config"
             );
-            if paths.config_path.exists() {
-                std::fs::copy(&paths.config_path, &paths.config_backup_path)
-                    .context("Failed to copy config to backup")?;
-            }
+            // if paths.config_path.exists() {
+            //     std::fs::copy(&paths.config_path, &paths.config_backup_path)
+            //         .context("Failed to copy config to backup")?;
+            // }
             return Ok((write_default_config(paths)?, true));
         }
     }
@@ -151,7 +148,7 @@ pub fn get_config(paths: &ProgramFiles) -> Result<(UserConfig, bool), crate::err
 fn fallback_create_default_state(
     paths: &ProgramFiles,
     err_msg: &str,
-) -> Result<std::collections::HashMap<String, String>, crate::errors::Error> {
+) -> Result<IndexMap<String, String>, crate::errors::Error> {
     tracing::error!(
         task = "getting config",
         status = "error",
@@ -163,9 +160,8 @@ fn fallback_create_default_state(
 }
 pub fn get_config_for_state(
     paths: &ProgramFiles,
-) -> Result<std::collections::HashMap<String, String>, crate::errors::Error> {
+) -> Result<IndexMap<String, String>, crate::errors::Error> {
     let config_content = std::fs::read_to_string(paths.config_path.clone());
-    //check if keys in state hash map are identical, as in constants, then add backup file copying if ok
     match config_content {
         Ok(content) => {
             log_helper(
@@ -178,13 +174,10 @@ pub fn get_config_for_state(
                 write_default_config(paths)?;
                 return Ok(get_config_for_state(paths)?);
             }
-            let json: Result<serde_json::Value, anyhow::Error> =
-                serde_json::from_str(&content).context("Failed to serialize config content");
-            match json {
-                Ok(json) => {
-                    let user_config: WriteConfig = serde_json::from_value(json)
-                        .context("failed to deserialize user config")?;
-
+            let user_config: Result<WriteConfig, anyhow::Error> =
+                serde_json::from_str(&content).context("failed to deserialize user config");
+            match user_config {
+                Ok(user_config) => {
                     if count_settings(&user_config.sections)
                         != crate::services::user_settings::settings_constants::NUMBER_OF_SETTINGS
                     {
@@ -196,11 +189,11 @@ pub fn get_config_for_state(
                         );
                     }
 
-                    let state_config: std::collections::HashMap<String, String> =
-                        parse_config_to_state_hash_map(&user_config);
+                    let state_config: IndexMap<String, String> =
+                        parse_config_to_state_index_map(&user_config);
                     if check_config_correctnes(&state_config) {
-                        std::fs::copy(&paths.config_path, &paths.config_backup_path)
-                            .context("Failed to copy config to backup")?;
+                        // std::fs::copy(&paths.config_path, &paths.config_backup_path)
+                        //     .context("Failed to copy config to backup")?;
                         Ok(state_config)
                     } else {
                         fallback_create_default_state(
@@ -210,9 +203,7 @@ pub fn get_config_for_state(
                     }
                 }
 
-                Err(err) => {
-                    return fallback_create_default_state(paths, &format!("{:?}", err));
-                }
+                Err(err) => return fallback_create_default_state(paths, &format!("{:?}", err)),
             }
         }
         Err(err) => {
@@ -277,7 +268,6 @@ fn parse_section_recursevly(section: &Section) -> WriteSection {
         settings: settings_map,
     }
 }
-//TODO implement functionality for this settings section, think about what really should be there and what to add, (for example restore config)
 fn parse_write_to_user_config(write_config: WriteConfig) -> UserConfig {
     let mut sections: Vec<Section> = Vec::new();
 
@@ -336,18 +326,16 @@ fn parse_settings(settings: IndexMap<String, String>) -> Vec<Setting> {
     return_settings
 }
 
-fn parse_config_to_state_hash_map(
-    readed_config: &WriteConfig,
-) -> std::collections::HashMap<String, String> {
-    let mut return_map = std::collections::HashMap::new();
+fn parse_config_to_state_index_map(readed_config: &WriteConfig) -> IndexMap<String, String> {
+    let mut return_map = IndexMap::new();
     for section in &readed_config.sections {
         return_map.extend(handle_write_sections(section));
     }
     return_map
 }
 
-fn handle_write_sections(section: &WriteSection) -> std::collections::HashMap<String, String> {
-    let mut collect_map: HashMap<String, String> = HashMap::new();
+fn handle_write_sections(section: &WriteSection) -> IndexMap<String, String> {
+    let mut collect_map: IndexMap<String, String> = IndexMap::new();
     collect_map.extend(section.settings.clone());
     if let Some(subsection) = &section.write_sections {
         for s in subsection {
@@ -361,7 +349,7 @@ pub fn save_config(
     config: &UserConfig,
     config_path: PathBuf,
     config_path_backup: PathBuf,
-) -> Result<std::collections::HashMap<String, String>, crate::errors::Error> {
+) -> Result<IndexMap<String, String>, crate::errors::Error> {
     let parsed_config = parse_config(&config);
     let config_content = serde_json::to_string_pretty(&parsed_config)
         .inspect_err(|err| {
@@ -373,9 +361,9 @@ pub fn save_config(
             );
         })
         .context("failed to parse UserConfig to json")?;
-    let hash_config = parse_config_to_state_hash_map(&parsed_config);
+    let hash_config = parse_config_to_state_index_map(&parsed_config);
+    std::fs::copy(&config_path, config_path_backup).context("Failed to copy config to backup")?;
     std::fs::write(&config_path, config_content)?;
-    std::fs::copy(config_path, config_path_backup).context("Failed to copy config to backup")?;
     Ok(hash_config)
 }
 
@@ -389,7 +377,7 @@ fn count_settings(write_sections: &Vec<WriteSection>) -> i64 {
     }
     return counter;
 }
-fn check_config_correctnes(settings_map: &HashMap<String, String>) -> bool {
+fn check_config_correctnes(settings_map: &IndexMap<String, String>) -> bool {
     let expected = services::user_settings::settings_constants::SETTING_NAME_LIST;
     if settings_map.len() != expected.len() {
         return false;
@@ -401,27 +389,37 @@ fn check_config_correctnes(settings_map: &HashMap<String, String>) -> bool {
     }
     true
 }
-
+pub fn load_config_backup(
+    backup_path: &PathBuf,
+    config_path: &PathBuf,
+) -> Result<(), crate::errors::Error> {
+    std::fs::copy(backup_path, config_path)?;
+    Ok(())
+}
+//change state hashmap, change hashmap on frontend
 #[test]
 
-fn state_hash_map_test() {
+fn state_index_map_test() {
     let write_config = parse_config(
         &crate::services::user_settings::settings_constants::default_config(
             "C:\\Users\\Jakub\\AppData\\Local\\llava/users/ffcd2a2c-2de2-4864-9b8c-326e240bf385/",
         ),
     );
-    let parsed = parse_config_to_state_hash_map(&write_config);
+    let parsed = parse_config_to_state_index_map(&write_config);
     println!("{:#?}", parsed);
-    assert_eq!(parsed.len(), 18); //change value depending on number of setting on the list!!
+    assert_eq!(
+        parsed.len(),
+        services::user_settings::settings_constants::NUMBER_OF_SETTINGS as usize
+    );
 }
 
 #[test]
 fn detect_duplicate_settings_by_length() {
     // Create a WriteConfig with duplicated setting keys across sections
-    let mut s1 = std::collections::IndexMap::new();
+    let mut s1 = IndexMap::new();
     s1.insert("local.mode".to_string(), "true".to_string());
 
-    let mut s2 = std::collections::IndexMap::new();
+    let mut s2 = IndexMap::new();
     // duplicate key intentionally
     s2.insert("local.mode".to_string(), "false".to_string());
 
@@ -442,7 +440,7 @@ fn detect_duplicate_settings_by_length() {
     };
 
     let total_count = count_settings(&write_config.sections) as usize;
-    let parsed = parse_config_to_state_hash_map(&write_config);
+    let parsed = parse_config_to_state_index_map(&write_config);
     let unique_count = parsed.len();
 
     // If duplicates exist, total_count (sum of all settings) will be greater than unique_count
@@ -459,11 +457,43 @@ fn parse_and_check_defaults_no_duplicates() {
             "C:\\Users\\Jakub\\AppData\\Local\\llava/users/ffcd2a2c-2de2-4864-9b8c-326e240bf385/",
         ),
     );
-    let parsed = parse_config_to_state_hash_map(&write_config);
+    let parsed = parse_config_to_state_index_map(&write_config);
     // Ensure no duplicates and that keys match expected set
     assert_eq!(
         parsed.len(),
         services::user_settings::settings_constants::NUMBER_OF_SETTINGS as usize
     );
     assert!(check_config_correctnes(&parsed));
+}
+
+#[test]
+fn deserialize_write_config_preserves_settings_order() {
+    let raw = r#"
+        {
+            "sections": [
+                {
+                    "sectionId": "local.core",
+                    "writeSections": null,
+                    "settings": {
+                        "local.importNotes": "idle",
+                        "local.mode": "off",
+                        "local.encryption": "on"
+                    }
+                }
+            ]
+        }
+        "#;
+
+    let parsed: WriteConfig =
+        serde_json::from_str(raw).expect("WriteConfig should deserialize from JSON");
+    let keys: Vec<String> = parsed.sections[0].settings.keys().cloned().collect();
+
+    assert_eq!(
+        keys,
+        vec![
+            "local.importNotes".to_string(),
+            "local.mode".to_string(),
+            "local.encryption".to_string()
+        ]
+    );
 }

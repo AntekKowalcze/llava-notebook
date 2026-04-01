@@ -18,7 +18,16 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "capabilities": [
+  "default",
+  {
+    "identifier": "clipboard-manager",
+    "description": "copy to clipboard capability for all windows",
+    "windows": ["*"],
+    "permissions": ["clipboard-manager:allow-write-text"]
+  }
+]
     }
   },
   "bundle": {

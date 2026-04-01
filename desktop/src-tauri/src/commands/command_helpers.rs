@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use indexmap::IndexMap;
 use llava_core::AppState;
 pub fn change_state_after_login(
     state: &tauri::State<'_, AppState>,
@@ -6,7 +7,7 @@ pub fn change_state_after_login(
     notes_conn: rusqlite::Connection,
     paths: llava_core::ProgramFiles,
     username: String,
-    user_config: std::collections::HashMap<String, String>,
+    user_config: IndexMap<String, String>,
 ) -> Result<(), llava_core::Error> {
     *state
         .current_user

@@ -5,11 +5,7 @@ import BottomBar from '../components/BottomBar.vue';
 <template>
   <div class="flex h-full w-full flex-col">
     <RouterView></RouterView>
-    <BottomBar
-      :version="'0.1.0'"
-      :synced="'synced'"
-      class="fixed inset-x-0 bottom-0"
-    ></BottomBar>
+    <BottomBar :version="'0.1.0'" :synced="'synced'" class="fixed inset-x-0 bottom-0"></BottomBar>
   </div>
 </template>
 

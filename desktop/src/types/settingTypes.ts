@@ -9,7 +9,7 @@ export type Setting = {
   inputType: InputType;
   options: string[] | null;
   buttonLabel: string | null;
-
+  
   show: boolean; // frontend only
 };
 

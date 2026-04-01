@@ -54,6 +54,9 @@ pub enum Error {
     #[error("Fatal error couldn't find home directory for app")]
     FatalError,
 
+    #[error("Couldn't lock state, check deadlocks.")]
+    LockError,
+
     #[error("File operation error: {0}")]
     FileOperationError(String),
 

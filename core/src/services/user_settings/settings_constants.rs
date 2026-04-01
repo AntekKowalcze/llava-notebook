@@ -1,6 +1,5 @@
 use crate::services::user_settings::settings::SettingInputType;
 use crate::services::user_settings::settings::{Section, Setting, UserConfig};
-//TODO Add buttons so i can preview my dashboard and settings on release, add function to display settings in vue
 pub struct SettingMeta {
     pub field: &'static str,
     pub label: &'static str,
@@ -25,6 +24,8 @@ pub const SETTING_NAME_LIST: &[&str] = &[
     "local.logout",
     "local.deleteLocalFiles",
     "local.deleteAccount",
+    "local.changeUsername",
+    "local.changePassword",
     "online.mode",
     "online.sync",
     "online.connectedDevices",
@@ -138,9 +139,27 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
                 SettingInputType::Button,
                 Some("Show".to_string()),
             ),
+            Setting::new(
+                "local.changeUsername".to_string(),
+                "changeLocalUsername".to_string(),
+                "change local username".to_string(),
+                "Update the way we call you.".to_string(),
+                "idle".to_string(),
+                SettingInputType::Button,
+                Some("Change".to_string()),
+            ),
+            Setting::new(
+                "local.changePassword".to_string(),
+                "changeLocalPassword".to_string(),
+                "Change local password".to_string(),
+                "Update the password used for this local account.".to_string(),
+                "idle".to_string(),
+                SettingInputType::Button,
+                Some("Change".to_string()),
+            ),
         ],
     );
-
+    //when default readed nad writen it works, when reaed from file it reads from automatic backupss
     let local_danger = Section::new(
         "local.danger".to_string(),
         "Danger zone".to_string(),
@@ -303,6 +322,24 @@ pub static SETTINGS_META: phf::Map<&'static str, SettingMeta> = phf_map! {
         button_label: Some("Show"),
 
 
+    },
+
+    "local.changeUsername" => SettingMeta {
+        field: "changeLocalUsername",
+        label: "Change local username",
+        description: "Update the way we call you",
+        input_type: SettingInputType::Button,
+        options: None,
+        button_label: Some("Change")
+    },
+
+    "local.changePassword" => SettingMeta {
+        field: "changeLocalPassword",
+        label: "Change local password",
+        description: "Update the password used for this local account.",
+        input_type: SettingInputType::Button,
+        options: None,
+        button_label: Some("Change")
     },
 
     "local.exportNotes" => SettingMeta {

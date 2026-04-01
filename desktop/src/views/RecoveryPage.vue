@@ -5,16 +5,21 @@ import TextInput from '../components/forms/TextInput.vue';
 import { InputTypes } from '../types/inputTypes';
 import { ref } from 'vue';
 import { useAuthStore } from '../stores/auth';
-
+//logout not redirecting
+import { useRoute } from 'vue-router';
 import { invoke } from '@tauri-apps/api/core';
 import { useToast } from 'vue-toastification';
 import { useRouter } from 'vue-router';
 const toast = useToast();
+const route = useRoute();
 const router = useRouter();
 let code = ref<string>('');
 let username = ref<string>('');
 const authStore = useAuthStore();
-
+const originRaw = (route.query.origin as string | undefined) ?? 'login';
+// normalize: allow values like "settings", "/settings", "login" or "/login"
+const originKey = originRaw.replace(/^\/+/, '');
+const originTo = originKey === 'settings' ? '/main/settings' : originKey === 'login' ? '/login' : originRaw.startsWith('/') ? originRaw : `/${originKey}`;
 async function checkCode() {
   try {
     let [userId, one_code] = await invoke<[string, boolean]>('log_with_code', {
@@ -23,7 +28,6 @@ async function checkCode() {
     });
     if (one_code) {
       toast.info('You have used all of your codes, generate more in settings');
-      //TODO add function for generating codes (just new 8 codes use what you have)
     }
     authStore.$patch({
       loggedIn: true,
@@ -47,32 +51,13 @@ async function checkCode() {
 </script>
 
 <template>
-  <FormCard
-    header-text="Enter recovery key"
-    sub-text="enter the recovery code you received when logging in"
-  >
-    <TextInput
-      name="username"
-      placeholder="enter username"
-      :type="InputTypes.Text"
-      v-model="username"
-    ></TextInput>
-    <TextInput
-      name="code"
-      placeholder="enter recovery code"
-      :type="InputTypes.Text"
-      class="mb-24 mt-20"
-      v-model="code"
-    ></TextInput>
-    <FormButtons
-      content="submit"
-      @click="checkCode"
-    ></FormButtons>
-    <RouterLink
-      to="/login"
-      class="mb-0 mt-8 text-note-ivory/80 hover:underline"
-    >
-      Back to login
+  <FormCard header-text="Enter recovery key" sub-text="enter the recovery code you received when logging in">
+    <TextInput name="username" placeholder="enter username" :type="InputTypes.Text" v-model="username"></TextInput>
+    <TextInput name="code" placeholder="enter recovery code" :type="InputTypes.Text" class="mb-24 mt-20" v-model="code">
+    </TextInput>
+    <FormButtons content="submit" @click="checkCode"></FormButtons>
+    <RouterLink :to="originTo" class="mb-0 mt-8 text-note-ivory/80 hover:underline">
+      Go back
     </RouterLink>
   </FormCard>
 </template>

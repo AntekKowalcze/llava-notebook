@@ -64,38 +64,15 @@ function showTimeout(lengthMs: number) {
 }
 </script>
 <template>
-  <FormCard
-    header-text="Sign in"
-    sub-text="log in to existing offline account"
-  >
-    <TextInput
-      :name="'username'"
-      :placeholder="'username'"
-      :type="InputTypes.Text"
-      v-model="username"
-    ></TextInput>
-    <TextInput
-      :name="'password'"
-      :placeholder="'password'"
-      :type="InputTypes.Password"
-      v-model="password"
-    ></TextInput>
-    <FormButtons
-      :disabled="disabled"
-      :content="'Submit'"
-      @click="submitLogin"
-    ></FormButtons>
+  <FormCard header-text="Sign in" sub-text="log in to existing offline account">
+    <TextInput :name="'username'" :placeholder="'username'" :type="InputTypes.Text" v-model="username"></TextInput>
+    <TextInput :name="'password'" :placeholder="'password'" :type="InputTypes.Password" v-model="password"></TextInput>
+    <FormButtons :disabled="disabled" :content="'Submit'" @click="submitLogin"></FormButtons>
 
-    <RouterLink
-      to="/recovery"
-      class="mt-12 text-note-ivory/80 hover:underline"
-    >
+    <RouterLink :to="{ name: 'recovery', query: { origin: 'login' } }" class="mt-12 text-note-ivory/80 hover:underline">
       Forgot password?
     </RouterLink>
-    <RouterLink
-      to="/register"
-      class="mt-12 text-note-ivory/80 hover:underline"
-    >
+    <RouterLink to="/register" class="mt-12 text-note-ivory/80 hover:underline">
       Do you want to create account?
     </RouterLink>
   </FormCard>

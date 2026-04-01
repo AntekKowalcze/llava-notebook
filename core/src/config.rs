@@ -44,8 +44,9 @@ use crate::constants::*;
 use crate::utils::{Format, log_helper};
 use anyhow::Context;
 use dirs_next::data_local_dir;
+use indexmap::IndexMap;
 use rusqlite::Connection;
-use serde::{Deserialize, Serialize};
+// use serde::{Deserialize, Serialize};
 
 use std::{path::PathBuf, sync::Mutex};
 #[derive(Debug, Clone)]
@@ -73,7 +74,7 @@ pub struct AppState {
 
     pub username: Mutex<Option<String>>,
     pub paths: Mutex<Option<ProgramFiles>>,
-    pub user_config: Mutex<Option<std::collections::HashMap<String, String>>>,
+    pub user_config: Mutex<Option<IndexMap<String, String>>>,
 }
 
 impl AppState {
@@ -89,11 +90,11 @@ impl AppState {
         })
     }
 }
-#[derive(Serialize, Deserialize)]
+// #[derive(Serialize, Deserialize)]
 
-pub struct ConfigData {
-    pub data_dir: PathBuf,
-}
+// pub struct ConfigData {
+//     pub data_dir: PathBuf,
+// }
 impl ProgramFiles {
     pub fn init() -> Result<ProgramFiles, crate::errors::Error> {
         let program_home_path = data_local_dir()

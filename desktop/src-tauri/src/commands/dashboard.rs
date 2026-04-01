@@ -12,7 +12,7 @@ pub async fn get_dashboard_data(
 
     let users_db = users_db_guard
         .as_ref()
-        .ok_or(llava_core::Error::FatalError)?;
+        .ok_or(llava_core::Error::LockError)?;
 
     let notes_db_guard = state
         .notes_db
@@ -20,7 +20,7 @@ pub async fn get_dashboard_data(
         .map_err(|_| anyhow!("Couldnt edit notes db in state"))?;
     let notes_db = notes_db_guard
         .as_ref()
-        .ok_or(llava_core::Error::FatalError)?;
+        .ok_or(llava_core::Error::LockError)?;
 
     return Ok(llava_core::stats::get_dashboard_stats(
         user_uuid, &notes_db, &users_db,

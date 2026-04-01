@@ -7,7 +7,6 @@ pub fn getting_user_input(buffer: &mut String) {
     std::io::stdin()
         .read_line(buffer)
         .expect("getting input failed");
-    //im using expect cuz it wont be used in application only for testing
 }
 ///gets time in UTC timestamp i64
 pub fn get_time() -> i64 {

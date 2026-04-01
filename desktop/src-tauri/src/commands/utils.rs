@@ -12,7 +12,7 @@ pub async fn get_username_from_uuid(
         .map_err(|_| anyhow!("error while gettnig users_db from state"))?;
     let users_db = users_db_guard
         .as_ref()
-        .ok_or(llava_core::Error::FatalError)?;
+        .ok_or(llava_core::Error::LockError)?;
     let username = llava_core::get_username_from_uuid(users_db, user_uuid)?;
     Ok(username)
 }

@@ -8,6 +8,7 @@ const routes = [
   {
     path: '/',
     name: 'index',
+    
     beforeEnter: async () => {
       const authStore = useAuthStore();
       try {
@@ -27,11 +28,14 @@ const routes = [
       } catch (err) {
         console.error(err);
       }
+
     },
+    meta : { skipAuth: true }
   },
   {
     path: '/main',
     name: 'main',
+   
     component: () => import('../views/MainView.vue'),
     children: [
       { path: '', name: 'editor', component: () => import('../views/LoadingPage.vue') }, // /main
@@ -39,7 +43,7 @@ const routes = [
         path: 'dashboard',
         name: 'dashboard',
         component: () => import('../views/DashboardView.vue'),
-      }, // /main/dashboard
+      },
       { path: 'settings', name: 'settings', component: () => import('../views/SettingsView.vue') }, // /main/settings
     ],
   },
@@ -48,8 +52,8 @@ const routes = [
     name: 'choose',
     component: () => import('../views/RegisterAskPage.vue'),
   },
-  { path: '/register', name: 'register', component: () => import('../views/RegisterPage.vue') },
-  { path: '/login', name: 'login', component: () => import('../views/LoginPage.vue') },
+  { path: '/register', name: 'register', component: () => import('../views/RegisterPage.vue') ,meta : { skipAuth: true } },
+  { path: '/login', name: 'login', component: () => import('../views/LoginPage.vue')  ,meta : { skipAuth: true }},
   { path: '/loading', name: 'loading', component: () => import('../views/LoadingPage.vue') },
   {
     path: '/recoveryCodes',
@@ -61,9 +65,8 @@ const routes = [
     name: 'changePassword',
     component: () => import('../views/ChangePassword.vue'),
   },
-  { path: '/recovery', name: 'recovery', component: () => import('../views/RecoveryPage.vue') },
+  { path: '/recovery', name: 'recovery', component: () => import('../views/RecoveryPage.vue') ,meta : { skipAuth: true }},  
 ];
-
 export const router = createRouter({
   history: createWebHashHistory(),
   routes,
@@ -71,3 +74,27 @@ export const router = createRouter({
     return { top: 0 };
   },
 });
+
+router.beforeEach(async (to, from) => {
+    if (to.matched.some(record => record.meta && record.meta.skipAuth)) {
+      return true;
+    }
+    const authStore = useAuthStore();
+    try {
+      await Promise.all([authStore.checkUsers(), authStore.checkSession()]);
+    } catch (err) {
+      console.error('auth checks failed', err);
+      toast.error('Authentication check failed');
+      return { path: '/login', replace: true };
+    }
+
+    if (authStore.hasNoUsers) {
+      return { path: '/register', replace: true };
+    }
+
+    if (!authStore.loggedIn) {
+      return { path: '/login', replace: true };
+    }
+
+    return true;
+  })

@@ -24,20 +24,25 @@ pub fn main() {
     // };
     let user_db = connect_or_create_local_login_db(&program_paths.local_login_database_path)
         .expect("error while creating locla login db");
-    let _logger_worker = if cfg!(not(debug_assertions)) {
-        Some(llava_core::configure_logger(&program_paths.logs_path).expect("failed logger"))
-    } else {
-        println!("Tryb DEV: Logger plikowy wyłączony");
-        None
-    };
+    // let _logger_worker = if cfg!(not(debug_assertions)) {
+    //     Some(llava_core::configure_logger(&program_paths.logs_path).expect("failed logger"))
+    // } else {
+    //     println!("Tryb DEV: Logger plikowy wyłączony");
+    //     None
+    // };
+    let _logger_worker =
+        Some(llava_core::configure_logger(&program_paths.logs_path).expect("failed logger"));
     let device_id = llava_core::get_device_id(&user_db, &program_paths.device_id_path)
         .expect("big error while reading device id");
     println!("{}", device_id);
     let mut builder = tauri::Builder::default();
-    #[cfg(debug_assertions)]
-    {
-        builder = builder.plugin(tauri_plugin_devtools::init());
-    }
+    builder = builder.plugin(tauri_plugin_opener::init());
+    builder = builder.plugin(tauri_plugin_clipboard_manager::init());
+
+    // #[cfg(debug_assertions)]
+    // {
+    //     builder = builder.plugin(tauri_plugin_devtools::init());
+    // }
     let mut state: llava_core::AppState =
         llava_core::AppState::init().expect("couldnt create state struct");
 
@@ -72,6 +77,10 @@ pub fn main() {
             commands::settings::get_config_data,
             commands::settings::update_settings,
             commands::settings::get_methapone_map,
+            commands::settings::load_backup_config,
+            commands::settings::get_logfile_content,
+            commands::settings::get_recovery_codes,
+            commands::settings::change_username
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

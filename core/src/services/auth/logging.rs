@@ -47,13 +47,11 @@ use zeroize::Zeroize;
 
 use crate::{ProgramFiles, errors, utils};
 
-pub fn local_log_in(
-    username: String,
-    password: zeroize::Zeroizing<String>,
-    users_db: &mut rusqlite::Connection,
-    paths: &crate::config::ProgramFiles,
-) -> Result<(uuid::Uuid, crate::config::ProgramFiles, Connection), crate::errors::Error> {
-    check_if_user_exists(&username, users_db)?;
+pub fn autorization(
+    username: &str,
+    password: &str,
+    users_db: &Connection,
+) -> Result<bool, crate::errors::Error> {
     let hash = users_db
         .query_row(
             "SELECT password_hash FROM users_data WHERE username = :username",
@@ -85,7 +83,17 @@ pub fn local_log_in(
     let password_verified = Argon2::default()
         .verify_password(&password.as_bytes(), &password_hash)
         .is_ok();
+    Ok(password_verified)
+}
 
+pub fn local_log_in(
+    username: String,
+    password: zeroize::Zeroizing<String>,
+    users_db: &mut rusqlite::Connection,
+    paths: &crate::config::ProgramFiles,
+) -> Result<(uuid::Uuid, crate::config::ProgramFiles, Connection), crate::errors::Error> {
+    check_if_user_exists(&username, users_db)?;
+    let password_verified = autorization(&username, &password, &users_db)?;
     if password_verified {
         crate::utils::log_helper(
             "logging",
