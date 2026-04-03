@@ -10,6 +10,7 @@ use rusqlite::{Connection, OptionalExtension};
 use std::path::PathBuf;
 //init note after new note clicked and name sumbited
 ///this note init note struct and creates md file
+/// okay when hanlding notes add sync intent: what user wants to happen with note, if it should or shouldn't be encrypted and key_type, with which key its encrypted
 //TODO every note should be encrypted on disk, with same key as in database, title as plaintext should be deleted from sql schema, it should be deriven from constatnt not editable # as first sign in md file (title sign and first line content is title) and name of the note should be changed to uuid of note, to getting note file content should be just export,
 // TODO after function which saves note content manually there should be command which increents activity number in sql database
 // TODO TREAT CRETING NOTE AS EDITING SO RUN ADDING ACTIVITY COUNT AFTER CREATION AND DELETATION look at queries in dashboard to create good insert queries in adding note

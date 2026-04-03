@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import FormCard from '../components/forms/FormCard.vue';
-import FormButtons from '../components/forms/FormButtons.vue';
-import TextInput from '../components/forms/TextInput.vue';
-import { InputTypes } from '../types/inputTypes';
+import FormCard from '../../components/auth/forms/FormCard.vue';
+import TextInput from '../../components/auth/forms/TextInput.vue';
+import { InputTypes } from '../../types/inputTypes';
 import { ref } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import { useRouter } from 'vue-router';
 import { useToast } from 'vue-toastification';
-import { useAuthStore } from '../stores/auth';
+import { useAuthStore } from '../../stores/auth';
+import SubmitButton from '../../components/commons/SubmitButton.vue';
 
 const toast = useToast();
 
@@ -64,15 +64,38 @@ function showTimeout(lengthMs: number) {
 }
 </script>
 <template>
-  <FormCard header-text="Sign in" sub-text="log in to existing offline account">
-    <TextInput :name="'username'" :placeholder="'username'" :type="InputTypes.Text" v-model="username"></TextInput>
-    <TextInput :name="'password'" :placeholder="'password'" :type="InputTypes.Password" v-model="password"></TextInput>
-    <FormButtons :disabled="disabled" :content="'Submit'" @click="submitLogin"></FormButtons>
+  <FormCard
+    header-text="Sign in"
+    sub-text="log in to existing offline account"
+  >
+    <TextInput
+      :name="'username'"
+      :placeholder="'username'"
+      :type="InputTypes.Text"
+      v-model="username"
+    ></TextInput>
+    <TextInput
+      :name="'password'"
+      :placeholder="'password'"
+      :type="InputTypes.Password"
+      v-model="password"
+    ></TextInput>
+    <SubmitButton
+      :disabled="disabled"
+      :content="'Submit'"
+      @click="submitLogin"
+    ></SubmitButton>
 
-    <RouterLink :to="{ name: 'recovery', query: { origin: 'login' } }" class="mt-12 text-note-ivory/80 hover:underline">
+    <RouterLink
+      :to="{ name: 'recovery', query: { origin: 'login' } }"
+      class="mt-12 text-note-ivory/80 hover:underline"
+    >
       Forgot password?
     </RouterLink>
-    <RouterLink to="/register" class="mt-12 text-note-ivory/80 hover:underline">
+    <RouterLink
+      to="/register"
+      class="mt-12 text-note-ivory/80 hover:underline"
+    >
       Do you want to create account?
     </RouterLink>
   </FormCard>

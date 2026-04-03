@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import FormButtons from '../components/forms/FormButtons.vue';
-import FormCard from '../components/forms/FormCard.vue';
+import SubmitButton from '../commons/SubmitButton.vue';
+import FormCard from './forms/FormCard.vue';
 import { useRouter } from 'vue-router';
 const router = useRouter();
 const props = defineProps<{
@@ -21,16 +21,16 @@ function No() {
     header-text="Choose"
     :sub-text="props.subText"
   >
-    <FormButtons
+    <SubmitButton
       content="YES"
       @click="Yes()"
       class="mt-4 h-20 w-48"
-    ></FormButtons>
-    <FormButtons
+    ></SubmitButton>
+    <SubmitButton
       content="NO"
       @click="No()"
       class="h-20 w-48"
-    ></FormButtons>
+    ></SubmitButton>
     <slot></slot>
   </FormCard>
 </template>

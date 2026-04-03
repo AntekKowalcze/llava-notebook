@@ -305,10 +305,11 @@ fn test_changing_user() {
 #[test]
 fn test_creating_device_id() {
     let paths = ProgramFiles::init_in_base().unwrap();
-    let local_conn = crate::services::auth::database_creation::connect_or_create_local_login_db(
-        &paths.local_login_database_path,
-    )
-    .unwrap();
+    let local_conn =
+        crate::services::local_auth::database_creation::connect_or_create_local_login_db(
+            &paths.local_login_database_path,
+        )
+        .unwrap();
     let device_id = get_device_id(&local_conn, &paths.device_id_path).unwrap();
     println!("{}", device_id);
 }

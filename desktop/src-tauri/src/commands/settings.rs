@@ -113,8 +113,8 @@ pub async fn get_recovery_codes(
         .map_err(|_| anyhow!("failed to lock username"))?;
     let username = username_lock.as_ref().ok_or(llava_core::Error::LockError)?;
 
-    if llava_core::auth::autorization(&username, &password, &users_db)? {
-        let codes = llava_core::auth::recovery_code_handling(username, users_db, &password)?;
+    if llava_core::local_auth::autorization(&username, &password, &users_db)? {
+        let codes = llava_core::local_auth::recovery_code_handling(username, users_db, &password)?;
 
         password.zeroize();
         Ok(codes)

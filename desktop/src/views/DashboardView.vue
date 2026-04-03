@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import IconComponent from '../components/IconComponent.vue';
+import IconComponent from '../components/main/IconComponent.vue';
 import noteSvg from '../assets/notepad.svg';
 import { ref } from 'vue';
 import { useAuthStore } from '../stores/auth';

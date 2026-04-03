@@ -132,7 +132,7 @@ pub fn local_log_in(
     //delete session keyring token,
     let user_uuid = uuid::Uuid::parse_str(&user_uuid).context("failed to parse uuid")?;
     change_last_login(users_db, &user_uuid)?;
-    let paths = crate::services::auth::register::after_validation(&user_uuid, paths)?;
+    let paths = crate::services::local_auth::register::after_validation(&user_uuid, paths)?;
     session_operations(&users_db, user_uuid)?;
     let users_db = crate::services::storage::db_creation::get_connection(&paths)?;
     crate::utils::log_helper(
@@ -241,7 +241,8 @@ pub fn log_with_code(
 
             code.zeroize();
             if found > 0 {
-                let paths = crate::services::auth::register::after_validation(&user_id, paths)?;
+                let paths =
+                    crate::services::local_auth::register::after_validation(&user_id, paths)?;
                 session_operations(&users_db, user_id)?;
                 let users_db = crate::services::storage::db_creation::get_connection(&paths)?;
                 decoded.zeroize();
@@ -680,7 +681,7 @@ fn login_test() {
     let password = zeroize::Zeroizing::from("ToJestTest!".to_string());
     let password_r = zeroize::Zeroizing::from("ToJestTest!".to_string());
 
-    crate::services::auth::register::register_user_offline(
+    crate::services::local_auth::register::register_user_offline(
         username.clone(),
         password.clone(),
         password_r,

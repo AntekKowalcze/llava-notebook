@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import FormCard from '../components/forms/FormCard.vue';
-import FormButtons from '../components/forms/FormButtons.vue';
-import TextInput from '../components/forms/TextInput.vue';
-import { InputTypes } from '../types/inputTypes';
+import FormCard from '../../components/auth/forms/FormCard.vue';
+import SubmitButton from '../../components/commons/SubmitButton.vue';
+import TextInput from '../../components/auth/forms/TextInput.vue';
+import { InputTypes } from '../../types/inputTypes';
 import { ref } from 'vue';
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { invoke } from '@tauri-apps/api/core';
-import { useAuthStore } from '../stores/auth';
+import { useAuthStore } from '../../stores/auth';
 
 import { useToast } from 'vue-toastification';
-import TinyError from '../components/forms/TinyError.vue';
+import TinyError from '../../components/auth/forms/TinyError.vue';
 const authStore = useAuthStore();
 const username = authStore.loggedInUsername;
 const router = useRouter();
@@ -66,11 +66,11 @@ async function changePassword() {
       v-if="repeatPassword && !passwordsMatch"
       error-content="Passwords do not match!"
     ></TinyError>
-    <FormButtons
+    <SubmitButton
       :disabled="!canSubmit"
       :content="'Submit'"
       @click="changePassword"
-    ></FormButtons>
+    ></SubmitButton>
     <RouterLink
       to="/loading"
       class="mb-0 mt-8 text-note-ivory/80 hover:underline"

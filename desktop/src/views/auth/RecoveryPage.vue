@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import FormButtons from '../components/forms/FormButtons.vue';
-import FormCard from '../components/forms/FormCard.vue';
-import TextInput from '../components/forms/TextInput.vue';
-import { InputTypes } from '../types/inputTypes';
+import SubmitButton from '../../components/commons/SubmitButton.vue';
+import FormCard from '../../components/auth/forms/FormCard.vue';
+import TextInput from '../../components/auth/forms/TextInput.vue';
+import { InputTypes } from '../../types/inputTypes';
 import { ref } from 'vue';
-import { useAuthStore } from '../stores/auth';
+import { useAuthStore } from '../../stores/auth';
 //logout not redirecting
 import { useRoute } from 'vue-router';
 import { invoke } from '@tauri-apps/api/core';
@@ -19,7 +19,14 @@ const authStore = useAuthStore();
 const originRaw = (route.query.origin as string | undefined) ?? 'login';
 // normalize: allow values like "settings", "/settings", "login" or "/login"
 const originKey = originRaw.replace(/^\/+/, '');
-const originTo = originKey === 'settings' ? '/main/settings' : originKey === 'login' ? '/login' : originRaw.startsWith('/') ? originRaw : `/${originKey}`;
+const originTo =
+  originKey === 'settings'
+    ? '/main/settings'
+    : originKey === 'login'
+      ? '/login'
+      : originRaw.startsWith('/')
+        ? originRaw
+        : `/${originKey}`;
 async function checkCode() {
   try {
     let [userId, one_code] = await invoke<[string, boolean]>('log_with_code', {
@@ -51,12 +58,31 @@ async function checkCode() {
 </script>
 
 <template>
-  <FormCard header-text="Enter recovery key" sub-text="enter the recovery code you received when logging in">
-    <TextInput name="username" placeholder="enter username" :type="InputTypes.Text" v-model="username"></TextInput>
-    <TextInput name="code" placeholder="enter recovery code" :type="InputTypes.Text" class="mb-24 mt-20" v-model="code">
-    </TextInput>
-    <FormButtons content="submit" @click="checkCode"></FormButtons>
-    <RouterLink :to="originTo" class="mb-0 mt-8 text-note-ivory/80 hover:underline">
+  <FormCard
+    header-text="Enter recovery key"
+    sub-text="enter the recovery code you received when logging in"
+  >
+    <TextInput
+      name="username"
+      placeholder="enter username"
+      :type="InputTypes.Text"
+      v-model="username"
+    ></TextInput>
+    <TextInput
+      name="code"
+      placeholder="enter recovery code"
+      :type="InputTypes.Text"
+      class="mb-24 mt-20"
+      v-model="code"
+    ></TextInput>
+    <SubmitButton
+      content="submit"
+      @click="checkCode"
+    ></SubmitButton>
+    <RouterLink
+      :to="originTo"
+      class="mb-0 mt-8 text-note-ivory/80 hover:underline"
+    >
       Go back
     </RouterLink>
   </FormCard>

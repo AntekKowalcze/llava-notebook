@@ -3,21 +3,22 @@
 mod config;
 mod constants;
 mod errors;
+mod migrations;
 mod models;
 mod services;
 mod utils;
 
-pub mod auth {
-    pub use crate::services::auth::database_creation::connect_or_create_local_login_db;
-    pub use crate::services::auth::logging::SessionState;
-    pub use crate::services::auth::logging::{
+pub mod local_auth {
+    pub use crate::services::local_auth::database_creation::connect_or_create_local_login_db;
+    pub use crate::services::local_auth::logging::SessionState;
+    pub use crate::services::local_auth::logging::{
         autorization, change_last_login, check_error_count, check_if_user_logged_in, get_timeout,
         local_log_in, local_logout, log_with_code, zero_error_count,
     };
-    pub use crate::services::auth::register::{
+    pub use crate::services::local_auth::register::{
         change_password, recovery_code_handling, register_user_offline,
     };
-    pub use crate::services::auth::utils::check_if_first_start;
+    pub use crate::services::local_auth::utils::check_if_first_start;
 }
 
 pub mod storage {

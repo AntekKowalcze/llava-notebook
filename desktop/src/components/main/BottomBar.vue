@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useUserConfigStore } from '../stores/userConfig';
+import { useUserConfigStore } from '../../stores/userConfig';
 const userConfig = useUserConfigStore();
 const encrypted = computed(() => {
   return userConfig.config['local.encryption'];

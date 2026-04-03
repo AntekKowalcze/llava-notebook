@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import YesNoChoosePage from '../components/YesNoChoosePage.vue';
+import YesNoChoosePage from '../../components/auth/YesNoChoosePage.vue';
 const yesLink = '/loading';
 const noLink = '/main/';
 </script>

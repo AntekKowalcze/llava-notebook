@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import FormCard from '../components/forms/FormCard.vue';
-import FormButtons from '../components/forms/FormButtons.vue';
+import FormCard from '../../components/auth/forms/FormCard.vue';
+import SubmitButton from '../../components/commons/SubmitButton.vue';
 import { useToast } from 'vue-toastification';
 import { useRouter } from 'vue-router';
 import { onMounted, ref } from 'vue';
-import { useAuthStore } from '../stores/auth';
+import { useAuthStore } from '../../stores/auth';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 
 const authStore = useAuthStore();
@@ -55,22 +55,41 @@ async function CopyToClipboard() {
 </script>
 
 <template>
-  <FormCard header-text="Recovery Codes"
-    sub-text="These are yours recovery codes, save them if so you can restore your account then">
-    <ul class="min-h-[16rem] list-outside list-disc space-y-3 pl-6 text-note-pumice marker:text-note-paprika">
-      <li v-if="!keys.length" class="text-note-pumice marker:text-note-paprika">
+  <FormCard
+    header-text="Recovery Codes"
+    sub-text="These are yours recovery codes, save them if so you can restore your account then"
+  >
+    <ul
+      class="min-h-[16rem] list-outside list-disc space-y-3 pl-6 text-note-pumice marker:text-note-paprika"
+    >
+      <li
+        v-if="!keys.length"
+        class="text-note-pumice marker:text-note-paprika"
+      >
         Generating codes…
       </li>
 
-      <li v-else v-for="key in keys" :key="key" class="font-mono tracking-widest">
+      <li
+        v-else
+        v-for="key in keys"
+        :key="key"
+        class="font-mono tracking-widest"
+      >
         {{ key }}
       </li>
     </ul>
 
     <div class="flex w-80 flex-row justify-between">
-      <FormButtons :content="'Copy'" @click="CopyToClipboard" :disabled="!areCodesShown"></FormButtons>
+      <SubmitButton
+        :content="'Copy'"
+        @click="CopyToClipboard"
+        :disabled="!areCodesShown"
+      ></SubmitButton>
 
-      <FormButtons :content="'Next'" @click="next"></FormButtons>
+      <SubmitButton
+        :content="'Next'"
+        @click="next"
+      ></SubmitButton>
     </div>
   </FormCard>
 </template>

@@ -11,12 +11,12 @@ fn program_flow() {
 
     let _logger_worker = llava_core::configure_logger(&program_paths.logs_path)
         .expect("failed creating logger guard");
-    let mut local_login_db_conn = llava_core::auth::connect_or_create_local_login_db(
+    let mut local_login_db_conn = llava_core::local_auth::connect_or_create_local_login_db(
         &program_paths.local_login_database_path,
     )
     .expect("failed creating local user db");
 
-    llava_core::auth::register_user_offline(
+    llava_core::local_auth::register_user_offline(
         "test".to_string(),
         Zeroizing::from("ZAQ!2wsx".to_string()),
         Zeroizing::from("ZAQ!2wsx".to_string()),
@@ -37,7 +37,7 @@ fn program_flow() {
         .unwrap_or(false);
     assert!(user_exists, "User should exist in local DB");
 
-    let (current_user, program_paths, mut note_db_conn) = llava_core::auth::local_log_in(
+    let (current_user, program_paths, mut note_db_conn) = llava_core::local_auth::local_log_in(
         "test".to_string(),
         Zeroizing::from("ZAQ!2wsx".to_string()),
         &mut local_login_db_conn,
@@ -52,7 +52,7 @@ fn program_flow() {
         .current_user
         .lock()
         .expect("failed to lock")
-        .ok_or(crate::errors::Error::CurrentUserNotFound)
+        // .ok_or(crate::errors::Error::CurrentUserNotFound)
         .expect("failed to read owner_id");
 
     llava_core::storage::add_note_to_database(

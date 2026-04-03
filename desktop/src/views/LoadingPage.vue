@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core';
-import LoadingCircle from '../components/LoadingCircle.vue';
+import LoadingCircle from '../components/main/LoadingCircle.vue';
 
-import IconComponent from '../components/IconComponent.vue';
+import IconComponent from '../components/main/IconComponent.vue';
 //LOGOUT LOGIC
-import FormButtons from '../components/forms/FormButtons.vue';
+import SubmitButton from '../components/commons/SubmitButton.vue';
 import { useAuthStore } from '../stores/auth';
 import { useToast } from 'vue-toastification';
 import { useRouter } from 'vue-router';
@@ -29,12 +29,33 @@ async function logout() {
 </script>
 
 <template>
-  <IconComponent :height="'44'" :width="'44'"></IconComponent>
+  <IconComponent
+    :height="'44'"
+    :width="'44'"
+  ></IconComponent>
   <LoadingCircle />
   <!-- LOGOUT -->
-  <FormButtons :disabled="false" :content="buttonContent" @click="logout"></FormButtons>
-  <FormButtons :disabled="false" :content="'go to settings'" @click="() => { router.replace('/main/settings') }">
-  </FormButtons>
-  <FormButtons :disabled="false" :content="'go to dashboard'" @click="() => { router.replace('/main/dashboard') }">
-  </FormButtons>
+  <SubmitButton
+    :disabled="false"
+    :content="buttonContent"
+    @click="logout"
+  ></SubmitButton>
+  <SubmitButton
+    :disabled="false"
+    :content="'go to settings'"
+    @click="
+      () => {
+        router.replace('/main/settings');
+      }
+    "
+  ></SubmitButton>
+  <SubmitButton
+    :disabled="false"
+    :content="'go to dashboard'"
+    @click="
+      () => {
+        router.replace('/main/dashboard');
+      }
+    "
+  ></SubmitButton>
 </template>

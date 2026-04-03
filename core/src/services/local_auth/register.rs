@@ -48,13 +48,16 @@ pub fn register_user_offline(
     let notes_key: chacha20poly1305::Key = ChaCha20Poly1305::generate_key(&mut OsRng); //Creating of chacha poly key for encrypting notes
     let (password_hash, salt, encrypted_notes_key, nonce_for_key_wrap) =
         generate_enctypted_keys(password, notes_key)?;
-    let new_user = crate::services::auth::auth_data_models::local_user::LocalUser {
+    let new_user = crate::services::local_auth::auth_data_models::local_user::LocalUser {
         user_id: uuid::Uuid::new_v4(),
         username: username,
         password_hash: password_hash, //SALT ALREADY IN PHC STRING
         notes_key: encrypted_notes_key,
         nonce_notes_key: nonce_for_key_wrap,
         kek_salt: salt,
+        master_key_enc: None,
+        master_key_nonce: None,
+        master_kek_salt: None,
         is_online_linked: false,
         online_account_email: None,
         device_id: crate::config::get_device_id(&users_db, &paths.device_id_path)?,
@@ -72,19 +75,22 @@ pub fn register_user_offline(
         LOCAL_USER_DB_INSERT_SQL_SCHEMA,
         rusqlite::named_params! {
         ":user_id": new_user.user_id.to_string(),
-         ":username":new_user.username ,
-         ":password_hash":new_user.password_hash,
-         ":notes_key":new_user.notes_key,
-         ":nonce_notes_key":new_user.nonce_notes_key,
-         ":kek_salt": new_user.kek_salt,
-         ":is_online_linked": new_user.is_online_linked,
-         ":online_account_email":new_user.online_account_email,
-         ":device_id": new_user.device_id.to_string(),
-         ":created_at":new_user.created_at,
-         ":last_login":new_user.last_login,
-         ":password_errors":new_user.password_errors,
-         ":ending_block_timestamp":new_user.ending_block_timestamp,//timestamp
-          },
+        ":username":new_user.username ,
+        ":password_hash":new_user.password_hash,
+        ":notes_key":new_user.notes_key,
+        ":nonce_notes_key":new_user.nonce_notes_key,
+        ":master_key_enc": new_user.master_key_enc,
+        ":master_key_nonce": new_user.master_key_nonce,
+        ":master_kek_salt": new_user.master_kek_salt,
+        ":kek_salt": new_user.kek_salt,
+        ":is_online_linked": new_user.is_online_linked,
+        ":online_account_email":new_user.online_account_email,
+        ":device_id": new_user.device_id.to_string(),
+        ":created_at":new_user.created_at,
+        ":last_login":new_user.last_login,
+        ":password_errors":new_user.password_errors,
+        ":ending_block_timestamp":new_user.ending_block_timestamp,//timestamp
+         },
     )
     .context("Couldnt insert user into database, transaction failed while registering a user")?;
     tx.commit().context(
@@ -101,7 +107,7 @@ pub fn register_user_offline(
     let codes = recovery_code_handling(&new_user.username, users_db, password)?; //get recovery codes as strings
 
     let paths = after_validation(&new_user.user_id, paths)?;
-    crate::services::auth::logging::session_operations(&users_db, new_user.user_id)?;
+    crate::services::local_auth::logging::session_operations(&users_db, new_user.user_id)?;
     let users_db = crate::services::storage::db_creation::get_connection(&paths)?; //get connection for note database
     Ok((new_user.user_id, paths, users_db, codes))
 }

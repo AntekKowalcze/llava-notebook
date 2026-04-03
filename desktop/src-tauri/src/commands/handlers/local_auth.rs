@@ -17,7 +17,7 @@ pub fn register(
     let password_zeroized = Zeroizing::from(password);
     let password_repeated_zeroized = Zeroizing::from(password_repeated);
 
-    llava_core::auth::register_user_offline(
+    llava_core::local_auth::register_user_offline(
         username,
         password_zeroized,
         password_repeated_zeroized,
@@ -34,12 +34,12 @@ pub fn login(
 ) -> Result<(uuid::Uuid, llava_core::ProgramFiles, rusqlite::Connection), llava_core::Error> {
     let password_zeroized = Zeroizing::from(password);
 
-    llava_core::auth::local_log_in(username.clone(), password_zeroized, users_db, paths).map_err(
-        |e| match &e {
+    llava_core::local_auth::local_log_in(username.clone(), password_zeroized, users_db, paths)
+        .map_err(|e| match &e {
             llava_core::Error::WrongPassword => {
                 if let Ok(user_uuid) = llava_core::get_user_uuid(users_db, &username) {
                     if let Ok(end_of_timeout) =
-                        llava_core::auth::check_error_count(users_db, &user_uuid)
+                        llava_core::local_auth::check_error_count(users_db, &user_uuid)
                     {
                         if end_of_timeout > llava_core::get_time() {
                             let timeout_duration = end_of_timeout - llava_core::get_time();
@@ -50,8 +50,7 @@ pub fn login(
                 e
             }
             _ => llava_core::Error::FatalError,
-        },
-    )
+        })
 }
 
 pub fn log_with_code(
@@ -61,7 +60,7 @@ pub fn log_with_code(
     users_db: &rusqlite::Connection,
 ) -> Result<(llava_core::ProgramFiles, rusqlite::Connection, bool), llava_core::Error> {
     let user_uuid = llava_core::get_user_uuid(users_db, username)?;
-    llava_core::auth::log_with_code(paths, code, users_db, user_uuid)
+    llava_core::local_auth::log_with_code(paths, code, users_db, user_uuid)
 }
 
 pub fn check_timeout(
@@ -73,7 +72,7 @@ pub fn check_timeout(
         _ => llava_core::Error::FatalError,
     })?;
 
-    match llava_core::auth::get_timeout(users_db, &user_uuid) {
+    match llava_core::local_auth::get_timeout(users_db, &user_uuid) {
         Ok(end_of_timeout) => {
             if end_of_timeout > llava_core::get_time() {
                 Ok(end_of_timeout - llava_core::get_time())

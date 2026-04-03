@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, watchEffect } from 'vue';
 import { computed } from 'vue';
-import iconHidden from '../../assets/inputs/password_hidden.png';
-import iconShown from '../../assets/inputs/password_shown.png';
-import { InputTypes } from '../../types/inputTypes';
-import { type Input } from '../../types/inputTypes';
+import iconHidden from '../../../assets/inputs/password_hidden.png';
+import iconShown from '../../../assets/inputs/password_shown.png';
+import { InputTypes } from '../../../types/inputTypes';
+import { type Input } from '../../../types/inputTypes';
 let props = defineProps<Input>();
 const isValid = defineModel<boolean>('isValid');
 const inputValue = defineModel<string>({ default: '' });

@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { computed } from 'vue';
-import TextInput from '../components/forms/TextInput.vue';
-import { InputTypes } from '../types/inputTypes';
-import FormButtons from '../components/forms/FormButtons.vue';
-import FormCard from '../components/forms/FormCard.vue';
-import TinyError from '../components/forms/TinyError.vue';
+import TextInput from '../../components/auth/forms/TextInput.vue';
+import { InputTypes } from '../../types/inputTypes';
+import SubmitButton from '../../components/commons/SubmitButton.vue';
+import FormCard from '../../components/auth/forms/FormCard.vue';
+import TinyError from '../../components/auth/forms/TinyError.vue';
 import { invoke } from '@tauri-apps/api/core';
 import { useRouter } from 'vue-router';
-import { useAuthStore } from '../stores/auth';
+import { useAuthStore } from '../../stores/auth';
 import { RouterLink } from 'vue-router';
 import { useToast } from 'vue-toastification';
-import LoadingCircle from '../components/LoadingCircle.vue';
+import LoadingCircle from '../../components/main/LoadingCircle.vue';
 const authStore = useAuthStore();
 const router = useRouter();
 const username = ref<string>('');
@@ -109,11 +109,11 @@ async function submitRegister() {
         error-content="Username to short!"
         class="mt-2"
       ></TinyError>
-      <FormButtons
+      <SubmitButton
         :disabled="!canSubmit"
         :content="'Submit'"
         @click="submitRegister"
-      ></FormButtons>
+      ></SubmitButton>
       <RouterLink
         to="/login"
         class="mb-0 mt-8 text-note-ivory/80 hover:underline"

@@ -35,6 +35,9 @@ pub const LOGS_PATH: &str = "llava/logs/app.log";
 
 //register.rs
 //SQL
+
+pub const NOTES_DB_VERSION: i64 = 0;
+pub const USERS_DB_VERSION: i64 = 1;
 pub const LOCAL_USER_DB_INSERT_SQL_SCHEMA: &str = r#"INSERT INTO users_data (
                 user_id,
                 username,
@@ -42,6 +45,9 @@ pub const LOCAL_USER_DB_INSERT_SQL_SCHEMA: &str = r#"INSERT INTO users_data (
                 notes_key,
                 nonce_notes_key,
                 kek_salt,
+                master_key_enc,
+                master_key_nonce,
+                master_kek_salt,
                 is_online_linked,
                 online_account_email, 
                 device_id, 
@@ -56,6 +62,9 @@ pub const LOCAL_USER_DB_INSERT_SQL_SCHEMA: &str = r#"INSERT INTO users_data (
                 :notes_key, 
                 :nonce_notes_key,
                 :kek_salt, 
+                :master_key_enc,
+                :master_key_nonce,
+                :master_kek_salt,
                 :is_online_linked, 
                 :online_account_email, 
                 :device_id, 
@@ -194,6 +203,9 @@ pub const LOCAL_LOGIN_DB_SCHEMA: &str = r#" CREATE TABLE IF NOT EXISTS users_dat
                         notes_key BLOB NOT NULL,
                         nonce_notes_key BLOB NOT NULL,
                         kek_salt STRING,
+                        master_key_enc BLOB,
+                        master_key_nonce BLOB,
+                        master_kek_salt TEXT,
                         is_online_linked INTEGER NOT NULL DEFAULT 0, 
                         online_account_email TEXT DEFAULT NULL, 
                         device_id TEXT NOT NULL,

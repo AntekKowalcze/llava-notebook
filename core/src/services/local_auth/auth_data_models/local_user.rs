@@ -7,9 +7,14 @@ pub struct LocalUser {
     pub user_id: uuid::Uuid,
     pub username: String,
     pub password_hash: String, //hashed
+    // LOCAL ENCRYPTION
     pub notes_key: Vec<u8>,
     pub nonce_notes_key: Vec<u8>,
     pub kek_salt: String,
+    //ONLINE ENCRYPTION
+    pub master_key_enc: Option<Vec<u8>>,
+    pub master_key_nonce: Option<Vec<u8>>,
+    pub master_kek_salt: Option<String>,
     pub is_online_linked: bool,
     pub online_account_email: Option<String>,
     #[zeroize(skip)]
@@ -39,3 +44,5 @@ pub struct LocalUser {
 
 // index on user name
 //
+//TODO 1. edit this model and entire register for adding new key, online key, which will be used to encrypt notes, which has to be stored online, or decrypt notes from cloud when we do not have internet access
+// this fileds should also be wrapped with kek later.

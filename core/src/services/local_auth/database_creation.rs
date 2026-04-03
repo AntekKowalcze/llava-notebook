@@ -15,6 +15,7 @@
 //! - `anyhow` — `.context()` error propagation
 
 use crate::constants::LOCAL_LOGIN_DB_SCHEMA;
+use crate::migrations::migration::run_users_migration;
 use crate::utils::{Format, log_helper};
 use anyhow::Context;
 //llava/users/local_login_db.sqlite
@@ -53,6 +54,7 @@ pub fn connect_or_create_local_login_db(
         .context("Couldnt create database of local users in database creation")?;
     tx.commit()
         .context("Couldnt create local login db, couldnt commit transaction")?;
+    run_users_migration(&local_login_conn).context("failed while running users db migration")?;
     log_helper::<String>(
         "creation of database",
         "success",

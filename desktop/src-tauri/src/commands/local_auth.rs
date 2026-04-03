@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Context};
-use llava_core::auth::SessionState;
+use llava_core::local_auth::SessionState;
 use llava_core::AppState;
 use tauri::AppHandle;
 use tauri::Emitter;
@@ -24,7 +24,7 @@ pub async fn register_command(
         let paths = paths_guard.as_ref().ok_or(llava_core::Error::LockError)?;
         let users_db = conn_guard.as_mut().ok_or(llava_core::Error::LockError)?;
 
-        crate::commands::handlers::auth::register(
+        crate::commands::handlers::local_auth::register(
             username.clone(),
             password,
             password_repeated,
@@ -73,7 +73,7 @@ pub async fn login_command(
         let users_db = conn_guard.as_mut().ok_or(llava_core::Error::LockError)?;
         let paths = paths_guard.as_ref().ok_or(llava_core::Error::LockError)?;
 
-        crate::commands::handlers::auth::login(username.clone(), password, paths, users_db)?
+        crate::commands::handlers::local_auth::login(username.clone(), password, paths, users_db)?
     };
 
     {
@@ -82,7 +82,7 @@ pub async fn login_command(
             .lock()
             .map_err(|_| anyhow!("failed to lock users_db"))?;
         let users_db = conn_guard.as_mut().ok_or(llava_core::Error::LockError)?;
-        llava_core::auth::zero_error_count(users_db, &new_uuid)?;
+        llava_core::local_auth::zero_error_count(users_db, &new_uuid)?;
     }
 
     let user_config = llava_core::settings::get_config_for_state(&new_paths)?;
@@ -113,7 +113,7 @@ pub async fn check_if_user_exists(
         .map_err(|_| anyhow!("Failed to lock AppState.paths"))?;
     let users_db: &mut rusqlite::Connection =
         conn_guard.as_mut().ok_or(llava_core::Error::LockError)?;
-    llava_core::auth::check_if_first_start(users_db)
+    llava_core::local_auth::check_if_first_start(users_db)
 }
 
 #[tauri::command]
@@ -142,7 +142,7 @@ pub async fn log_with_code(
 
         let user_uuid = llava_core::get_user_uuid(users_db, &username)?;
         let (paths, notes_conn, one_code) =
-            crate::commands::handlers::auth::log_with_code(code, &username, paths, users_db)?;
+            crate::commands::handlers::local_auth::log_with_code(code, &username, paths, users_db)?;
 
         (user_uuid, paths, notes_conn, one_code)
     };
@@ -176,7 +176,7 @@ pub async fn check_timeout_before_submit(
         .map_err(|_| anyhow!("failed to lock users_db"))?;
     let users_db = conn_guard.as_ref().ok_or(llava_core::Error::LockError)?;
 
-    crate::commands::handlers::auth::check_timeout(&username, users_db)
+    crate::commands::handlers::local_auth::check_timeout(&username, users_db)
 }
 #[tauri::command]
 pub async fn change_password(
@@ -192,7 +192,7 @@ pub async fn change_password(
         .lock()
         .map_err(|_| anyhow!("failed to get users_db from state"))?;
     let user_db = user_db_guard.as_ref().ok_or(llava_core::Error::LockError)?;
-    llava_core::auth::change_password(user_db, username, password, password_repeated, code)?;
+    llava_core::local_auth::change_password(user_db, username, password, password_repeated, code)?;
     Ok(())
 }
 
@@ -217,7 +217,7 @@ pub async fn check_login_on_start(
             .clone()
     };
     let is_logged_in: SessionState =
-        llava_core::auth::check_if_user_logged_in(users_db, &program_files)?;
+        llava_core::local_auth::check_if_user_logged_in(users_db, &program_files)?;
 
     if let SessionState::LoggedIn { user_id } = &is_logged_in {
         let parsed_user_uuid =
@@ -277,6 +277,6 @@ pub async fn local_logout_command(
         .lock()
         .map_err(|_| anyhow!("Cannot lock state"))?;
     let paths = paths_guard.as_ref().ok_or(llava_core::Error::LockError)?;
-    llava_core::auth::local_logout(user_uuid, users_db, paths)?;
+    llava_core::local_auth::local_logout(user_uuid, users_db, paths)?;
     Ok(())
 }

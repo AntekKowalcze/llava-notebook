@@ -22,7 +22,7 @@ const router = useRouter();
 const settingList = ref<UserConfig | null>(null);
 const cardSettings = ref<Setting[]>([]);
 const username = ref<string | null>(authStore.loggedInUsername);
-const newUsername = ref<string>("")
+const newUsername = ref<string>('');
 const id = authStore.loggedInUserId;
 const showFilter = ref<boolean>(false);
 let filters = ['local', 'local.core', 'local.danger', 'online', 'online.core', 'online.ai'];
@@ -31,13 +31,13 @@ let settingsToShow: string[]; //list of setting ids got from metaphone
 let previousSearchTextLength: number = 0;
 let metaphoneCache: string[][] = [];
 let metaphoneMap: Record<string, string[]>;
-let showLogs = ref<boolean>(false)
-const logContents = ref<string>("")
-const showPasswordInput = ref<boolean>(false)
-const showUsernameInput = ref<boolean>(false)
-const passwordResolver = ref<((value: string | null) => void) | null>(null)
-const usernameLoading = ref<boolean>(false)
-const codesLoading = ref<boolean>(false)
+let showLogs = ref<boolean>(false);
+const logContents = ref<string>('');
+const showPasswordInput = ref<boolean>(false);
+const showUsernameInput = ref<boolean>(false);
+const passwordResolver = ref<((value: string | null) => void) | null>(null);
+const usernameLoading = ref<boolean>(false);
+const codesLoading = ref<boolean>(false);
 function search() {
   if (settingList.value == null) return;
   if (searchText.value.length == 0) {
@@ -153,17 +153,17 @@ async function handleChange(id: string, value: string) {
     toast.error('Failed to save config');
   }
   await handleUpdate(id);
-  let element = cardSettings.value.find((el) => el.id == id)
-  let index = cardSettings.value.findIndex((el) => el.id == id)
+  let element = cardSettings.value.find((el) => el.id == id);
+  let index = cardSettings.value.findIndex((el) => el.id == id);
   if (cardSettings.value[index] && element) {
-    element.currentValue = value
-    cardSettings.value[index] = element
+    element.currentValue = value;
+    cardSettings.value[index] = element;
   }
 }
 async function handleUpdate(id: string) {
-  console.log(id)
+  console.log(id);
   switch (id) {
-    case "local.logout": {
+    case 'local.logout': {
       try {
         await invoke<void>('local_logout_command', { userUuid: authStore.loggedInUserId });
         authStore.$patch({
@@ -178,76 +178,72 @@ async function handleUpdate(id: string) {
       }
       break;
     }
-    case "local.loadConfigBackup": {
+    case 'local.loadConfigBackup': {
       try {
-        await invoke<void>('load_backup_config')
+        await invoke<void>('load_backup_config');
         const [userConfig, _isDefault] = await invoke<[UserConfig, boolean]>('get_config_data');
         settingList.value = userConfig;
-        initVisibility(settingList.value.sections)
-        initSettingVisibility(settingList.value.sections, true)
+        initVisibility(settingList.value.sections);
+        initSettingVisibility(settingList.value.sections, true);
 
-        toast.success("backup loaded successfully")
-
+        toast.success('backup loaded successfully');
       } catch (err) {
-        console.log(err)
-        toast.error("failed to load backup config")
+        console.log(err);
+        toast.error('failed to load backup config');
       }
       break;
     }
-    case "local.showLogs": {
+    case 'local.showLogs': {
       try {
-        logContents.value = await invoke<string>('get_logfile_content')
-        showLogs.value = true
-
-
+        logContents.value = await invoke<string>('get_logfile_content');
+        showLogs.value = true;
       } catch (err) {
-        console.log(err)
-        toast.error("failed to show logs")
+        console.log(err);
+        toast.error('failed to show logs');
       }
       break;
     }
-    case "local.generateRecoveryCodes": {
+    case 'local.generateRecoveryCodes': {
       try {
-        const pwd = await askForPassword()
-        if (!pwd) return
-        codesLoading.value = true
-        const codes = await invoke<string[]>('get_recovery_codes', { password: pwd })
-        codesLoading.value = false
-        passwordResolver.value?.(null)
-        passwordResolver.value = null
+        const pwd = await askForPassword();
+        if (!pwd) return;
+        codesLoading.value = true;
+        const codes = await invoke<string[]>('get_recovery_codes', { password: pwd });
+        codesLoading.value = false;
+        passwordResolver.value?.(null);
+        passwordResolver.value = null;
         let codeString = codes.join('\n');
-        await writeText(codeString)
+        await writeText(codeString);
         toast.success(
           'Codes copied successfully, remember, never show codes to other people and store them in encrypted places',
           { timeout: 10000 }
         );
-        codesLoading.value = false
-        showPasswordInput.value = false
+        codesLoading.value = false;
+        showPasswordInput.value = false;
       } catch (err) {
-        codesLoading.value = false
-        console.log(err)
+        codesLoading.value = false;
+        console.log(err);
 
-        toast.error("failed to generate codes")
+        toast.error('failed to generate codes');
       }
       break;
     }
-    case "local.changeUsername": {
+    case 'local.changeUsername': {
       try {
         showUsernameInput.value = true;
       } catch (err) {
-        showUsernameInput.value = false
-        newUsername.value = ""
-        console.log(err)
-        toast.error("failed to change username")
+        showUsernameInput.value = false;
+        newUsername.value = '';
+        console.log(err);
+        toast.error('failed to change username');
       }
       break;
     }
-    case "local.changePassword": {
-      router.replace({ name: 'recovery', query: { origin: 'settings' } })
+    case 'local.changePassword': {
+      router.replace({ name: 'recovery', query: { origin: 'settings' } });
     }
   }
 }
-
 
 function findAndUpdate(sections: Section[], id: string, value: string): boolean {
   for (const section of sections) {
@@ -325,43 +321,41 @@ function hide() {
   }
 }
 function closeLogs() {
-  showLogs.value = false
+  showLogs.value = false;
 }
-
 
 function askForPassword(): Promise<string | null> {
-  showPasswordInput.value = true
+  showPasswordInput.value = true;
   return new Promise((resolve) => {
-    passwordResolver.value = resolve
-  })
-
+    passwordResolver.value = resolve;
+  });
 }
 function handlePassword(p: string) {
-  passwordResolver.value?.(p)
-  passwordResolver.value = null
+  passwordResolver.value?.(p);
+  passwordResolver.value = null;
 }
 
 function handlePasswordCancel() {
-  showPasswordInput.value = false
-  passwordResolver.value?.(null)
-  passwordResolver.value = null
+  showPasswordInput.value = false;
+  passwordResolver.value?.(null);
+  passwordResolver.value = null;
 }
 
 async function handleUsername(newUsername: string) {
-  usernameLoading.value = true
-  await invoke<void>("change_username", { newUsername: newUsername })
-  if (!username) return
-  username.value = newUsername
+  usernameLoading.value = true;
+  await invoke<void>('change_username', { newUsername: newUsername });
+  if (!username) return;
+  username.value = newUsername;
   authStore.$patch({
-    loggedInUsername: newUsername
+    loggedInUsername: newUsername,
   });
-  usernameLoading.value = false
-  showUsernameInput.value = false
-  return
+  usernameLoading.value = false;
+  showUsernameInput.value = false;
+  return;
 }
 function handleUsernameCancel() {
-  showUsernameInput.value = false
-  newUsername.value = ""
+  showUsernameInput.value = false;
+  newUsername.value = '';
 }
 </script>
 
@@ -369,27 +363,39 @@ function handleUsernameCancel() {
   <div class="relative flex h-screen flex-col overflow-hidden px-[10%]">
     <ArrowBigLeftDash
       class="absolute left-[2%] top-[93%] text-note-paprika/80 transition-transform duration-200 hover:scale-95"
-      @click="redirect" />
+      @click="redirect"
+    />
 
-    <LogPreview v-if="showLogs" class="absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]"
-      :log-content="logContents" @close-logs="closeLogs()"></LogPreview>
+    <LogPreview
+      v-if="showLogs"
+      class="absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]"
+      :log-content="logContents"
+      @close-logs="closeLogs()"
+    ></LogPreview>
 
-    <PasswordInput :loading="codesLoading" v-if="showPasswordInput"
-      class="absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]" @submit-password="handlePassword"
-      @cancel-password="handlePasswordCancel">
-    </PasswordInput>
+    <PasswordInput
+      :loading="codesLoading"
+      v-if="showPasswordInput"
+      class="absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]"
+      @submit-password="handlePassword"
+      @cancel-password="handlePasswordCancel"
+    ></PasswordInput>
 
-    <ChangeUsername :loading="usernameLoading" v-if="showUsernameInput"
-      class="absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]" @submit-username="handleUsername"
-      @cancel-username="handleUsernameCancel">
-    </ChangeUsername>
-
+    <ChangeUsername
+      :loading="usernameLoading"
+      v-if="showUsernameInput"
+      class="absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]"
+      @submit-username="handleUsername"
+      @cancel-username="handleUsernameCancel"
+    ></ChangeUsername>
 
     <header class="shrink-0 pb-4 pt-8">
       <div class="flex items-start justify-between gap-8">
         <div class="flex h-[27vh] min-h-60 flex-col justify-between">
           <div class="flex flex-col">
-            <h1 class="text-4xl font-semibold tracking-tight text-note-ivory lg:text-5xl xl:text-6xl">
+            <h1
+              class="text-4xl font-semibold tracking-tight text-note-ivory lg:text-5xl xl:text-6xl"
+            >
               Settings of
               <span class="text-note-paprika">{{ username }}</span>
             </h1>
@@ -397,20 +403,28 @@ function handleUsernameCancel() {
           </div>
 
           <span
-            class="flex h-10 w-80 items-center rounded-md border-2 border-note-pumice/50 bg-black/40 p-2 transition duration-1000 ease-out focus-within:border-note-paprika/80 focus-within:bg-black/60">
+            class="flex h-10 w-80 items-center rounded-md border-2 border-note-pumice/50 bg-black/40 p-2 transition duration-1000 ease-out focus-within:border-note-paprika/80 focus-within:bg-black/60"
+          >
             <input
               class="w-[90%] select-none bg-note-graphite text-note-ivory outline-none transition duration-1000 ease-out placeholder:text-note-pumice/70 focus:border-transparent focus:bg-black/50 focus:shadow-none focus:outline-none focus:ring-0"
-              type="text" placeholder="Search..." @input="search" @blur="handleBlur" v-model="searchText"
-              @focus="hide" />
+              type="text"
+              placeholder="Search..."
+              @input="search"
+              @blur="handleBlur"
+              v-model="searchText"
+              @focus="hide"
+            />
             <Search class="ml-2 shrink-0 text-note-paprika" />
           </span>
         </div>
 
         <div
-          class="flex h-[27vh] min-h-60 w-[28%] min-w-56 shrink-0 flex-col rounded-xl border border-note-pumice/20 bg-note-graphite/80 px-4 py-4">
+          class="flex h-[27vh] min-h-60 w-[28%] min-w-56 shrink-0 flex-col rounded-xl border border-note-pumice/20 bg-note-graphite/80 px-4 py-4"
+        >
           <div class="mb-4 flex items-center gap-2">
             <div
-              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-note-paprika/20 text-note-glow">
+              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-note-paprika/20 text-note-glow"
+            >
               <InfoIcon class="h-4 w-4" />
             </div>
             <div class="flex min-w-0 flex-col">
@@ -422,13 +436,20 @@ function handleUsernameCancel() {
           </div>
 
           <div
-            class="flex flex-1 flex-col justify-between overflow-hidden rounded-lg border border-note-pumice/10 bg-black/40 px-3 py-2">
-            <button v-for="setting in cardSettings" :key="setting.id" type="button"
-              class="flex w-full items-center rounded-md px-2 py-1.5 text-xs text-note-pumice/80 transition-colors hover:bg-black/50 hover:text-note-ivory">
+            class="flex flex-1 flex-col justify-between overflow-hidden rounded-lg border border-note-pumice/10 bg-black/40 px-3 py-2"
+          >
+            <button
+              v-for="setting in cardSettings"
+              :key="setting.id"
+              type="button"
+              class="flex w-full items-center rounded-md px-2 py-1.5 text-xs text-note-pumice/80 transition-colors hover:bg-black/50 hover:text-note-ivory"
+            >
               <span class="flex flex-1 justify-start">{{ setting.label }}</span>
               <span class="flex flex-1 justify-center">{{ setting.currentValue }}</span>
-              <span @click="goToSetting(setting.id)"
-                class="flex flex-1 justify-end text-[11px] uppercase tracking-wide text-note-paprika">
+              <span
+                @click="goToSetting(setting.id)"
+                class="flex flex-1 justify-end text-[11px] uppercase tracking-wide text-note-paprika"
+              >
                 go to setting
               </span>
             </button>
@@ -440,25 +461,39 @@ function handleUsernameCancel() {
     <ScreenDeviderHorizontal class="shrink-0" />
 
     <div class="mb-2 mt-4 flex shrink-0">
-      <Funnel class="text-note-pumice/90 transition duration-500 ease-out hover:text-note-paprika"
-        @click="showFilters" />
+      <Funnel
+        class="text-note-pumice/90 transition duration-500 ease-out hover:text-note-paprika"
+        @click="showFilters"
+      />
       <template v-if="showFilter">
-        <div v-for="filter in filters" :key="filter" class="ml-4 flex h-fit w-44 border-note-ivory">
-          <CheckboxInput :checked="getElementVisibility(settingList!.sections, filter) ?? true" :id="filter"
+        <div
+          v-for="filter in filters"
+          :key="filter"
+          class="ml-4 flex h-fit w-44 border-note-ivory"
+        >
+          <CheckboxInput
+            :checked="getElementVisibility(settingList!.sections, filter) ?? true"
+            :id="filter"
             @visibility-changed="
               (id, value) => {
                 handleVisibilityChange(id, value);
               }
-            "></CheckboxInput>
+            "
+          ></CheckboxInput>
         </div>
       </template>
     </div>
 
     <main class="my-4 flex min-h-0 flex-1 flex-col gap-4 pb-6">
       <div
-        class="scrollbar-none min-h-0 w-full flex-1 overflow-y-auto rounded-xl border border-note-pumice/40 bg-black/40 p-4">
-        <SectionComp v-if="settingList" v-for="section in settingList.sections" :section="section"
-          @setting-changed="handleChange"></SectionComp>
+        class="scrollbar-none min-h-0 w-full flex-1 overflow-y-auto rounded-xl border border-note-pumice/40 bg-black/40 p-4"
+      >
+        <SectionComp
+          v-if="settingList"
+          v-for="section in settingList.sections"
+          :section="section"
+          @setting-changed="handleChange"
+        ></SectionComp>
       </div>
     </main>
   </div>
@@ -480,5 +515,4 @@ function handleUsernameCancel() {
 }
 </style>
 
-
-<!-- kliknięcie pokazuje moduł: w module zbierane hasło, moduł emituje username do frontendu, funkcja handluje hasło + username i zwraca username i stąd biore username -->
+<!-- todo switching online / local mode switches all settings which are connected to this things -->

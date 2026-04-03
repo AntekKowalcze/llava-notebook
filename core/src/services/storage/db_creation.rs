@@ -26,6 +26,7 @@ use anyhow::Context;
 use rusqlite::{Connection, Result};
 
 use crate::constants::NOTE_DB_SCHEMA;
+use crate::migrations::migration::run_notes_migration;
 
 pub fn get_connection(
     paths: &crate::config::ProgramFiles,
@@ -56,7 +57,6 @@ fn creating_tables(
     }
     let mut notes_db = notes_db_res.context("couldnt establish connection to notes database")?;
 
-    // ustawienia pragm
     notes_db
         .pragma_update(None, "foreign_keys", "ON")
         .context("Pragma error while creating notes db, foreign_keys")?;
@@ -112,6 +112,7 @@ fn creating_tables(
             );
         })
         .context("failed to create database")?;
+    run_notes_migration(&notes_db).context("failed while running notes db migration")?;
     log_helper(
         "ensuring notes db schema",
         "success",
