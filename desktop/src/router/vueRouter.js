@@ -80,6 +80,12 @@ const routes = [
     component: () => import('../views/auth/RecoveryPage.vue'),
     meta: { skipAuth: true },
   },
+  {
+    path: '/register/online',
+    name: 'registerOnline',
+    component: () => import('../views/auth/OnlineRegister.vue'),
+    meta: {skipAuth: true}
+  }
 ];
 export const router = createRouter({
   history: createWebHashHistory(),

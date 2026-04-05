@@ -1,6 +1,7 @@
 use anyhow::anyhow;
 use indexmap::IndexMap;
 use llava_core::AppState;
+use zeroize::Zeroize;
 pub fn change_state_after_login(
     state: &tauri::State<'_, AppState>,
     user_uuid: uuid::Uuid,
@@ -8,6 +9,7 @@ pub fn change_state_after_login(
     paths: llava_core::ProgramFiles,
     username: String,
     user_config: IndexMap<String, String>,
+    mut notes_key: chacha20poly1305::Key,
 ) -> Result<(), llava_core::Error> {
     *state
         .current_user
@@ -32,5 +34,10 @@ pub fn change_state_after_login(
         .user_config
         .lock()
         .map_err(|_| anyhow!("Couldnt edit user_config in state"))? = Some(user_config);
+    *state
+        .notes_key
+        .lock()
+        .map_err(|_| anyhow!("Couldnt edit kek_bytes in state"))? = Some(notes_key);
+    notes_key.zeroize();
     Ok(())
 }

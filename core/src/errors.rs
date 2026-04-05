@@ -57,6 +57,9 @@ pub enum Error {
     #[error("Couldn't lock state, check deadlocks.")]
     LockError,
 
+    #[error("Email not verified.")]
+    WrongEmail,
+
     #[error("File operation error: {0}")]
     FileOperationError(String),
 

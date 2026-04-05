@@ -1,3 +1,4 @@
+use chacha20poly1305::Key;
 use zeroize::Zeroizing;
 pub fn register(
     username: String,
@@ -11,6 +12,7 @@ pub fn register(
         llava_core::ProgramFiles,
         rusqlite::Connection,
         Vec<String>,
+        chacha20poly1305::Key,
     ),
     llava_core::Error,
 > {
@@ -31,7 +33,15 @@ pub fn login(
     password: String,
     paths: &llava_core::ProgramFiles,
     users_db: &mut rusqlite::Connection,
-) -> Result<(uuid::Uuid, llava_core::ProgramFiles, rusqlite::Connection), llava_core::Error> {
+) -> Result<
+    (
+        uuid::Uuid,
+        llava_core::ProgramFiles,
+        rusqlite::Connection,
+        chacha20poly1305::Key,
+    ),
+    llava_core::Error,
+> {
     let password_zeroized = Zeroizing::from(password);
 
     llava_core::local_auth::local_log_in(username.clone(), password_zeroized, users_db, paths)
@@ -49,7 +59,10 @@ pub fn login(
                 }
                 e
             }
-            _ => llava_core::Error::FatalError,
+            _ => {
+                tracing::error!("login error: {:?}", e);
+                e
+            }
         })
 }
 
@@ -58,7 +71,15 @@ pub fn log_with_code(
     username: &str,
     paths: &llava_core::ProgramFiles,
     users_db: &rusqlite::Connection,
-) -> Result<(llava_core::ProgramFiles, rusqlite::Connection, bool), llava_core::Error> {
+) -> Result<
+    (
+        llava_core::ProgramFiles,
+        rusqlite::Connection,
+        bool,
+        chacha20poly1305::Key,
+    ),
+    llava_core::Error,
+> {
     let user_uuid = llava_core::get_user_uuid(users_db, username)?;
     llava_core::local_auth::log_with_code(paths, code, users_db, user_uuid)
 }

@@ -29,12 +29,13 @@ llava_core = { path = "../../core" }
 uuid = { version = "1", features = ["v4", "serde"] }
 zeroize = "1"
 tracing = "0.1.43"
-
+chacha20poly1305 = "0.10"
 tauri-plugin-devtools = "2"
 anyhow = "1.0.100"
 rusqlite = "0.38.0"
 indexmap = { version = "2.13.0", features = ["serde"] }
 tauri-plugin-clipboard-manager = "2.3.2"
+jsonwebtoken = { version = "10.3.0", features = ["hmac"] }
 
 [profile.release]
 opt-level = "s"

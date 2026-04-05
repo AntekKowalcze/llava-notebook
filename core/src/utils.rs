@@ -65,3 +65,11 @@ pub fn get_username_from_uuid(
         .context("Failed to get user uuid from database")?;
     Ok(username)
 }
+
+pub fn get_host_name() -> Result<String, crate::errors::Error> {
+    let hostname = hostname::get()
+        .context("failed to get hostname")?
+        .to_string_lossy()
+        .to_string();
+    Ok(hostname)
+}

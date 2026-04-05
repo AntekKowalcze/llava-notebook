@@ -11,7 +11,7 @@ pub async fn register_command(
     state: tauri::State<'_, AppState>,
     app_handle: AppHandle,
 ) -> Result<(Vec<String>, String), llava_core::Error> {
-    let (new_uuid, new_paths, users_db, codes) = {
+    let (new_uuid, new_paths, users_db, codes, notes_key) = {
         let mut conn_guard = state
             .users_db
             .lock()
@@ -46,6 +46,7 @@ pub async fn register_command(
         new_paths,
         username,
         user_config,
+        notes_key,
     )?;
 
     Ok((codes, new_uuid.to_string()))
@@ -60,7 +61,7 @@ pub async fn login_command(
     state: tauri::State<'_, AppState>,
     app_handle: AppHandle,
 ) -> Result<String, llava_core::Error> {
-    let (new_uuid, new_paths, notes_conn) = {
+    let (new_uuid, new_paths, notes_conn, notes_key) = {
         let mut conn_guard = state
             .users_db
             .lock()
@@ -98,6 +99,7 @@ pub async fn login_command(
         new_paths,
         username,
         user_config,
+        notes_key,
     )?;
 
     Ok(new_uuid.to_string())
@@ -125,7 +127,7 @@ pub async fn log_with_code(
 ) -> Result<(String, bool), llava_core::Error> {
     code.retain(|c| c != '-');
 
-    let (user_uuid, paths, notes_conn, one_code) = {
+    let (user_uuid, paths, notes_conn, one_code, notes_key) = {
         let users_db_guard = state
             .users_db
             .lock()
@@ -141,10 +143,10 @@ pub async fn log_with_code(
         let paths = paths_guard.as_ref().ok_or(llava_core::Error::LockError)?;
 
         let user_uuid = llava_core::get_user_uuid(users_db, &username)?;
-        let (paths, notes_conn, one_code) =
+        let (paths, notes_conn, one_code, notes_key) =
             crate::commands::handlers::local_auth::log_with_code(code, &username, paths, users_db)?;
 
-        (user_uuid, paths, notes_conn, one_code)
+        (user_uuid, paths, notes_conn, one_code, notes_key)
     };
 
     let user_config = llava_core::settings::get_config_for_state(&paths)?;
@@ -160,6 +162,7 @@ pub async fn log_with_code(
         paths,
         username,
         user_config,
+        notes_key,
     )?;
 
     Ok((user_uuid.to_string(), one_code))
@@ -219,7 +222,8 @@ pub async fn check_login_on_start(
     let is_logged_in: SessionState =
         llava_core::local_auth::check_if_user_logged_in(users_db, &program_files)?;
 
-    if let SessionState::LoggedIn { user_id } = &is_logged_in {
+    if let SessionState::LoggedIn { user_id, notes_key } = &is_logged_in {
+        let notes_key: chacha20poly1305::Key = chacha20poly1305::Key::clone_from_slice(&notes_key);
         let parsed_user_uuid =
             uuid::Uuid::parse_str(&user_id).context("Failed to parse user_id to string")?;
 
@@ -241,6 +245,7 @@ pub async fn check_login_on_start(
             updated_paths.clone(),
             username,
             user_config,
+            notes_key,
         )?;
     }
     println!("{:#?}", state);

@@ -39,14 +39,23 @@ pub fn register_user_offline(
     password_repeated: zeroize::Zeroizing<String>,
     paths: &crate::config::ProgramFiles,
     users_db: &mut Connection,
-) -> Result<(uuid::Uuid, ProgramFiles, Connection, Vec<String>), crate::errors::Error> {
+) -> Result<
+    (
+        uuid::Uuid,
+        ProgramFiles,
+        Connection,
+        Vec<String>,
+        chacha20poly1305::Key,
+    ),
+    crate::errors::Error,
+> {
     let username = username.trim().to_string();
     validate_username(&username, &users_db)?;
     let password = password.as_str().trim();
     let password_repeated = password_repeated.as_str().trim();
     password_validation(password, password_repeated)?;
     let notes_key: chacha20poly1305::Key = ChaCha20Poly1305::generate_key(&mut OsRng); //Creating of chacha poly key for encrypting notes
-    let (password_hash, salt, encrypted_notes_key, nonce_for_key_wrap) =
+    let (mut kek_bytes, password_hash, salt, encrypted_notes_key, nonce_for_key_wrap) =
         generate_enctypted_keys(password, notes_key)?;
     let new_user = crate::services::local_auth::auth_data_models::local_user::LocalUser {
         user_id: uuid::Uuid::new_v4(),
@@ -107,16 +116,21 @@ pub fn register_user_offline(
     let codes = recovery_code_handling(&new_user.username, users_db, password)?; //get recovery codes as strings
 
     let paths = after_validation(&new_user.user_id, paths)?;
-    crate::services::local_auth::logging::session_operations(&users_db, new_user.user_id)?;
+    crate::services::local_auth::logging::session_operations(
+        &users_db,
+        new_user.user_id,
+        &notes_key,
+    )?;
     let users_db = crate::services::storage::db_creation::get_connection(&paths)?; //get connection for note database
-    Ok((new_user.user_id, paths, users_db, codes))
+    kek_bytes.zeroize();
+    Ok((new_user.user_id, paths, users_db, codes, notes_key))
 }
 
 fn generate_enctypted_keys(
     //reuse on password change
     password: &str,
-    mut notes_key: chacha20poly1305::Key,
-) -> Result<(String, String, Vec<u8>, Vec<u8>), crate::errors::Error> {
+    notes_key: chacha20poly1305::Key,
+) -> Result<(Vec<u8>, String, String, Vec<u8>, Vec<u8>), crate::errors::Error> {
     let salt: SaltString = SaltString::generate(&mut OsRng); //generating salt for password
     let argon2 = Argon2::default(); //creating argon2 instance
     let mut kek_bytes = [0u8; KEY_ENCRYPTED_KEY_LENGTH]; //creating empty array to store key to chachapoly instance
@@ -156,9 +170,8 @@ fn generate_enctypted_keys(
         })
         .context("Couldnt encrypt key encrypted key while registering a user")?; //encrypt notes key with nonce and kek (kek is key for chachapoly we are encrypting with)
 
-    kek_bytes.zeroize();
-    notes_key.as_mut_slice().zeroize();
     Ok((
+        Vec::from(kek_bytes),
         password_hash,
         salt.to_string(),
         encrypted_notes_key,
@@ -311,7 +324,7 @@ fn generate_recovery_code(
         kdf_salt.to_string(),
     ))
 }
-fn password_validation(
+pub fn password_validation(
     password: &str,
     password_repeated: &str,
 ) -> Result<(), crate::errors::Error> {

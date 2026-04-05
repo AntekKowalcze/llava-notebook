@@ -42,6 +42,9 @@ pub mod stats {
     pub use crate::services::user_stats::dashboard_stats::{DashboardData, get_dashboard_stats};
 }
 
+pub mod online_auth {
+    pub use crate::services::online_auth::register::register;
+}
 pub use config::get_device_id;
 pub use config::get_paths;
 pub use config::{AppState, ProgramFiles};

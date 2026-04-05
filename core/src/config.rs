@@ -41,6 +41,7 @@
 //! - `uuid` — UUIDv4 generation for new device IDs and nil-UUID sentinel on first run
 //! - `std::sync::Mutex` — Thread-safe shared state in [`AppState`]
 use crate::constants::*;
+use crate::services::online_auth::models::online_account::AccessToken;
 use crate::utils::{Format, log_helper};
 use anyhow::Context;
 use dirs_next::data_local_dir;
@@ -65,6 +66,7 @@ pub struct ProgramFiles {
     pub active_user_path: PathBuf,
     pub app_home: PathBuf,
 }
+//TODO add kek to state, on register add it to state, on login add it to state, on logout delete it from state
 #[derive(Default, Debug)]
 pub struct AppState {
     pub device_id: Mutex<Option<uuid::Uuid>>,
@@ -75,6 +77,8 @@ pub struct AppState {
     pub username: Mutex<Option<String>>,
     pub paths: Mutex<Option<ProgramFiles>>,
     pub user_config: Mutex<Option<IndexMap<String, String>>>,
+    pub notes_key: Mutex<Option<chacha20poly1305::Key>>,
+    pub access_token: Mutex<Option<AccessToken>>,
 }
 
 impl AppState {
@@ -87,6 +91,8 @@ impl AppState {
             username: Mutex::new(None),
             paths: Mutex::new(None), //login will return current user
             user_config: Mutex::new(None),
+            notes_key: Mutex::new(None),
+            access_token: Mutex::new(None),
         })
     }
 }

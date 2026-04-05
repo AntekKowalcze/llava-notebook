@@ -72,7 +72,6 @@ func ValidateAccessToken(tokenString string, accessSecret []byte) (*models.Acces
 	return payload, nil
 }
 
-// TODO 1 parse jti in refresh to uuid from string
 func AuthMiddleware(accessSecret []byte) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		tokenString := strings.TrimPrefix(c.Get(fiber.HeaderAuthorization), "Bearer ")

@@ -235,6 +235,8 @@ pub const LOCAL_LOGIN_DB_SCHEMA: &str = r#" CREATE TABLE IF NOT EXISTS users_dat
                         user_id TEXT NOT NULL, 
                         created_at INTEGER NOT NULL DEFAULT(unixepoch()) ,
                         expires_at INTEGER NOT NULL,
+                        wrapped_notes_key BLOB NOT NULL,
+                        wrapped_notes_key_nonce BLOB NOT NULL,
                         FOREIGN KEY(user_id) REFERENCES users_data(user_id) ON DELETE CASCADE);
                               
                         "#;

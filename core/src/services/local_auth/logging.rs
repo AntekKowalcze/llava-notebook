@@ -39,10 +39,12 @@
 //! - `uuid` — UUIDv4 generation for session tokens and user identification
 
 use anyhow::Context;
+
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
+
+use chacha20poly1305::{AeadCore, ChaCha20Poly1305, Key, KeyInit, aead, aead::Aead};
 use rusqlite::{Connection, OptionalExtension, named_params};
 use sha2::{Digest, Sha256};
-
 use zeroize::Zeroize;
 
 use crate::{ProgramFiles, errors, utils};
@@ -72,13 +74,15 @@ pub fn autorization(
         .context("Couldnt get password_hash FROM users_data db ")?;
 
     let password_hash = PasswordHash::new(&hash)
-        .inspect_err(|e| tracing::error!(
-            task = "logging",
-            status = "error",
-            error = ?e,
-            "failed to parse password hash from db"
-        ))
-        .context("CoPrepared using GPT-5.2 Thinkinguldnt create a password hash from password given by user in login")?;
+        .inspect_err(|e| {
+            tracing::error!(
+                task = "logging",
+                status = "error",
+                error = ?e,
+                "failed to parse password hash from db"
+            )
+        })
+        .context("Coldnt create a password hash from password given by user in login")?;
 
     let password_verified = Argon2::default()
         .verify_password(&password.as_bytes(), &password_hash)
@@ -91,7 +95,15 @@ pub fn local_log_in(
     password: zeroize::Zeroizing<String>,
     users_db: &mut rusqlite::Connection,
     paths: &crate::config::ProgramFiles,
-) -> Result<(uuid::Uuid, crate::config::ProgramFiles, Connection), crate::errors::Error> {
+) -> Result<
+    (
+        uuid::Uuid,
+        crate::config::ProgramFiles,
+        Connection,
+        chacha20poly1305::Key,
+    ),
+    crate::errors::Error,
+> {
     check_if_user_exists(&username, users_db)?;
     let password_verified = autorization(&username, &password, &users_db)?;
     if password_verified {
@@ -133,24 +145,76 @@ pub fn local_log_in(
     let user_uuid = uuid::Uuid::parse_str(&user_uuid).context("failed to parse uuid")?;
     change_last_login(users_db, &user_uuid)?;
     let paths = crate::services::local_auth::register::after_validation(&user_uuid, paths)?;
-    session_operations(&users_db, user_uuid)?;
-    let users_db = crate::services::storage::db_creation::get_connection(&paths)?;
+    let (notes_key, nonce, kek_salt) = users_db
+        .query_row(
+            "SELECT notes_key, nonce_notes_key, kek_salt FROM users_data WHERE user_id = ?", //Z recovery key a nie z usera
+            [&user_uuid.to_string()],
+            |row| {
+                let notes_key: Vec<u8> = row.get(0)?;
+                let nonce: Vec<u8> = row.get(1)?;
+                let kek: String = row.get(2)?;
+                Ok((notes_key, nonce, kek))
+            },
+        )
+        .context("Failed to get user encryption data from database")?;
+
+    let mut kek_bytes = [0u8; 32]; //create kek bytes empty array
+    Argon2::default()
+        .hash_password_into(password.as_bytes(), kek_salt.as_bytes(), &mut kek_bytes)
+        .inspect_err(|e| {
+            tracing::error!(
+                task = "recovery code handling",
+                status = "error",
+                error = %e,
+                "failed to derive KEK from password"
+            )
+        })
+        .context("Failed to derive kek")?;
+    let kek = chacha20poly1305::ChaCha20Poly1305::new(&kek_bytes.into());
+    let nonce_arr = chacha20poly1305::Nonce::from_slice(&nonce);
+
+    let mut decrypted_notes_key = kek
+        .decrypt(nonce_arr, notes_key.as_ref())
+        .inspect_err(|e| {
+            tracing::error!(
+                task = "recovery code handling",
+                status = "error",
+                error = %e,
+                "failed to decrypt notes key"
+            )
+        })
+        .map_err(|_| anyhow::anyhow!("Failed to decrypt notes_key"))
+        .context("notes_key decryption failed")?;
+
+    let notes_db = crate::services::storage::db_creation::get_connection(&paths)?;
+    kek_bytes.zeroize();
+    let notes_key: chacha20poly1305::Key =
+        chacha20poly1305::Key::clone_from_slice(&decrypted_notes_key);
+    session_operations(users_db, user_uuid, &notes_key)?;
+    decrypted_notes_key.zeroize();
     crate::utils::log_helper(
         "logging",
         "success",
         Some(crate::utils::Format::Display(&username)),
         "user logged in succesfully",
     );
-    Ok((user_uuid, paths, users_db))
-}
 
+    Ok((user_uuid, paths, notes_db, notes_key))
+}
 pub fn log_with_code(
     paths: &crate::config::ProgramFiles,
     mut code: String,
     users_db: &rusqlite::Connection,
     user_id: uuid::Uuid,
-) -> Result<(crate::config::ProgramFiles, Connection, bool), crate::errors::Error> {
-    let mut found = 0;
+) -> Result<
+    (
+        crate::config::ProgramFiles,
+        Connection,
+        bool,
+        chacha20poly1305::Key,
+    ),
+    crate::errors::Error,
+> {
     let count: i8 = users_db
         .query_row(
             "SELECT COUNT(*) FROM recovery_keys WHERE user_id = :id and used_at IS NULL",
@@ -163,7 +227,7 @@ pub fn log_with_code(
         one_code = true;
     }
     let mut stmt = users_db
-        .prepare("SELECT code_hash FROM recovery_keys WHERE user_id = :id AND used_at IS NULL")
+        .prepare("SELECT code_hash, wrapped_notes_key, wrapped_notes_key_nonce, recovery_kdf_salt FROM recovery_keys WHERE user_id = :id AND used_at IS NULL")
         .inspect_err(|e| {
             tracing::error!(
                 task = "logging with code",
@@ -176,7 +240,7 @@ pub fn log_with_code(
         .context("failed to prepare statement")?;
     let mut handle = stmt
         .query(named_params! {
-            ":id":user_id.to_string()
+            ":id": user_id.to_string()
         })
         .inspect_err(|e| {
             tracing::error!(
@@ -205,6 +269,14 @@ pub fn log_with_code(
                     )
                 })
                 .context("failed to get hash")?;
+            let wrapped_notes_key: Vec<u8> =
+                row.get(1).context("failed to get wrapped_notes_key")?;
+            let wrapped_notes_key_nonce: Vec<u8> = row
+                .get(2)
+                .context("failed to get wrapped_notes_key_nonce")?;
+            let recovery_kdf_salt: String =
+                row.get(3).context("failed to get recovery_kdf_salt")?;
+
             let phc = PasswordHash::new(&hash)
                 .inspect_err(|e| {
                     tracing::error!(
@@ -216,8 +288,8 @@ pub fn log_with_code(
                     )
                 })
                 .context("failed to parse hash from db to phc")?;
+
             if argon2.verify_password(&decoded, &phc).is_ok() {
-                found += 1;
                 users_db
                     .execute(
                         "UPDATE recovery_keys SET used_at = :time WHERE code_hash = :h",
@@ -236,25 +308,59 @@ pub fn log_with_code(
                         )
                     })
                     .context("Failed to mark code as used")?;
-            }
-            hash.zeroize();
 
-            code.zeroize();
-            if found > 0 {
+                // derive recovery KEK from raw code bytes + salt
+                let mut recovery_kek_bytes = [0u8; 32];
+                argon2
+                    .hash_password_into(
+                        &decoded,
+                        recovery_kdf_salt.as_bytes(),
+                        &mut recovery_kek_bytes,
+                    )
+                    .inspect_err(|e| {
+                        tracing::error!(
+                            task = "logging with code",
+                            status = "error",
+                            error = %e,
+                            "failed to derive recovery KEK"
+                        )
+                    })
+                    .context("Failed to derive recovery KEK")?;
+
+                let recovery_kek = ChaCha20Poly1305::new(Key::from_slice(&recovery_kek_bytes));
+                let nonce_arr = chacha20poly1305::Nonce::from_slice(&wrapped_notes_key_nonce);
+                let mut decrypted_notes_key = recovery_kek
+                    .decrypt(nonce_arr, wrapped_notes_key.as_ref())
+                    .map_err(|_| anyhow::anyhow!("Failed to decrypt notes_key with recovery KEK"))
+                    .context("notes_key decryption failed")?;
+
+                let notes_key: chacha20poly1305::Key =
+                    chacha20poly1305::Key::clone_from_slice(&decrypted_notes_key);
+
+                // zeroize all sensitive material
+                decrypted_notes_key.zeroize();
+                recovery_kek_bytes.zeroize();
+                decoded.zeroize();
+                hash.zeroize();
+                code.zeroize();
+
                 let paths =
                     crate::services::local_auth::register::after_validation(&user_id, paths)?;
-                session_operations(&users_db, user_id)?;
-                let users_db = crate::services::storage::db_creation::get_connection(&paths)?;
-                decoded.zeroize();
+                session_operations(&users_db, user_id, &notes_key)?;
+                let notes_db = crate::services::storage::db_creation::get_connection(&paths)?;
+
                 crate::utils::log_helper(
                     "logging with code",
                     "success",
                     None::<crate::utils::Format<String>>,
                     "user logged in using recovery code",
                 );
-                return Ok((paths, users_db, one_code));
+                return Ok((paths, notes_db, one_code, notes_key));
             }
+            hash.zeroize();
         }
+        code.zeroize();
+        decoded.zeroize();
     } else {
         tracing::error!(
             task = "logging with code",
@@ -273,7 +379,6 @@ pub fn log_with_code(
     );
     Err(crate::errors::Error::WrongPassword)
 }
-
 fn check_if_user_exists(
     username: &str,
     users_db: &rusqlite::Connection,
@@ -498,26 +603,46 @@ pub fn get_timeout(users_db: &Connection, uuid: &uuid::Uuid) -> Result<i64, crat
 pub fn session_operations(
     users_db: &Connection,
     user_id: uuid::Uuid,
+    notes_key: &chacha20poly1305::Key,
 ) -> Result<(), crate::errors::Error> {
     let session_uuid = uuid::Uuid::new_v4();
+    let session_uuid_str = session_uuid.to_string();
+
+    // derive session KEK from session token using SHA256 (32 bytes, fits ChaCha key)
+    let session_kek_bytes = Sha256::digest(session_uuid_str.as_bytes());
+    let session_kek = ChaCha20Poly1305::new(Key::from_slice(&session_kek_bytes));
+
+    // wrap notes_key with session KEK
+    let nonce = chacha20poly1305::ChaCha20Poly1305::generate_nonce(&mut aead::OsRng);
+    let wrapped_notes_key = session_kek
+        .encrypt(&nonce, notes_key.as_slice())
+        .map_err(|_| anyhow::anyhow!("Failed to wrap notes_key with session KEK"))
+        .context("failed to wrap notes_key")?;
+
     let session_uuid_hash = base32::encode(
         base32::Alphabet::Crockford,
-        &Sha256::digest(session_uuid.to_string().as_bytes()),
+        &Sha256::digest(session_uuid_str.as_bytes()),
     );
     let expires_at = crate::utils::get_time() / 1000 + crate::constants::SESSION_TOKEN_TIME_ALIVE;
+
     let mut stmt = users_db
-        .prepare("INSERT INTO session_data(hashed_token, user_id, expires_at) VALUES (:session_hash, :uid, :expires);")
-        .inspect_err(|e| tracing::error!(
+    .prepare("INSERT INTO session_data(hashed_token, user_id, expires_at, wrapped_notes_key, wrapped_notes_key_nonce) VALUES (:session_hash, :uid, :expires, :wnk, :nonce);")
+    .inspect_err(|e| {
+        tracing::error!(
             task = "session operations",
             status = "error",
             error = ?e,
             "failed to prepare insert statement to session_data"
-        ))
-        .context("failed to prepare insert statement to session_data")?;
+        )
+    })
+    .context("failed to prepare insert statement to session_data")?;
+
     stmt.execute(named_params! {
         ":session_hash": session_uuid_hash,
         ":uid": user_id.to_string(),
         ":expires": expires_at,
+        ":wnk": wrapped_notes_key,
+        ":nonce": nonce.as_slice(),
     })
     .inspect_err(|e| {
         tracing::error!(
@@ -528,27 +653,13 @@ pub fn session_operations(
         )
     })
     .context("failed to insert data into session_data table")?;
+
     let keyring_entry = keyring::Entry::new("llava_desktop", "session_token")
-        .inspect_err(|e| {
-            tracing::error!(
-                task = "session operations",
-                status = "error",
-                error = ?e,
-                "failed to create keyring entry"
-            )
-        })
         .context("failed to create keyring entry")?;
     keyring_entry
-        .set_password(&session_uuid.to_string())
-        .inspect_err(|e| {
-            tracing::error!(
-                task = "session operations",
-                status = "error",
-                error = ?e,
-                "failed to set secret in keyring"
-            )
-        })
+        .set_password(&session_uuid_str)
         .context("failed to set secret in keyring")?;
+
     crate::utils::log_helper(
         "session operations",
         "success",
@@ -557,10 +668,11 @@ pub fn session_operations(
     );
     Ok(())
 }
+
 #[derive(Debug, serde::Serialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum SessionState {
-    LoggedIn { user_id: String },
+    LoggedIn { user_id: String, notes_key: Vec<u8> },
     Expired,
     NotLoggedIn,
 }
@@ -570,14 +682,6 @@ pub fn check_if_user_logged_in(
     paths: &ProgramFiles,
 ) -> Result<SessionState, crate::errors::Error> {
     let keyring_entry = keyring::Entry::new("llava_desktop", "session_token")
-        .inspect_err(|e| {
-            tracing::error!(
-                task = "check session",
-                status = "error",
-                error = ?e,
-                "failed to create keyring entry"
-            )
-        })
         .context("failed to create keyring entry")?;
 
     let token = match keyring_entry.get_password() {
@@ -591,26 +695,54 @@ pub fn check_if_user_logged_in(
     );
 
     let result = users_db.query_row(
-        "SELECT user_id, expires_at FROM session_data WHERE hashed_token = ?1",
+        "SELECT user_id, expires_at, wrapped_notes_key, wrapped_notes_key_nonce FROM session_data WHERE hashed_token = ?1",
         rusqlite::params![hashed],
-        |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)),
+        |row| Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, i64>(1)?,
+            row.get::<_, Vec<u8>>(2)?,
+            row.get::<_, Vec<u8>>(3)?,
+        )),
     );
 
     match result {
-        Ok((user_id, expires_at)) => {
+        Ok((user_id, expires_at, wrapped_notes_key, wrapped_notes_key_nonce)) => {
             if expires_at > (crate::utils::get_time() / 1000) {
+                // derive session KEK from token
+                let session_kek_bytes = Sha256::digest(token.as_bytes());
+                let session_kek = ChaCha20Poly1305::new(Key::from_slice(&session_kek_bytes));
+                let nonce_arr = chacha20poly1305::Nonce::from_slice(&wrapped_notes_key_nonce);
+
+                let mut decrypted_notes_key = session_kek
+                    .decrypt(nonce_arr, wrapped_notes_key.as_ref())
+                    .map_err(|_| anyhow::anyhow!("Failed to unwrap notes_key from session"))
+                    .context("notes_key decryption from session failed")?;
+
+                let notes_key_vec = decrypted_notes_key.to_vec();
+                decrypted_notes_key.zeroize();
+
+                let parsed_user_id =
+                    uuid::Uuid::parse_str(&user_id).context("failed to parse ID")?;
+                crate::config::change_active_user(&parsed_user_id, paths)?;
+
                 crate::utils::log_helper(
                     "check session",
                     "success",
                     Some(crate::utils::Format::Display(&user_id)),
                     "user is logged in",
                 );
-                let parsed_user_id =
-                    &uuid::Uuid::parse_str(&user_id).context("failed to parse ID")?;
-                crate::config::change_active_user(parsed_user_id, &paths)?;
-                Ok(SessionState::LoggedIn { user_id })
+                Ok(SessionState::LoggedIn {
+                    user_id,
+                    notes_key: notes_key_vec,
+                })
             } else {
                 let _ = keyring_entry.delete_credential();
+                users_db
+                    .execute(
+                        "DELETE FROM session_data WHERE hashed_token = ?1",
+                        rusqlite::params![hashed],
+                    )
+                    .ok();
                 crate::utils::log_helper(
                     "check session",
                     "success",

@@ -80,7 +80,8 @@ pub fn main() {
             commands::settings::load_backup_config,
             commands::settings::get_logfile_content,
             commands::settings::get_recovery_codes,
-            commands::settings::change_username
+            commands::settings::change_username,
+            commands::online_auth::register_user_online
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

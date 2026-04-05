@@ -9,9 +9,15 @@ pub struct ArgonParams {
     pub p_cost: u32,
 }
 
+#[derive(serde::Deserialize, Serialize)]
+pub struct Tokens {
+    pub access_token: AccessToken,
+    pub refresh_token: RefreshToken,
+}
+#[derive(serde::Serialize)]
 pub struct RegisterRequest {
-    user: RegisterUserPayload,
-    device: RegisterDevicePayload,
+    pub user: RegisterUserPayload,
+    pub device: RegisterDevicePayload,
 }
 
 /// Sent to the server on registration — only what client owns
@@ -59,6 +65,8 @@ pub struct AccessTokenPayload {
 }
 
 /// Raw access token — just a wrapper so you don't pass bare strings around
+#[derive(Debug, Serialize, Deserialize)]
+
 pub struct AccessToken(pub String);
 
 /// Sent to server when linking/registering a device
@@ -81,12 +89,14 @@ pub struct Device {
 }
 
 /// Stored in OS keyring, sent to server on refresh
+// #[derive(Debug, Serialize, Deserialize)]
+// pub struct RefreshToken {
+//     pub jti: Uuid,
+//     pub expires_at: i64,
+// }
 #[derive(Debug, Serialize, Deserialize)]
-pub struct RefreshToken {
-    pub jti: Uuid,
-    pub expires_at: i64,
-}
 
+pub struct RefreshToken(pub String);
 /// Server response after login or token refresh
 #[derive(Debug, Deserialize)]
 pub struct AuthResponse {

@@ -76,7 +76,6 @@ fn creating_tables(
         .pragma_update(None, "journal_mode", "WAL")
         .context("Pragma error while creating notes db, journal mode")?;
 
-    // opcjonalne potwierdzenie (tylko do logów)
     if let Ok(mode) = notes_db.pragma_query_value(None, "journal_mode", |r| r.get::<_, String>(0)) {
         crate::services::logger::log_success(&format!("Journal mode set to {}", mode));
     }
