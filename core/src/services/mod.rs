@@ -4,6 +4,7 @@ pub mod cleaner;
 pub mod crypto;
 pub mod local_auth;
 pub mod logger;
+pub mod online_auth;
 pub mod storage;
 pub mod sync;
 pub mod user_settings;

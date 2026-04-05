@@ -1,0 +1,98 @@
+@baseUrl = http://127.0.0.1:3000
+@seedValidRefresh = 11111111-1111-1111-1111-111111111111.sig_valid_seed
+@seedExpiredRefresh = 22222222-2222-2222-2222-222222222222.sig_expired_seed
+
+### Health check
+GET {{baseUrl}}/
+
+### Register (optional setup)
+# @name register
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+    "user": {
+        "email": "abc@example.com",
+        "password_hash": "$argon2id$v=19$m=65536,t=3,p=4$c2FsdHNhbHRzYWx0c2FsdA$hash",
+        "master_key_enc": "AQID/xAQEB8fHx8=",
+        "master_key_nonce": "CQgHBgUEAwIB",
+        "kek_salt": "c2FsdHNhbHRzYWx0",
+        "argon2_params": {
+            "m_cost": 65536,
+            "t_cost": 3,
+            "p_cost": 4
+        }
+    },
+    "device": {
+        "device_name": "antek-arch",
+        "device_id": "550e8400-e29b-41d4-a716-446655440000"
+    }
+}
+
+### Login (optional setup)
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+    "email": "abc@example.com",
+    "password_hash": "$argon2id$v=19$m=65536,t=3,p=4$c2FsdHNhbHRzYWx0c2FsdA$hash",
+    "device_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+
+### Refresh from login token
+# Expected: 200 with new access and refresh token.
+# @name refreshFromLogin
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+    "refresh_token": "{{login.response.body.$.refresh_token}}"
+}
+
+### Refresh seeded valid token (single use)
+# Run mongosh seed first. Expected: 200.
+# @name refreshSeededValid
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+    "refresh_token": "{{seedValidRefresh}}"
+}
+
+### Replay seeded valid token (must fail)
+# Expected: 401 invalid_refresh_token because token was consumed above.
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+    "refresh_token": "{{seedValidRefresh}}"
+}
+
+### Expired seeded token
+# Expected: 401 session_expired.
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+    "refresh_token": "{{seedExpiredRefresh}}"
+}
+
+### Malformed token (bad UUID)
+# Expected: 401 invalid_refresh_token.
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+    "refresh_token": "not-a-uuid.sig"
+}
+
+### Invalid format (missing dot)
+# Expected: 401 invalid_refresh_token.
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+    "refresh_token": "totally-wrong-format"
+}
+

@@ -3,3 +3,4 @@ target/
 core/target/
 node_modules
 .github
+**/*.env
