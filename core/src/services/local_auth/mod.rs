@@ -3,7 +3,7 @@ pub mod database_creation;
 pub mod logging;
 pub mod register;
 pub mod utils;
-//TODO
+
 //IN my head it looks like that
 //1. one online account 1 user (for now) but multiple devices.
 //2. Last write wins conflict (if its nice programming problem i will consider makign somethning better)

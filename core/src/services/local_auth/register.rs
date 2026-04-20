@@ -18,12 +18,12 @@ use crate::constants::*;
 use crate::utils::{Format, log_helper};
 use anyhow::Context;
 
+use crate::services::online_auth::models::online_account::ArgonParams;
 use argon2::password_hash::rand_core::RngCore;
 use argon2::{
     Argon2, PasswordHash, PasswordVerifier,
     password_hash::{PasswordHasher, SaltString, rand_core::OsRng},
 };
-
 use chacha20poly1305::{
     ChaCha20Poly1305,
     aead::{Aead, AeadCore, KeyInit},
@@ -55,7 +55,7 @@ pub fn register_user_offline(
     let password_repeated = password_repeated.as_str().trim();
     password_validation(password, password_repeated)?;
     let notes_key: chacha20poly1305::Key = ChaCha20Poly1305::generate_key(&mut OsRng); //Creating of chacha poly key for encrypting notes
-    let (mut kek_bytes, password_hash, salt, encrypted_notes_key, nonce_for_key_wrap) =
+    let (mut kek_bytes, password_hash, salt, encrypted_notes_key, nonce_for_key_wrap, argon_params) =
         generate_enctypted_keys(password, notes_key)?;
     let new_user = crate::services::local_auth::auth_data_models::local_user::LocalUser {
         user_id: uuid::Uuid::new_v4(),
@@ -64,6 +64,7 @@ pub fn register_user_offline(
         notes_key: encrypted_notes_key,
         nonce_notes_key: nonce_for_key_wrap,
         kek_salt: salt,
+        kek_argon_params: argon_params,
         master_key_enc: None,
         master_key_nonce: None,
         master_kek_salt: None,
@@ -92,6 +93,7 @@ pub fn register_user_offline(
         ":master_key_nonce": new_user.master_key_nonce,
         ":master_kek_salt": new_user.master_kek_salt,
         ":kek_salt": new_user.kek_salt,
+        ":kek_argon_params": new_user.kek_argon_params,
         ":is_online_linked": new_user.is_online_linked,
         ":online_account_email":new_user.online_account_email,
         ":device_id": new_user.device_id.to_string(),
@@ -130,7 +132,7 @@ fn generate_enctypted_keys(
     //reuse on password change
     password: &str,
     notes_key: chacha20poly1305::Key,
-) -> Result<(Vec<u8>, String, String, Vec<u8>, Vec<u8>), crate::errors::Error> {
+) -> Result<(Vec<u8>, String, String, Vec<u8>, Vec<u8>, String), crate::errors::Error> {
     let salt: SaltString = SaltString::generate(&mut OsRng); //generating salt for password
     let argon2 = Argon2::default(); //creating argon2 instance
     let mut kek_bytes = [0u8; KEY_ENCRYPTED_KEY_LENGTH]; //creating empty array to store key to chachapoly instance
@@ -170,12 +172,22 @@ fn generate_enctypted_keys(
         })
         .context("Couldnt encrypt key encrypted key while registering a user")?; //encrypt notes key with nonce and kek (kek is key for chachapoly we are encrypting with)
 
+    let params = argon2::Params::default();
+    let argon_params = ArgonParams {
+        m_cost: params.m_cost(),
+        t_cost: params.t_cost(),
+        p_cost: params.p_cost(),
+    };
+    let argon_params =
+        serde_json::to_string(&argon_params).context("failed to parse params into string")?;
+
     Ok((
         Vec::from(kek_bytes),
         password_hash,
         salt.to_string(),
         encrypted_notes_key,
         nonce_for_key_wrap.to_vec(),
+        argon_params,
     ))
 }
 
@@ -187,22 +199,32 @@ pub fn recovery_code_handling(
 ) -> Result<Vec<String>, crate::errors::Error> {
     let user_uuid = crate::utils::get_user_uuid(users_db, &username)?;
     let mut user_visible_codes: Vec<String> = Vec::new();
-    let arg = Argon2::default();
-    let (notes_key, nonce, kek_salt) = users_db
+    let (notes_key, nonce, kek_salt, params_string) = users_db
         .query_row(
-            "SELECT notes_key, nonce_notes_key, kek_salt FROM users_data WHERE user_id = ?", //Z recovery key a nie z usera
+            "SELECT notes_key, nonce_notes_key, kek_salt, kek_argon_params FROM users_data WHERE user_id = ?", //from recovery key not from user
             [&user_uuid.to_string()],
             |row| {
                 let notes_key: Vec<u8> = row.get(0)?;
                 let nonce: Vec<u8> = row.get(1)?;
                 let kek: String = row.get(2)?;
-                Ok((notes_key, nonce, kek))
+                let params_string: String = row.get(3)?;
+                Ok((notes_key, nonce, kek, params_string))
             },
         )
         .context("Failed to get user encryption data from database")?; //get nonce, encrypted notes_key, and salt used to get kek_bytes
     let mut kek_bytes = [0u8; 32]; //create kek bytes empty array
-    Argon2::default()
-        .hash_password_into(password.as_bytes(), kek_salt.as_bytes(), &mut kek_bytes)
+    let argon_params: ArgonParams =
+        serde_json::from_str(&params_string).context("failed to parse params from string")?;
+    let params = argon2::Params::new(
+        argon_params.m_cost,
+        argon_params.t_cost,
+        argon_params.p_cost,
+        None,
+    )
+    .context("failed to create params")?;
+    let arg = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
+    //from default to get from database
+    arg.hash_password_into(password.as_bytes(), kek_salt.as_bytes(), &mut kek_bytes)
         .inspect_err(|e| {
             tracing::error!(
                 task = "recovery code handling",
@@ -435,7 +457,7 @@ pub fn change_password(
 
     let mut found = 0;
     let mut stmt = users_db
-        .prepare("SELECT code_hash FROM recovery_keys WHERE user_id = :id AND used_at IS NOT NULL")
+        .prepare("SELECT code_hash FROM recovery_keys WHERE user_id = :id")
         .context("failed to prepare statement")?;
     let mut handle = stmt
         .query(named_params! {
@@ -443,23 +465,37 @@ pub fn change_password(
         })
         .context("failed to get handle to codes")?;
 
+    let params_str: String = users_db
+        .query_row(
+            "SELECT kek_argon_params FROM users_data WHERE user_id = :id",
+            named_params! {
+                ":id": user_uuid.to_string()
+            },
+            |row| row.get(0),
+        )
+        .context("failed to get kek_argon_params for user")?;
+    let argon_params: ArgonParams =
+        serde_json::from_str(&params_str).context("failed to parse argon params from string")?;
+    let params = argon2::Params::new(
+        argon_params.m_cost,
+        argon_params.t_cost,
+        argon_params.p_cost,
+        None,
+    )
+    .context("failed to create argon2 params")?;
+
     if let Some(mut decoded) = base32::decode(base32::Alphabet::Crockford, &code) {
-        let argon2 = Argon2::default();
+        let argon2 = Argon2::new(
+            argon2::Algorithm::Argon2id,
+            argon2::Version::V0x13,
+            params.clone(),
+        );
         while let Some(row) = handle.next().context("failed to get next row")? {
             let hash: String = row.get(0).context("failed to get hash")?;
             let phc: PasswordHash<'_> =
                 argon2::PasswordHash::new(&hash).context("failed to parse hash from db to phc")?;
             if argon2.verify_password(&decoded, &phc).is_ok() {
                 found += 1;
-                users_db
-                    .execute(
-                        "UPDATE recovery_keys SET used_at = :time WHERE code_hash = :h",
-                        named_params! {
-                            ":time": crate::utils::get_time(),
-                            ":h": hash
-                        },
-                    )
-                    .context("Failed to mark code as used")?;
             }
 
             code.zeroize();
@@ -476,7 +512,7 @@ pub fn change_password(
     ).context("failed to obtain crypto meta for used code")?;
                 //For decryption
                 let mut kek_bytes = [0u8; 32];
-                Argon2::default()
+                argon2
                     .hash_password_into(&decoded, kdf_salt.as_bytes(), &mut kek_bytes)
                     .inspect_err(|e| {
                         tracing::error!(
@@ -524,15 +560,25 @@ pub fn change_password(
                     .encrypt(&new_nonce, decrypted_notes_key.as_ref())
                     .context("failed to wrap notes_key")?;
                 new_kek_bytes.zeroize();
-                let mut stmt = users_db.prepare("UPDATE users_data SET password_hash = :ph, notes_key = :nk, nonce_notes_key = :nnk, kek_salt = :kdf_salt, password_errors = 0 WHERE user_id = :uuid").context("failed to prepare update after changing password")?;
+                let mut stmt = users_db.prepare("UPDATE users_data SET password_hash = :ph, notes_key = :nk, nonce_notes_key = :nnk, kek_salt = :kdf_salt, password_errors = 0, kek_argon_params= :kap WHERE user_id = :uuid").context("failed to prepare update after changing password")?;
                 stmt.execute(named_params! {
                     ":ph": &hashed_password.to_string(),
                     ":nk": wrapped_key,
                     ":nnk": new_nonce.to_vec(),
                     ":kdf_salt": new_kdf_salt.to_string(),
-                    ":uuid": user_uuid.to_string()
+                    ":uuid": user_uuid.to_string(),
+                    ":kap": params_str
                 })
                 .context("failed updating users data table after changing password")?;
+                users_db
+                    .execute(
+                        "UPDATE recovery_keys SET used_at = :time WHERE code_hash = :h",
+                        named_params! {
+                            ":time": crate::utils::get_time(),
+                            ":h": hash
+                        },
+                    )
+                    .context("Failed to mark code as used")?;
                 log_helper(
                     "change password",
                     "success",
@@ -540,17 +586,11 @@ pub fn change_password(
                     "password changed successfully, user data updated",
                 );
                 decrypted_notes_key.zeroize();
-                break;
+                return Ok(());
             }
         }
-
-        //getting code bytes
-        //
-
-        // let argon2 = Argon2::default();
     }
-
-    Ok(())
+    return Err(crate::errors::Error::CodeNotFound);
 }
 
 #[test]

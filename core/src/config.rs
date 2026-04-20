@@ -46,6 +46,7 @@ use crate::utils::{Format, log_helper};
 use anyhow::Context;
 use dirs_next::data_local_dir;
 use indexmap::IndexMap;
+use reqwest::Client;
 use rusqlite::Connection;
 // use serde::{Deserialize, Serialize};
 
@@ -66,7 +67,6 @@ pub struct ProgramFiles {
     pub active_user_path: PathBuf,
     pub app_home: PathBuf,
 }
-//TODO add kek to state, on register add it to state, on login add it to state, on logout delete it from state
 #[derive(Default, Debug)]
 pub struct AppState {
     pub device_id: Mutex<Option<uuid::Uuid>>,
@@ -78,7 +78,10 @@ pub struct AppState {
     pub paths: Mutex<Option<ProgramFiles>>,
     pub user_config: Mutex<Option<IndexMap<String, String>>>,
     pub notes_key: Mutex<Option<chacha20poly1305::Key>>,
+
     pub access_token: Mutex<Option<AccessToken>>,
+    pub online_user_id: Mutex<Option<String>>, //BSON on server
+    pub server_client: Client,
 }
 
 impl AppState {
@@ -93,6 +96,8 @@ impl AppState {
             user_config: Mutex::new(None),
             notes_key: Mutex::new(None),
             access_token: Mutex::new(None),
+            online_user_id: Mutex::new(None),
+            server_client: Client::new(),
         })
     }
 }

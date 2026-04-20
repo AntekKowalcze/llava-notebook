@@ -36,6 +36,9 @@ pub enum Error {
     #[error("Note name after sanitization is empty")]
     NoteNameError,
 
+    #[error("Code not found")]
+    CodeNotFound,
+
     #[error("File with this note name already exists")]
     FileAlreadyExists,
 

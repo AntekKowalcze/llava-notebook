@@ -1,3 +1,4 @@
+use crate::constants::SERVER_ADDRESS;
 use crate::services::online_auth::models::online_account::{
     AccessToken, ArgonParams, RegisterDevicePayload, RegisterRequest, RegisterUserPayload, Tokens,
 };
@@ -8,14 +9,16 @@ use argon2::{
 };
 use chacha20poly1305::{AeadCore, ChaCha20Poly1305, Key, KeyInit, aead::Aead};
 use regex::Regex;
+use rusqlite::{Connection, named_params};
 use zeroize::Zeroize;
 pub async fn register(
+    client: &reqwest::Client,
     email: String,
     password: zeroize::Zeroizing<String>,
     password_repeated: zeroize::Zeroizing<String>,
     device_id: uuid::Uuid,
     notes_key: &chacha20poly1305::Key,
-) -> Result<AccessToken, crate::errors::Error> {
+) -> Result<(AccessToken, String), crate::errors::Error> {
     verify_email(&email)?;
     crate::services::local_auth::register::password_validation(&password, &password_repeated)?;
 
@@ -66,9 +69,8 @@ pub async fn register(
         user: user,
         device: device,
     };
-    let client = reqwest::Client::new();
     let res = client
-        .post("http://127.0.0.1:3000/auth/register")
+        .post(format!("{}auth/register", SERVER_ADDRESS))
         .json(&request)
         .send()
         .await
@@ -87,7 +89,7 @@ pub async fn register(
     entry
         .set_password(&tokens.refresh_token.0)
         .context("failed to store refresh token in keyring")?;
-    Ok(tokens.access_token)
+    Ok((tokens.access_token, tokens.user_id))
 }
 
 fn verify_email(email: &str) -> Result<(), crate::errors::Error> {
@@ -99,4 +101,22 @@ fn verify_email(email: &str) -> Result<(), crate::errors::Error> {
     } else {
         Ok(())
     }
+}
+
+pub fn change_email_in_database(
+    email: &str,
+    users_db: &Connection,
+    user_id: String,
+) -> Result<(), crate::errors::Error> {
+    users_db
+        .execute(
+            "UPDATE users_data SET online_account_email = :mail WHERE user_id = :id;",
+            named_params! {
+                ":mail": email,
+                ":id": user_id
+            },
+        )
+        .inspect_err(|err| println!("{:?}", err))
+        .context("failed to update mail in users_db locally")?;
+    Ok(())
 }

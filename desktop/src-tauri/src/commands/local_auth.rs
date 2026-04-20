@@ -3,6 +3,7 @@ use llava_core::local_auth::SessionState;
 use llava_core::AppState;
 use tauri::AppHandle;
 use tauri::Emitter;
+use zeroize::Zeroize;
 #[tauri::command]
 pub async fn register_command(
     username: String,
@@ -73,7 +74,10 @@ pub async fn login_command(
 
         let users_db = conn_guard.as_mut().ok_or(llava_core::Error::LockError)?;
         let paths = paths_guard.as_ref().ok_or(llava_core::Error::LockError)?;
-
+        let timeout = crate::commands::handlers::local_auth::check_timeout(&username, users_db)?; //returns diff between current timestamp and end of lock timestamp
+        if timeout > 0 {
+            return Err(llava_core::Error::AccountLocked(0));
+        }
         crate::commands::handlers::local_auth::login(username.clone(), password, paths, users_db)?
     };
 
@@ -219,11 +223,12 @@ pub async fn check_login_on_start(
             .ok_or(llava_core::Error::LockError)?
             .clone()
     };
-    let is_logged_in: SessionState =
+    let mut is_logged_in: SessionState =
         llava_core::local_auth::check_if_user_logged_in(users_db, &program_files)?;
 
-    if let SessionState::LoggedIn { user_id, notes_key } = &is_logged_in {
-        let notes_key: chacha20poly1305::Key = chacha20poly1305::Key::clone_from_slice(&notes_key);
+    if let SessionState::LoggedIn { user_id, notes_key } = &mut is_logged_in {
+        let mut owned_key: chacha20poly1305::Key =
+            chacha20poly1305::Key::clone_from_slice(&notes_key);
         let parsed_user_uuid =
             uuid::Uuid::parse_str(&user_id).context("Failed to parse user_id to string")?;
 
@@ -245,18 +250,38 @@ pub async fn check_login_on_start(
             updated_paths.clone(),
             username,
             user_config,
-            notes_key,
+            owned_key,
         )?;
+        *notes_key = vec![];
+        owned_key.zeroize();
     }
-    println!("{:#?}", state);
+
     Ok(is_logged_in)
 }
 
 #[tauri::command]
 pub async fn local_logout_command(
-    user_uuid: String,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), llava_core::Error> {
+    let user_uuid = {
+        let mut user_uuid_guard = state
+            .current_user
+            .lock()
+            .map_err(|_| llava_core::Error::LockError)?;
+        let id = user_uuid_guard
+            .as_mut()
+            .ok_or(llava_core::Error::LockError)?
+            .to_string();
+        id
+    };
+    *state
+        .access_token
+        .lock()
+        .map_err(|_| anyhow!("couldnt edit access_token"))? = None;
+    *state
+        .notes_key
+        .lock()
+        .map_err(|_| anyhow!("couldnt edit access_token"))? = None;
     *state
         .current_user
         .lock()
@@ -265,7 +290,6 @@ pub async fn local_logout_command(
         .notes_db
         .lock()
         .map_err(|_| anyhow!("Couldnt edit notes db in state"))? = None;
-
     *state
         .username
         .lock()

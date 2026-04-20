@@ -59,13 +59,14 @@ async function submitRegister() {
         toast.success('successfully regisered online user account');
         await router.replace("/main/");
     } catch (err: any) {
-        toast.error(err)
-        // if (err === 'UsernameExistsError') {
-        //     toast.warning('Username already exists');
-        // } else {
-        //     toast.error('Failed registering local user');
-        //     console.error('Registration failed:', err);
-        // } //TODO add error matching here for better UX
+        console.log(err)
+        if (err.InternalError === "failed to send request") {
+            toast.error("Check internet connection and try again")
+        } else if (err.Conflict === "this email exists" || err.InternalError === "server error: {\"error\":\"database error\"}") { //TODO debug this with test@test.pl and you should get waning,check handling 
+            toast.warning("this email exist, use different email")
+        } else {
+            toast.error("Internal Error failed to register user, try again")
+        }
     } finally {
         loading.value = false;
     }

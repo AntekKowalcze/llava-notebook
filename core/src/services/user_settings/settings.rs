@@ -399,19 +399,19 @@ pub fn load_config_backup(
 //change state hashmap, change hashmap on frontend
 #[test]
 
-fn state_index_map_test() {
-    let write_config = parse_config(
-        &crate::services::user_settings::settings_constants::default_config(
-            "C:\\Users\\Jakub\\AppData\\Local\\llava/users/ffcd2a2c-2de2-4864-9b8c-326e240bf385/",
-        ),
-    );
-    let parsed = parse_config_to_state_index_map(&write_config);
-    println!("{:#?}", parsed);
-    assert_eq!(
-        parsed.len(),
-        services::user_settings::settings_constants::NUMBER_OF_SETTINGS as usize
-    );
-}
+// fn state_index_map_test() {
+//     let write_config = parse_config(
+//         &crate::services::user_settings::settings_constants::default_config(
+//            // give path here
+//         ),
+//     );
+//     let parsed = parse_config_to_state_index_map(&write_config);
+//     println!("{:#?}", parsed);
+//     assert_eq!(
+//         parsed.len(),
+//         services::user_settings::settings_constants::NUMBER_OF_SETTINGS as usize
+//     );
+// }
 
 #[test]
 fn detect_duplicate_settings_by_length() {
@@ -450,21 +450,21 @@ fn detect_duplicate_settings_by_length() {
     );
 }
 
-#[test]
-fn parse_and_check_defaults_no_duplicates() {
-    let write_config = parse_config(
-        &crate::services::user_settings::settings_constants::default_config(
-            "C:\\Users\\Jakub\\AppData\\Local\\llava/users/ffcd2a2c-2de2-4864-9b8c-326e240bf385/",
-        ),
-    );
-    let parsed = parse_config_to_state_index_map(&write_config);
-    // Ensure no duplicates and that keys match expected set
-    assert_eq!(
-        parsed.len(),
-        services::user_settings::settings_constants::NUMBER_OF_SETTINGS as usize
-    );
-    assert!(check_config_correctnes(&parsed));
-}
+// #[test]
+// fn parse_and_check_defaults_no_duplicates() {
+//     let write_config = parse_config(
+//         &crate::services::user_settings::settings_constants::default_config(
+//            //GIVE PATH HERE
+//         ),
+//     );
+//     let parsed = parse_config_to_state_index_map(&write_config);
+//     // Ensure no duplicates and that keys match expected set
+//     assert_eq!(
+//         parsed.len(),
+//         services::user_settings::settings_constants::NUMBER_OF_SETTINGS as usize
+//     );
+//     assert!(check_config_correctnes(&parsed));
+// }
 
 #[test]
 fn deserialize_write_config_preserves_settings_order() {

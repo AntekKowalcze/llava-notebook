@@ -1,4 +1,3 @@
-use chacha20poly1305::Key;
 use zeroize::Zeroizing;
 pub fn register(
     username: String,

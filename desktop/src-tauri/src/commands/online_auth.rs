@@ -1,10 +1,13 @@
 use llava_core::AppState;
+use tauri::AppHandle;
+use tauri::Emitter;
 #[tauri::command]
 pub async fn register_user_online(
     email: String,
     password: String,
     password_repeated: String,
     state: tauri::State<'_, AppState>,
+    app_handle: AppHandle,
 ) -> Result<(), llava_core::Error> {
     let device_id = {
         let guard = state
@@ -21,22 +24,59 @@ pub async fn register_user_online(
             .map_err(|_| llava_core::Error::LockError)?;
         guard.as_ref().ok_or(llava_core::Error::LockError)?.clone()
     }; // guard dropped here
+    let client = &state.server_client;
     let password = zeroize::Zeroizing::new(password);
     let password_repeated = zeroize::Zeroizing::new(password_repeated);
 
-    let access_token = llava_core::online_auth::register(
-        email,
+    let (access_token, online_user_id) = llava_core::online_auth::register(
+        client,
+        email.clone(),
         password,
         password_repeated,
         device_id.clone(),
         &notes_key,
     )
     .await?;
+
+    let conn_guard = state
+        .users_db
+        .lock()
+        .map_err(|_| llava_core::Error::LockError)?;
+    let users_db = conn_guard.as_ref().ok_or(llava_core::Error::LockError)?;
+    let user_id_guard_ = state
+        .current_user
+        .lock()
+        .map_err(|_| llava_core::Error::LockError)?;
+    let user_id = user_id_guard_
+        .as_ref()
+        .ok_or(llava_core::Error::LockError)?;
+
+    llava_core::online_auth::change_email_in_database(&email, &users_db, user_id.to_string())?;
+    //do it after register/after login function same locally
     *state
         .access_token
         .lock()
         .map_err(|_| llava_core::Error::LockError)? = Some(access_token);
-
+    *state
+        .online_user_id
+        .lock()
+        .map_err(|_| llava_core::Error::LockError)? = Some(online_user_id);
+    let mut config_map_guard = state
+        .user_config
+        .lock()
+        .map_err(|_| llava_core::Error::LockError)?;
+    let config_map = config_map_guard
+        .as_mut()
+        .ok_or(llava_core::Error::LockError)?;
+    if let Some(value) = config_map.get_mut("local.mode") {
+        *value = "off".to_string();
+    } else {
+        config_map.insert("local.mode".to_string(), "off".to_string());
+        
+    } //TODO basicly we need some settings rewrite to make it compatible with state (when state changes settings change not only in way settings changes -> state changes), possibly add config state reload on /main so it refreshes, bottom bar should use some indented source of thruth
+    app_handle
+        .emit("config-updated", &config_map)
+        .map_err(|_| llava_core::Error::FatalError)?;
     Ok(())
 }
 // #[derive(serde::Deserialize)]
@@ -47,4 +87,4 @@ pub async fn register_user_online(
 //     pub aud: Vec<String>,
 //     pub device_id: uuid::Uuid,
 // }
-// TODO Change go backend to response with user id
+//TODO fight with this settings update, next think what else should change on frontend/backend after online register, then add settings + login + logout

@@ -17,6 +17,7 @@
 
 //config.rs
 //folders
+pub const SERVER_ADDRESS: &str = "http://127.0.0.1:3000/";
 pub const USER_DIR_PATTERN: &str = "llava/users";
 pub const SUBDIRS: &[&str; 4] = &["notes", "assets", "tmp", "tmp_delete"];
 //jsons
@@ -37,7 +38,7 @@ pub const LOGS_PATH: &str = "llava/logs/app.log";
 //SQL
 
 pub const NOTES_DB_VERSION: i64 = 0;
-pub const USERS_DB_VERSION: i64 = 1;
+pub const USERS_DB_VERSION: i64 = 2;
 pub const LOCAL_USER_DB_INSERT_SQL_SCHEMA: &str = r#"INSERT INTO users_data (
                 user_id,
                 username,
@@ -45,6 +46,7 @@ pub const LOCAL_USER_DB_INSERT_SQL_SCHEMA: &str = r#"INSERT INTO users_data (
                 notes_key,
                 nonce_notes_key,
                 kek_salt,
+                kek_argon_params,
                 master_key_enc,
                 master_key_nonce,
                 master_kek_salt,
@@ -62,6 +64,7 @@ pub const LOCAL_USER_DB_INSERT_SQL_SCHEMA: &str = r#"INSERT INTO users_data (
                 :notes_key, 
                 :nonce_notes_key,
                 :kek_salt, 
+                :kek_argon_params,
                 :master_key_enc,
                 :master_key_nonce,
                 :master_kek_salt,
@@ -202,7 +205,8 @@ pub const LOCAL_LOGIN_DB_SCHEMA: &str = r#" CREATE TABLE IF NOT EXISTS users_dat
                         password_hash TEXT NOT NULL, 
                         notes_key BLOB NOT NULL,
                         nonce_notes_key BLOB NOT NULL,
-                        kek_salt STRING,
+                        kek_salt TEXT,
+                        kek_argon_params TEXT,
                         master_key_enc BLOB,
                         master_key_nonce BLOB,
                         master_kek_salt TEXT,

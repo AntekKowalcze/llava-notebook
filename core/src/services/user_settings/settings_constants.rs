@@ -26,7 +26,6 @@ pub const SETTING_NAME_LIST: &[&str] = &[
     "local.deleteAccount",
     "local.changeUsername",
     "local.changePassword",
-    "online.mode",
     "online.sync",
     "online.connectedDevices",
     "online.changeUsername",
@@ -45,7 +44,7 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
                 "localModeEnabled".to_string(),
                 "Local / offline mode".to_string(),
                 "Work fully offline on this device only.".to_string(),
-                "off".to_string(),
+                "on".to_string(),
                 SettingInputType::Switch,
                 None,
             ),
@@ -200,15 +199,6 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
         "Online & sync".to_string(),
         None,
         vec![
-            Setting::new(
-                "online.mode".to_string(),
-                "onlineModeEnabled".to_string(),
-                "Online mode".to_string(),
-                "Connect this device to your online account.".to_string(),
-                "off".to_string(),
-                SettingInputType::Switch,
-                None,
-            ),
             Setting::new(
                 "online.sync".to_string(),
                 "onlineSyncEnabled".to_string(),
@@ -440,16 +430,6 @@ pub static SETTINGS_META: phf::Map<&'static str, SettingMeta> = phf_map! {
 
     },
 
-    "online.mode" => SettingMeta {
-        field: "onlineModeEnabled",
-        label: "Online mode",
-        description: "Connect this device to your online account.",
-        input_type: SettingInputType::Switch,
-        options: None,
-        button_label: None
-
-
-    },
 
     "online.sync" => SettingMeta {
         field: "onlineSyncEnabled",

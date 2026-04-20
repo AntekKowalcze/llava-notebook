@@ -6,23 +6,22 @@ const encrypted = computed(() => {
   return userConfig.config['local.encryption'];
 });
 const local = computed(() => {
-  console.log(userConfig.config['local.mode']);
-  if (userConfig.config['local.mode'] == 'on') {
-    return true;
-  } else {
-    return false;
-  }
+  console.log(userConfig.config['online.sync']);
+  return userConfig.config['online.sync'] == 'off'
 });
-import { Lock, CloudOff, LockOpen, HardDrive, Server } from 'lucide-vue-next';
+const connected = computed(() => {
+  return userConfig.config['local.mode'] == 'off'
+})
+
+import { Lock, CloudOff, LockOpen, HardDrive, Server, Cloud } from 'lucide-vue-next';
 //, CloudUpload, CloudCheck, RefreshCw,
 defineProps<{ version: string; synced: string }>();
 </script>
 
 <template>
   <div
-    class="flex h-7 w-full select-none flex-row items-center justify-between border-t border-white/5 bg-black/40 px-4 text-xs"
-  >
-    <!-- LEWA: info o notatce -->
+    class="flex h-7 w-full select-none flex-row items-center justify-between border-t border-white/5 bg-black/40 px-4 text-xs">
+    <!-- LEFT: placeholder info -->
     <div class="flex items-center gap-3 text-note-pumice">
       <span>Last edited 3 min ago</span>
       <div class="h-3 w-px bg-white/10" />
@@ -31,10 +30,14 @@ defineProps<{ version: string; synced: string }>();
       <span>Markdown</span>
     </div>
 
-    <!-- PRAWA: app status -->
     <div class="flex items-center gap-2">
+      <!-- online -->
+      <div class="flex items-center gap-1.5 text-green-500" v-if="connected">
+        <Cloud :size="12" />
+        <span>Online</span>
+      </div>
       <!-- offline -->
-      <div class="flex items-center gap-1.5 text-note-garnet">
+      <div class="flex items-center gap-1.5 text-note-garnet" v-else>
         <CloudOff :size="12" />
         <span>Offline</span>
       </div>
@@ -57,19 +60,14 @@ defineProps<{ version: string; synced: string }>();
       <div class="h-3 w-px bg-white/10" />
 
       <!-- encrypted -->
-      <div
-        class="flex items-center gap-1 rounded bg-note-glow/10 px-1.5 py-0.5 text-note-glow"
-        v-if="encrypted == 'on'"
-      >
+      <div class="flex items-center gap-1 rounded bg-note-glow/10 px-1.5 py-0.5 text-note-glow"
+        v-if="encrypted == 'on'">
         <Lock :size="11" />
         <span>Encrypted</span>
       </div>
 
       <!-- unencrypted -->
-      <div
-        class="flex items-center gap-1 rounded bg-note-garnet/10 px-1.5 py-0.5 text-note-garnet"
-        v-else
-      >
+      <div class="flex items-center gap-1 rounded bg-note-garnet/10 px-1.5 py-0.5 text-note-garnet" v-else>
         <LockOpen :size="11" />
         <span>Unencrypted</span>
       </div>
@@ -77,19 +75,13 @@ defineProps<{ version: string; synced: string }>();
       <div class="h-3 w-px bg-white/10" />
 
       <!-- local -->
-      <div
-        class="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 text-note-pumice"
-        v-if="local"
-      >
+      <div class="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 text-note-pumice" v-if="local">
         <HardDrive :size="11" />
         <span>Local</span>
       </div>
 
       <!-- cloud -->
-      <div
-        class="flex items-center gap-1 rounded bg-note-paprika/10 px-1.5 py-0.5 text-note-paprika"
-        v-else
-      >
+      <div class="flex items-center gap-1 rounded bg-note-paprika/10 px-1.5 py-0.5 text-note-paprika" v-else>
         <Server :size="11" />
         <span>Cloud</span>
       </div>

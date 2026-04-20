@@ -13,6 +13,7 @@ pub struct ArgonParams {
 pub struct Tokens {
     pub access_token: AccessToken,
     pub refresh_token: RefreshToken,
+    pub user_id: String,
 }
 #[derive(serde::Serialize)]
 pub struct RegisterRequest {
@@ -34,27 +35,27 @@ pub struct RegisterUserPayload {
     pub argon2_params: ArgonParams,
 }
 
-/// Received from the server — full user object
-#[serde_as]
-#[derive(Debug, Deserialize)]
-pub struct OnlineUser {
-    #[serde(rename = "_id")]
-    pub id: Option<String>, // server returns ObjectId as string
-    pub email: String,
-    pub email_verified: bool,
-    #[serde_as(as = "Base64")]
-    pub master_key_enc: Vec<u8>,
-    #[serde_as(as = "Base64")]
-    pub master_key_nonce: Vec<u8>,
-    pub kek_salt: String,
-    pub argon2_params: ArgonParams,
-    pub storage_used_bytes: i64,
-    pub quota_bytes: i64,
-    pub failed_attempts: i64,
-    pub lockout_until: Option<i64>,
-    pub created_at: i64,
-    pub last_login: i64,
-}
+/// Received from the server — full user object NOT useful i think?
+// #[serde_as]
+// #[derive(Debug, Deserialize)]
+// pub struct OnlineUser {
+//     #[serde(rename = "_id")]
+//     pub id: Option<String>, // server returns ObjectId as string not
+//     pub email: String,
+//     pub email_verified: bool,
+//     #[serde_as(as = "Base64")]
+//     pub master_key_enc: Vec<u8>,
+//     #[serde_as(as = "Base64")]
+//     pub master_key_nonce: Vec<u8>,
+//     pub kek_salt: String,
+//     pub argon2_params: ArgonParams,
+//     pub storage_used_bytes: i64,
+//     pub quota_bytes: i64,
+//     pub failed_attempts: i64,
+//     pub lockout_until: Option<i64>,
+//     pub created_at: i64,
+//     pub last_login: i64,
+// }
 /// Decoded contents of an access token JWT
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AccessTokenPayload {
@@ -77,16 +78,16 @@ pub struct RegisterDevicePayload {
 }
 
 /// Received from server — full device object
-#[derive(Debug, Deserialize)]
-pub struct Device {
-    #[serde(rename = "_id")]
-    pub id: Option<String>,
-    pub device_id: Uuid,
-    pub user_id: String,
-    pub device_name: String,
-    pub last_seen: i64,
-    pub created_at: i64,
-}
+// #[derive(Debug, Deserialize)]
+// pub struct Device {
+//     #[serde(rename = "_id")]
+//     pub id: Option<String>,
+//     pub device_id: Uuid,
+//     pub user_id: String,
+//     pub device_name: String,
+//     pub last_seen: i64,
+//     pub created_at: i64,
+// }
 
 /// Stored in OS keyring, sent to server on refresh
 // #[derive(Debug, Serialize, Deserialize)]
@@ -138,8 +139,6 @@ pub struct AuthResponse {
 
 // ## Online user model
 
-// Your list is correct but devices should be a **separate collection** — one user will have multiple devices:
-// ```
 // users collection:
 // {
 //   _id: uuid,
@@ -172,10 +171,3 @@ pub struct AuthResponse {
 //   last_seen: timestamp,
 //   created_at: timestamp
 // }
-
-//JWT data email, id, device id
-
-//HOW JWT WORKS IN THIS APP
-
-// go server is a middlleware between client and mongo db, its tasks it to check wheather user can do operation (authorization) wheather user is who he si (authentication) - JWT and then it should have sync logic, which is server time based, so there is no time zone miss understanding etc, all mongo queries happen on server
-// client do all hevy job encrypting and preparing data, server just do crud operations.

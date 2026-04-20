@@ -48,7 +48,7 @@ async function checkCode() {
     console.log(err);
     if (err == 'WrongPassword') {
       toast.warning('Code does not exist');
-    } else if (err === 'UserNotExist') {
+    } else if (err === 'UserNotExists') {
       toast.warning('User does not exist');
     } else {
       toast.error('internal error');
@@ -58,31 +58,12 @@ async function checkCode() {
 </script>
 
 <template>
-  <FormCard
-    header-text="Enter recovery key"
-    sub-text="enter the recovery code you received when logging in"
-  >
-    <TextInput
-      name="username"
-      placeholder="enter username"
-      :type="InputTypes.Text"
-      v-model="username"
-    ></TextInput>
-    <TextInput
-      name="code"
-      placeholder="enter recovery code"
-      :type="InputTypes.Text"
-      class="mb-24 mt-20"
-      v-model="code"
-    ></TextInput>
-    <SubmitButton
-      content="submit"
-      @click="checkCode"
-    ></SubmitButton>
-    <RouterLink
-      :to="originTo"
-      class="mb-0 mt-8 text-note-ivory/80 hover:underline"
-    >
+  <FormCard header-text="Enter recovery key" sub-text="enter the recovery code you received when logging in">
+    <TextInput name="username" placeholder="enter username" :type="InputTypes.Text" v-model="username"></TextInput>
+    <TextInput name="code" placeholder="enter recovery code" :type="InputTypes.Text" class="mb-24 mt-20" v-model="code">
+    </TextInput>
+    <SubmitButton content="submit" @click="checkCode"></SubmitButton>
+    <RouterLink :to="originTo" class="mb-0 mt-8 text-note-ivory/80 hover:underline">
       Go back
     </RouterLink>
   </FormCard>

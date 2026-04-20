@@ -42,12 +42,12 @@ use anyhow::Context;
 
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
 
+use crate::services::online_auth::models::online_account::ArgonParams;
+use crate::{ProgramFiles, errors, utils};
 use chacha20poly1305::{AeadCore, ChaCha20Poly1305, Key, KeyInit, aead, aead::Aead};
 use rusqlite::{Connection, OptionalExtension, named_params};
 use sha2::{Digest, Sha256};
 use zeroize::Zeroize;
-
-use crate::{ProgramFiles, errors, utils};
 
 pub fn autorization(
     username: &str,
@@ -143,24 +143,34 @@ pub fn local_log_in(
         .context("no user with this id")?;
     //delete session keyring token,
     let user_uuid = uuid::Uuid::parse_str(&user_uuid).context("failed to parse uuid")?;
-    change_last_login(users_db, &user_uuid)?;
-    let paths = crate::services::local_auth::register::after_validation(&user_uuid, paths)?;
-    let (notes_key, nonce, kek_salt) = users_db
+
+    let (notes_key, nonce, kek_salt, params_string) = users_db
         .query_row(
-            "SELECT notes_key, nonce_notes_key, kek_salt FROM users_data WHERE user_id = ?", //Z recovery key a nie z usera
+            "SELECT notes_key, nonce_notes_key, kek_salt,kek_argon_params FROM users_data WHERE user_id = ?", //Z recovery key a nie z usera
             [&user_uuid.to_string()],
             |row| {
                 let notes_key: Vec<u8> = row.get(0)?;
                 let nonce: Vec<u8> = row.get(1)?;
                 let kek: String = row.get(2)?;
-                Ok((notes_key, nonce, kek))
+                let params_string: String = row.get(3)?;
+                Ok((notes_key, nonce, kek, params_string))
             },
         )
         .context("Failed to get user encryption data from database")?;
 
-    let mut kek_bytes = [0u8; 32]; //create kek bytes empty array
-    Argon2::default()
-        .hash_password_into(password.as_bytes(), kek_salt.as_bytes(), &mut kek_bytes)
+    let mut kek_bytes = [0u8; 32];
+    let argon_params: ArgonParams =
+        serde_json::from_str(&params_string).context("failed to parse params from string")?;
+    let params = argon2::Params::new(
+        argon_params.m_cost,
+        argon_params.t_cost,
+        argon_params.p_cost,
+        None,
+    )
+    .context("failed to create params")?;
+    let arg = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
+    //from default to get from database
+    arg.hash_password_into(password.as_bytes(), kek_salt.as_bytes(), &mut kek_bytes) //create kek bytes empty array
         .inspect_err(|e| {
             tracing::error!(
                 task = "recovery code handling",
@@ -186,12 +196,15 @@ pub fn local_log_in(
         .map_err(|_| anyhow::anyhow!("Failed to decrypt notes_key"))
         .context("notes_key decryption failed")?;
 
+    let paths = crate::services::local_auth::register::after_validation(&user_uuid, paths)?;
     let notes_db = crate::services::storage::db_creation::get_connection(&paths)?;
     kek_bytes.zeroize();
     let notes_key: chacha20poly1305::Key =
         chacha20poly1305::Key::clone_from_slice(&decrypted_notes_key);
     session_operations(users_db, user_uuid, &notes_key)?;
+    change_last_login(users_db, &user_uuid)?;
     decrypted_notes_key.zeroize();
+
     crate::utils::log_helper(
         "logging",
         "success",
@@ -254,7 +267,23 @@ pub fn log_with_code(
         .context("failed to get handle to codes")?;
 
     if let Some(mut decoded) = base32::decode(base32::Alphabet::Crockford, &code) {
-        let argon2 = Argon2::default();
+        let params_string: String = users_db
+            .query_row(
+                "SELECT kek_argon_params FROM users_data WHERE user_id = :id",
+                named_params! {
+                    ":id": user_id.to_string()
+                },
+                |row| {
+                    let params: String = row.get(0)?;
+                    return Ok(params);
+                },
+            )
+            .context("failed to get params")?;
+        let params_s: ArgonParams =
+            serde_json::from_str(&params_string).context("failed to get params")?;
+        let params = argon2::Params::new(params_s.m_cost, params_s.t_cost, params_s.p_cost, None)
+            .context("Failed to create params")?;
+        let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
 
         while let Some(row) = handle.next().context("failed to get next row")? {
             let mut hash: String = row

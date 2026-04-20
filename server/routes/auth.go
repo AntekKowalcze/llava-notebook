@@ -80,6 +80,7 @@ func (h *Handler) Register(c fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"access_token":  accessToken,
 		"refresh_token": jti.String() + "." + signature,
+		"user_id":       refreshInsert.UserID.Hex(),
 	})
 }
 
@@ -145,6 +146,7 @@ func (h *Handler) Login(c fiber.Ctx) error {
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{
 			"access_token":  accessToken,
 			"refresh_token": jti.String() + "." + signature,
+			"user_id":       refreshInsert.UserID.Hex(),
 		})
 
 	} else {

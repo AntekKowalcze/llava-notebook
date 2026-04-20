@@ -67,6 +67,35 @@ pub fn run_users_migration(users_db: &rusqlite::Connection) -> Result<(), crate:
             })
             .context("Failed to commit migration transaction on users database")?;
     }
+    if version < 2 {
+        let tx = users_db
+            .unchecked_transaction()
+            .context("failed to create transaction")?;
+
+        if !column_exists(&tx, "users_data", "kek_argon_params")? {
+            tx.execute(
+                "ALTER TABLE users_data ADD COLUMN kek_argon_params TEXT",
+                [],
+            )
+            .context("failed to add users_data.kek_argon_params")?;
+
+            tx.execute(r#"UPDATE users_data SET kek_argon_params = '{"m_cost": 19456, "t_cost": 2, "p_cost": 1}'"#, []).context("failed to update params")?;
+        }
+
+        tx.pragma_update(None, "user_version", crate::constants::USERS_DB_VERSION)
+            .context("Failed to update db version")?;
+        tx.commit()
+            .inspect_err(|e| {
+                tracing::error!(
+                    task = "migrating database",
+                    status = "error",
+                    error = ?e,
+                    %version,
+                    "failed to commit transaction"
+                )
+            })
+            .context("Failed to commit migration transaction on users database")?;
+    }
 
     Ok(())
 }

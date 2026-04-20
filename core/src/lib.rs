@@ -43,6 +43,7 @@ pub mod stats {
 }
 
 pub mod online_auth {
+    pub use crate::services::online_auth::register::change_email_in_database;
     pub use crate::services::online_auth::register::register;
 }
 pub use config::get_device_id;
