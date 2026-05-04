@@ -12,7 +12,9 @@ import { RouterLink } from 'vue-router';
 import { useToast } from 'vue-toastification';
 import LoadingCircle from '../../components/main/LoadingCircle.vue';
 import { useOnlineAuthStore } from '../../stores/onlineAuth'
+import { useUserConfigStore } from '../../stores/userConfig';
 const onlineAuthStore = useOnlineAuthStore();;
+const userConfig = useUserConfigStore();
 const router = useRouter();
 const email = ref<string>('');
 const password = ref<string>('');
@@ -35,6 +37,7 @@ const canSubmit = computed(() => {
         isPasswordValid.value &&
         passwordsMatch.value &&
         repeatPassword.value.length > 0 &&
+        correctEmail.value &&
         email.value.length > 0 && passwordsMatch.value
 
     );
@@ -45,10 +48,12 @@ async function submitRegister() {
     loading.value = true;
 
     try {
+        userConfig.updateSettingValue("local.mode", "off");
         await invoke<void>('register_user_online', {
             email: email.value,
             password: password.value,
             passwordRepeated: repeatPassword.value,
+            currentSettings: userConfig.settingList
         });
 
         console.log('Registration success');
@@ -62,7 +67,7 @@ async function submitRegister() {
         console.log(err)
         if (err.InternalError === "failed to send request") {
             toast.error("Check internet connection and try again")
-        } else if (err.Conflict === "this email exists" || err.InternalError === "server error: {\"error\":\"database error\"}") { //TODO debug this with test@test.pl and you should get waning,check handling 
+        } else if (err.Conflict === "this email exists" || err.InternalError === "server error: {\"error\":\"database error\"}") { //TOD add better handling if user exists still showing internet connection
             toast.warning("this email exist, use different email")
         } else {
             toast.error("Internal Error failed to register user, try again")

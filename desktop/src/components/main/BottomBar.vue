@@ -1,19 +1,17 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useUserConfigStore } from '../../stores/userConfig';
-const userConfig = useUserConfigStore();
-const encrypted = computed(() => {
-  return userConfig.config['local.encryption'];
-});
-const local = computed(() => {
-  console.log(userConfig.config['online.sync']);
-  return userConfig.config['online.sync'] == 'off'
-});
-const connected = computed(() => {
-  return userConfig.config['local.mode'] == 'off'
-})
-
 import { Lock, CloudOff, LockOpen, HardDrive, Server, Cloud } from 'lucide-vue-next';
+const userConfig = useUserConfigStore();
+
+onMounted(() => {
+  void userConfig.init();
+});
+
+const encrypted = computed(() => userConfig.config['local.encryption']);
+const local = computed(() => userConfig.config['online.sync'] === 'off');
+const connected = computed(() => userConfig.config['local.mode'] === 'off');
+
 //, CloudUpload, CloudCheck, RefreshCw,
 defineProps<{ version: string; synced: string }>();
 </script>

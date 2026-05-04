@@ -37,7 +37,7 @@ pub async fn register_command(
     let user_config = llava_core::settings::get_config_for_state(&new_paths)?;
 
     app_handle
-        .emit("config-updated", &user_config)
+        .emit("config-updated", &user_config) 
         .map_err(|_| llava_core::Error::FatalError)?;
 
     crate::commands::command_helpers::change_state_after_login(
@@ -294,6 +294,7 @@ pub async fn local_logout_command(
         .username
         .lock()
         .map_err(|_| anyhow!("Couldnt edit username in state"))? = None;
+    *state.user_config.lock().map_err(|_| anyhow!("Couldnt edit config in state"))? = None;
     let users_db_guard = state
         .users_db
         .lock()

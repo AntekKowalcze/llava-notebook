@@ -1,3 +1,4 @@
+
 use std::collections;
 
 use anyhow::anyhow;
@@ -21,6 +22,28 @@ pub async fn get_config_data(
     let (user_config, created_default): (llava_core::settings::UserConfig, bool) =
         llava_core::settings::get_config(&paths)?;
     Ok((user_config, created_default))
+}
+
+/// Returns the backend config state map used for runtime decisions.
+#[tauri::command]
+pub async fn get_config_state(
+    state: tauri::State<'_, AppState>,
+) -> Result<collections::HashMap<String, String>, llava_core::Error> {
+    let paths_guard = state
+        .paths
+        .lock()
+        .map_err(|_| anyhow!("failed to lock AppState.paths"))?;
+
+    let paths: &llava_core::ProgramFiles =
+        paths_guard.as_ref().ok_or(llava_core::Error::LockError)?;
+
+    let state_config = llava_core::settings::get_config_for_state(&paths)?;
+    *state
+        .user_config
+        .lock()
+        .map_err(|_| anyhow!("Couldnt edit user_config in state"))? = Some(state_config.clone());
+
+    Ok(state_config.into_iter().collect())
 }
 
 #[tauri::command]
@@ -50,6 +73,8 @@ pub async fn update_settings(
         .map_err(|_| anyhow!("Couldnt edit user_config in state"))? = Some(hash_config);
     Ok(())
 }
+
+
 
 #[tauri::command]
 pub async fn get_methapone_map() -> collections::HashMap<String, Vec<String>> {

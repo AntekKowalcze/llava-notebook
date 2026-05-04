@@ -30,6 +30,9 @@ pub const SETTING_NAME_LIST: &[&str] = &[
     "online.connectedDevices",
     "online.changeUsername",
     "online.changePasswordEmail",
+    "online.register",
+    "online.login",
+    "online.logout",
     "online.aiSummary",
 ];
 pub const NUMBER_OF_SETTINGS: i64 = SETTING_NAME_LIST.len() as i64;
@@ -234,6 +237,33 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
                 "idle".to_string(),
                 SettingInputType::Button,
                 Some("Change".to_string()),
+            ),
+            Setting::new(
+                "online.register".to_string(),
+                "registerOnline".to_string(),
+                "Register account".to_string(),
+                "Create a new online account.".to_string(),
+                "idle".to_string(),
+                SettingInputType::Button,
+                Some("Register".to_string()),
+            ),
+            Setting::new(
+                "online.login".to_string(),
+                "loginOnline".to_string(),
+                "Login".to_string(),
+                "Sign in to your online account.".to_string(),
+                "idle".to_string(),
+                SettingInputType::Button,
+                Some("Login".to_string()),
+            ),
+            Setting::new(
+                "online.logout".to_string(),
+                "logoutOnline".to_string(),
+                "Logout".to_string(),
+                "Sign out from your online account on this device.".to_string(),
+                "idle".to_string(),
+                SettingInputType::Button,
+                Some("Logout".to_string()),
             ),
         ],
     );
@@ -458,6 +488,36 @@ pub static SETTINGS_META: phf::Map<&'static str, SettingMeta> = phf_map! {
         input_type: SettingInputType::Button,
         options: None,
         button_label: Some("Change")
+
+    },
+
+    "online.register" => SettingMeta {
+        field: "registerOnline",
+        label: "Register account",
+        description: "Create a new online account.",
+        input_type: SettingInputType::Button,
+        options: None,
+        button_label: Some("Register")
+
+    },
+
+    "online.login" => SettingMeta {
+        field: "loginOnline",
+        label: "Login",
+        description: "Sign in to your online account.",
+        input_type: SettingInputType::Button,
+        options: None,
+        button_label: Some("Login")
+
+    },
+
+    "online.logout" => SettingMeta {
+        field: "logoutOnline",
+        label: "Logout",
+        description: "Sign out from your online account on this device.",
+        input_type: SettingInputType::Button,
+        options: None,
+        button_label: Some("Logout")
 
     },
 

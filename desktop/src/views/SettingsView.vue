@@ -5,10 +5,9 @@ import ScreenDeviderHorizontal from '../components/dashboard/ScreenDeviderHorizo
 import { useAuthStore } from '../stores/auth';
 import { useRouter } from 'vue-router';
 import { invoke } from '@tauri-apps/api/core';
-import { onMounted } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import { Section, Setting, UserConfig } from '../types/settingTypes';
 import SectionComp from '../components/settings/SectionComp.vue';
-import { ref } from 'vue';
 import { useToast } from 'vue-toastification';
 import CheckboxInput from '../components/settings/CheckboxInput.vue';
 import metaphone from '../lib/metaphone';
@@ -16,10 +15,22 @@ import LogPreview from '../components/settings/LogPreview.vue';
 import PasswordInput from '../components/settings/PasswordInput.vue';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import ChangeUsername from '../components/settings/ChangeUsername.vue';
+import { useUserConfigStore } from '../stores/userConfig';
+import { storeToRefs } from 'pinia';
 const toast = useToast();
 const authStore = useAuthStore();
 const router = useRouter();
-const settingList = ref<UserConfig | null>(null);
+const userConfigStore = useUserConfigStore();
+const { settingList, isDefault } = storeToRefs(userConfigStore);
+
+const cardSettingsIdList: string[] = [
+  'local.mode',
+  'local.encryption',
+  'local.logout',
+
+  'local.showLogs',
+  'local.deleteLocalFiles',
+];
 const cardSettings = ref<Setting[]>([]);
 const username = ref<string | null>(authStore.loggedInUsername);
 const newUsername = ref<string>('');
@@ -110,28 +121,43 @@ function initSettingVisibility(sections: Section[], state: boolean) {
     if (section.subsections) initSettingVisibility(section.subsections, state);
   }
 }
+function rebuildCardSettings() {
+  if (!settingList.value) {
+    cardSettings.value = [];
+    return;
+  }
+
+  const nextList: Setting[] = [];
+  for (const settingId of cardSettingsIdList) {
+    const found = findSetting(settingList.value.sections, settingId);
+    if (found != null) nextList.push(found);
+  }
+  cardSettings.value = nextList;
+}
+
+watch(
+  settingList,
+  () => {
+    rebuildCardSettings();
+  },
+  { deep: true, immediate: true }
+);
+
 onMounted(async () => {
   try {
+    await userConfigStore.init();
     metaphoneMap = await invoke<Record<string, string[]>>('get_methapone_map');
-    const [userConfig, isDefault] = await invoke<[UserConfig, boolean]>('get_config_data');
-    settingList.value = userConfig;
-    if (isDefault)
+
+    if (isDefault.value)
       toast.info(
         'Default config was written, you can restore last working version by restore option in settings'
       );
-    initSettingVisibility(settingList.value.sections, true);
-    initVisibility(settingList.value.sections);
-    let cardSettingsIdList: string[] = [
-      'local.mode',
-      'local.encryption',
-      'local.logout',
-      'online.sync',
-      'local.showLogs',
-      'local.deleteLocalFiles',
-    ];
-    for (let setting of cardSettingsIdList) {
-      const found = findSetting(settingList.value.sections, setting);
-      if (found) cardSettings.value.push(found);
+    if (settingList.value) {
+      initSettingVisibility(settingList.value.sections, true);
+      initVisibility(settingList.value.sections);
+    }
+    else {
+      throw new Error("Failed to obtain user config")
     }
   } catch (e) {
     console.warn('get_config_data failed:', e);
@@ -144,7 +170,7 @@ function showFilters() {
 }
 async function handleChange(id: string, value: string) {
   if (!settingList.value) return;
-  findAndUpdate(settingList.value.sections, id, value);
+  userConfigStore.updateSettingValue(id, value);
   try {
     if (id != 'local.loadConfigBackup' && id != 'local.logout') {
       await invoke('update_settings', { userConfig: settingList.value });
@@ -153,14 +179,8 @@ async function handleChange(id: string, value: string) {
     toast.error('Failed to save config');
   }
   await handleUpdate(id);
-  let element = cardSettings.value.find((el) => el.id == id);
-  let index = cardSettings.value.findIndex((el) => el.id == id);
-  if (cardSettings.value[index] && element) {
-    element.currentValue = value;
-    cardSettings.value[index] = element;
-  }
 }
-//todo investigate why emiting config update from online auth is not causing change in settings and is not causing change on bottom bar
+
 async function handleUpdate(id: string) {
   console.log(id);
   switch (id) {
@@ -172,6 +192,7 @@ async function handleUpdate(id: string) {
           loggedInUsername: null,
           loggedInUserId: null,
         });
+        userConfigStore.settingList = null 
         toast.success('logged out successfully');
         router.replace('/');
       } catch (err) {
@@ -246,22 +267,9 @@ async function handleUpdate(id: string) {
   }
 }
 
-function findAndUpdate(sections: Section[], id: string, value: string): boolean {
-  for (const section of sections) {
-    for (const setting of section.sectionSettings) {
-      if (setting.id === id) {
-        setting.currentValue = value;
-        return true;
-      }
-    }
-    if (section.subsections) {
-      if (findAndUpdate(section.subsections, id, value)) return true; 
-    }
-  }
-  return false;
-}
 
-function findSetting(sections: Section[], id: string) {
+
+function findSetting(sections: Section[], id: string): Setting | null {
   for (const section of sections) {
     for (const setting of section.sectionSettings) {
       if (setting.id === id) {
@@ -269,9 +277,13 @@ function findSetting(sections: Section[], id: string) {
       }
     }
     if (section.subsections) {
-      return findSetting(section.subsections, id);
+      const found = findSetting(section.subsections, id);
+      if (found) return found;
     }
   }
+  return null
+ 
+  
 }
 function goToSetting(id: string) {
   const el = document.getElementById(id);
@@ -296,7 +308,8 @@ function handleVisibilityChange(id: string, value: boolean) {
   changeSectionVisibility(settingList.value.sections, id, value);
 }
 
-function getElementVisibility(sections: Section[], id: string): boolean | undefined {
+function getElementVisibility(sections: Section[] | null | undefined, id: string): boolean | undefined {
+  if (!sections) return undefined;
   for (let section of sections) {
     if (section.id === id) {
       return section.show;
@@ -437,7 +450,7 @@ function handleUsernameCancel() {
         @click="showFilters" />
       <template v-if="showFilter">
         <div v-for="filter in filters" :key="filter" class="ml-4 flex h-fit w-44 border-note-ivory">
-          <CheckboxInput :checked="getElementVisibility(settingList!.sections, filter) ?? true" :id="filter"
+          <CheckboxInput :checked="getElementVisibility(settingList?.sections, filter) ?? true" :id="filter"
             @visibility-changed="
               (id, value) => {
                 handleVisibilityChange(id, value);

@@ -1,3 +1,4 @@
+use llava_core::settings::UserConfig;
 use llava_core::AppState;
 use tauri::AppHandle;
 use tauri::Emitter;
@@ -8,7 +9,9 @@ pub async fn register_user_online(
     password_repeated: String,
     state: tauri::State<'_, AppState>,
     app_handle: AppHandle,
+    current_settings: UserConfig,
 ) -> Result<(), llava_core::Error> {
+    println!("{:?}", current_settings);
     let device_id = {
         let guard = state
             .device_id
@@ -24,6 +27,7 @@ pub async fn register_user_online(
             .map_err(|_| llava_core::Error::LockError)?;
         guard.as_ref().ok_or(llava_core::Error::LockError)?.clone()
     }; // guard dropped here
+
     let client = &state.server_client;
     let password = zeroize::Zeroizing::new(password);
     let password_repeated = zeroize::Zeroizing::new(password_repeated);
@@ -72,11 +76,24 @@ pub async fn register_user_online(
         *value = "off".to_string();
     } else {
         config_map.insert("local.mode".to_string(), "off".to_string());
-        
-    } //TODO basicly we need some settings rewrite to make it compatible with state (when state changes settings change not only in way settings changes -> state changes), possibly add config state reload on /main so it refreshes, bottom bar should use some indented source of thruth
+    }
+    println!("{:?}", config_map);
+    let paths = {
+        let guard = state
+            .paths
+            .lock()
+            .map_err(|_| llava_core::Error::LockError)?;
+        guard.as_ref().ok_or(llava_core::Error::LockError)?.clone()
+    };
+    let hash_config = llava_core::settings::save_config(
+        &current_settings,
+        paths.config_path.clone(),
+        paths.config_backup_path.clone(),
+    )?;
     app_handle
-        .emit("config-updated", &config_map)
+        .emit("config-updated", &hash_config)
         .map_err(|_| llava_core::Error::FatalError)?;
+
     Ok(())
 }
 // #[derive(serde::Deserialize)]
@@ -87,4 +104,5 @@ pub async fn register_user_online(
 //     pub aud: Vec<String>,
 //     pub device_id: uuid::Uuid,
 // }
-//TODO fight with this settings update, next think what else should change on frontend/backend after online register, then add settings + login + logout
+
+//TODO next think what else should change on frontend/backend after online register, then add settings + login + logout

@@ -1,3 +1,36 @@
+//! # Settings configuration module
+//! **Purpose**: Define settings data structures, parse settings between file format and UI format,
+//! and persist updates to disk. This module is the backend authority for runtime settings state.
+//!
+//! ## Exported items
+//! * [`SettingInputType`] — UI input types for a setting
+//! * [`Setting`] — UI-facing setting record
+//! * [`Section`] — UI-facing section with optional subsections
+//! * [`UserConfig`] — Full UI-facing settings tree
+//! * [`WriteSection`] — File-facing section record used for config.json
+//! * [`WriteConfig`] — File-facing settings tree
+//! * [`get_config`] — Read config.json and build a [`UserConfig`] (creates default on empty/invalid)
+//! * [`get_config_for_state`] — Read config.json and build the backend hashmap state
+//! * [`save_config`] — Persist a [`UserConfig`] to config.json and return updated hashmap
+//! * [`load_config_backup`] — Restore config.json from backup
+//!
+//! ## Key design decisions
+//! - Backend hashmap is the runtime source of truth; config.json is the persistence source of truth.
+//! - UI-facing structs are derived from metadata in `settings_constants`.
+//! - Every write flow rebuilds the hashmap from the file schema to keep order and structure stable.
+//!
+//! ## Settings sync cheatsheet
+//! 1) Frontend sends intent (full [`UserConfig`] or a patch command).
+//! 2) Backend applies change.
+//! 3) Backend writes config.json.
+//! 4) Backend rebuilds hashmap state.
+//! 5) Backend emits `config-updated` so frontend resyncs.
+//! 6) Frontend never mutates its hashmap directly; it renders from events.
+//!
+//! ## Dependencies
+//! - `serde` / `serde_json` — Serialisation of config.json
+//! - `indexmap` — Stable ordering for settings
+//! - `anyhow` — Context for IO/parse errors
 use crate::{
     ProgramFiles,
     services::{

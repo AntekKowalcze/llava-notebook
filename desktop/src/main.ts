@@ -14,7 +14,8 @@ const app = createApp(App);
 app.use(PrimeVue);
 app.use(createPinia());
 app.use(router);
-useUserConfigStore();
+const userConfigStore = useUserConfigStore();
+void userConfigStore.init();
 app.use(Toast as any, {
   transition: 'Vue-Toastification__bounce',
   maxToasts: 20,

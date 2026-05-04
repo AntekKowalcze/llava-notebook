@@ -3,6 +3,7 @@
 
 use llava_core::local_auth::connect_or_create_local_login_db;
 use llava_core::ProgramFiles;
+use tauri::Emitter;
 use tauri::Manager;
 mod commands;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -61,6 +62,18 @@ pub fn main() {
     builder
         .setup(|app| {
             app.manage(state);
+            let app_state = app.state::<llava_core::AppState>();
+
+            if let Ok(paths_guard) = app_state.paths.lock() {
+                if let Some(paths) = paths_guard.as_ref() {
+                    if let Ok(state_config) = llava_core::settings::get_config_for_state(paths) {
+                        if let Ok(mut config_guard) = app_state.user_config.lock() {
+                            *config_guard = Some(state_config.clone());
+                        }
+                        let _ = app.emit("config-updated", &state_config);
+                    }
+                }
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -75,6 +88,7 @@ pub fn main() {
             commands::utils::get_username_from_uuid,
             commands::dashboard::get_dashboard_data,
             commands::settings::get_config_data,
+            commands::settings::get_config_state,
             commands::settings::update_settings,
             commands::settings::get_methapone_map,
             commands::settings::load_backup_config,
