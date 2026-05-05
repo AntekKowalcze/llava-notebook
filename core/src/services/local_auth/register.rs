@@ -70,6 +70,7 @@ pub fn register_user_offline(
         master_kek_salt: None,
         is_online_linked: false,
         online_account_email: None,
+        online_account_id: None,
         device_id: crate::config::get_device_id(&users_db, &paths.device_id_path)?,
         created_at: crate::utils::get_time(),
         last_login: crate::utils::get_time(),

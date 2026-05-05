@@ -19,6 +19,7 @@ pub struct LocalUser {
     pub master_kek_salt: Option<String>,
     pub is_online_linked: bool,
     pub online_account_email: Option<String>,
+    pub online_account_id: Option<String>,
     #[zeroize(skip)]
     pub device_id: uuid::Uuid,
     pub created_at: i64,

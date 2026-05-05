@@ -18,7 +18,8 @@ defineProps<{ version: string; synced: string }>();
 
 <template>
   <div
-    class="flex h-7 w-full select-none flex-row items-center justify-between border-t border-white/5 bg-black/40 px-4 text-xs">
+    class="flex h-7 w-full select-none flex-row items-center justify-between border-t border-white/5 bg-black/40 px-4 text-xs"
+  >
     <!-- LEFT: placeholder info -->
     <div class="flex items-center gap-3 text-note-pumice">
       <span>Last edited 3 min ago</span>
@@ -30,12 +31,18 @@ defineProps<{ version: string; synced: string }>();
 
     <div class="flex items-center gap-2">
       <!-- online -->
-      <div class="flex items-center gap-1.5 text-green-500" v-if="connected">
+      <div
+        class="flex items-center gap-1.5 text-green-500"
+        v-if="connected"
+      >
         <Cloud :size="12" />
         <span>Online</span>
       </div>
       <!-- offline -->
-      <div class="flex items-center gap-1.5 text-note-garnet" v-else>
+      <div
+        class="flex items-center gap-1.5 text-note-garnet"
+        v-else
+      >
         <CloudOff :size="12" />
         <span>Offline</span>
       </div>
@@ -58,14 +65,19 @@ defineProps<{ version: string; synced: string }>();
       <div class="h-3 w-px bg-white/10" />
 
       <!-- encrypted -->
-      <div class="flex items-center gap-1 rounded bg-note-glow/10 px-1.5 py-0.5 text-note-glow"
-        v-if="encrypted == 'on'">
+      <div
+        class="flex items-center gap-1 rounded bg-note-glow/10 px-1.5 py-0.5 text-note-glow"
+        v-if="encrypted == 'on'"
+      >
         <Lock :size="11" />
         <span>Encrypted</span>
       </div>
 
       <!-- unencrypted -->
-      <div class="flex items-center gap-1 rounded bg-note-garnet/10 px-1.5 py-0.5 text-note-garnet" v-else>
+      <div
+        class="flex items-center gap-1 rounded bg-note-garnet/10 px-1.5 py-0.5 text-note-garnet"
+        v-else
+      >
         <LockOpen :size="11" />
         <span>Unencrypted</span>
       </div>
@@ -73,13 +85,19 @@ defineProps<{ version: string; synced: string }>();
       <div class="h-3 w-px bg-white/10" />
 
       <!-- local -->
-      <div class="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 text-note-pumice" v-if="local">
+      <div
+        class="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 text-note-pumice"
+        v-if="local"
+      >
         <HardDrive :size="11" />
         <span>Local</span>
       </div>
 
       <!-- cloud -->
-      <div class="flex items-center gap-1 rounded bg-note-paprika/10 px-1.5 py-0.5 text-note-paprika" v-else>
+      <div
+        class="flex items-center gap-1 rounded bg-note-paprika/10 px-1.5 py-0.5 text-note-paprika"
+        v-else
+      >
         <Server :size="11" />
         <span>Cloud</span>
       </div>

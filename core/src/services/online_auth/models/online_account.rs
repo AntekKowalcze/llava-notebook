@@ -66,7 +66,7 @@ pub struct AccessTokenPayload {
 }
 
 /// Raw access token — just a wrapper so you don't pass bare strings around
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 
 pub struct AccessToken(pub String);
 
@@ -103,6 +103,11 @@ pub struct RefreshToken(pub String);
 pub struct AuthResponse {
     pub access_token: String,
     pub device_id: Uuid,
+}
+#[derive(Debug, Deserialize)]
+pub struct RefreshResponse {
+    pub access_token: AccessToken,
+    pub refresh_token: RefreshToken,
 }
 
 // {

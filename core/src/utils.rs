@@ -2,6 +2,7 @@
 
 use anyhow::Context;
 use rusqlite::{Connection, OptionalExtension, named_params};
+#[allow(dead_code)]
 pub fn getting_user_input(buffer: &mut String) {
     println!("Podaj treść");
     std::io::stdin()
@@ -73,3 +74,47 @@ pub fn get_host_name() -> Result<String, crate::errors::Error> {
         .to_string();
     Ok(hostname)
 }
+
+pub fn get_online_id(
+    user_id: &uuid::Uuid,
+    users_db: &Connection,
+) -> Result<String, crate::errors::Error> {
+    let online_id = users_db
+        .query_row(
+            "SELECT online_account_id FROM users_data WHERE user_id = :id;",
+            named_params!(":id": user_id.to_string()),
+            |row| row.get(0),
+        )
+        .optional()
+        .context("failed to get online user_id")?;
+
+    online_id.ok_or(crate::errors::Error::NotLoggedIn)
+}
+
+pub fn get_email_from_online_id(
+    online_id: &str,
+    users_db: &Connection,
+) -> Result<String, crate::errors::Error> {
+    let email = users_db
+        .query_row(
+            "SELECT online_account_email FROM users_data WHERE online_account_id = :id;",
+            named_params!(":id": online_id),
+            |row| row.get(0),
+        )
+        .context("failed to get online user_id")?;
+    return Ok(email);
+}
+pub fn is_online_linked(
+    user_id: &uuid::Uuid,
+    users_db: &Connection,
+) -> Result<bool, crate::errors::Error> {
+    let linked: i64 = users_db
+        .query_row(
+            "SELECT is_online_linked FROM users_data WHERE user_id = :id;",
+            named_params!(":id": user_id.to_string()),
+            |row| row.get(0),
+        )
+        .context("failed to get is_online_linked")?;
+    return Ok(linked == 1);
+}
+//todo change error on connection so when timed out, its server unavailable and on no connection internet errro

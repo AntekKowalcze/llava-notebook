@@ -22,6 +22,9 @@ pub static PHONETIC_CORPUS: phf::Map<&'static str, &'static [&'static str]> = ph
     "online.connectedDevices" => &["connected", "devices", "manage", "view", "account", "link", "linked"],
     "online.changePasswordEmail" => &["password", "email", "change", "reset", "link", "send", "security", "credential"],
     "online.changeUsername" => &["username", "name", "change", "update", "account", "profile", "rename"],
+    "online.register" => &["register", "signup", "create", "account", "join", "sign"],
+    "online.login" => &["login", "signin", "authenticate", "access", "session", "sign"],
+    "online.logout" => &["logout", "signout", "exit", "leave", "sign"],
     "online.aiSummary" => &["ai", "summary", "summaries", "generate", "notes", "intelligence", "automation", "smart"],
 };
 
@@ -257,7 +260,7 @@ fn metaphone(entry: &str) -> String {
                     output.push('k');
                     index += 1;
                     continue;
-                } //should g be dropped at the end?
+                }
 
                 output.push('k');
                 index += 1;

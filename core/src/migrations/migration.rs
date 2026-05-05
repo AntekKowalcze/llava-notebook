@@ -97,6 +97,34 @@ pub fn run_users_migration(users_db: &rusqlite::Connection) -> Result<(), crate:
             .context("Failed to commit migration transaction on users database")?;
     }
 
+    if version < 3 {
+        let tx = users_db
+            .unchecked_transaction()
+            .context("failed to create transaction")?;
+
+        if !column_exists(&tx, "users_data", "online_account_id")? {
+            tx.execute(
+                "ALTER TABLE users_data ADD COLUMN online_account_id TEXT",
+                [],
+            )
+            .context("failed to add users_data.online_account_id")?;
+        }
+
+        tx.pragma_update(None, "user_version", crate::constants::USERS_DB_VERSION)
+            .context("Failed to update db version")?;
+        tx.commit()
+            .inspect_err(|e| {
+                tracing::error!(
+                    task = "migrating database",
+                    status = "error",
+                    error = ?e,
+                    %version,
+                    "failed to commit transaction"
+                )
+            })
+            .context("Failed to commit migration transaction on users database")?;
+    }
+
     Ok(())
 }
 

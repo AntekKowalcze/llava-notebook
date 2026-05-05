@@ -28,9 +28,8 @@ export const useUserConfigStore = defineStore('userConfig', () => {
     if (initPromise) return initPromise;
 
     initPromise = (async () => {
-      const [settingListData, isDefaultData] = await invoke<[UserConfig, boolean]>(
-        'get_config_data'
-      );
+      const [settingListData, isDefaultData] =
+        await invoke<[UserConfig, boolean]>('get_config_data');
       settingList.value = settingListData;
       isDefault.value = isDefaultData;
 
@@ -72,5 +71,5 @@ export const useUserConfigStore = defineStore('userConfig', () => {
   return { config, settingList, isDefault, updateSettingValue, init };
 });
 //get here another listener which gets key and value and then runs find and update with this values so its changed like in setting view
-//config is writen on register, so its created 
+//config is writen on register, so its created
 //i think the best solution is 1. move settingsList to config store with update handling, and now i will be able to change config from backend emitting event and it will be automaticly upadted in settingsView file as well

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { invoke } from '@tauri-apps/api/core';
 import { ref } from 'vue';
+import { useOnlineAuthStore } from './onlineAuth';
 
 export const useAuthStore = defineStore('auth', () => {
   const hasNoUsers = ref<boolean | null>(null);
@@ -9,6 +10,7 @@ export const useAuthStore = defineStore('auth', () => {
   const loggedInUserId = ref<string | null>(null);
   const recoveryKeys = ref<string[] | null>(null);
   const pendingCode = ref<string | null>(null);
+  const linked = ref<boolean>(false);
   async function checkUsers() {
     try {
       const exists = await invoke<boolean>('check_if_user_exists');
@@ -18,12 +20,15 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
   async function checkSession() {
+    const onlineAuthStore = useOnlineAuthStore();
     try {
-      const state = await invoke<{ status: string; user_id?: string }>('check_login_on_start');
-
-      if (state.status === 'logged_in') {
-        loggedInUserId.value = state.user_id ?? null;
-
+      const [sessionState, loggedInOnline] =
+        await invoke<
+          [{ status: string; [key: string]: any }, { status: string; [key: string]: any }]
+        >('check_login_on_start');
+      console.log(loggedInOnline, sessionState); //why notes_key empty? also why online errors
+      if (sessionState.status === 'logged_in') {
+        loggedInUserId.value = sessionState.user_id ?? null;
         try {
           loggedInUsername.value = await invoke<string>('get_username_from_uuid', {
             userUuid: loggedInUserId.value,
@@ -38,7 +43,22 @@ export const useAuthStore = defineStore('auth', () => {
       } else {
         loggedIn.value = false;
       }
-    } catch {
+      if (loggedInOnline.status === 'logged_in') {
+        linked.value = true;
+        onlineAuthStore.$patch({
+          loggedIn: true,
+          loggedInId: loggedInOnline.data ?? null,
+        });
+        await onlineAuthStore.fetchEmail();
+      } else if ((loggedInOnline.status = 'not_linked')) {
+        linked.value = false;
+        onlineAuthStore.$patch({
+          loggedIn: false,
+          loggedInId: null,
+        });
+      }
+    } catch (err) {
+      console.error('checkSession error:', err);
       loggedIn.value = false;
     }
   }
@@ -51,6 +71,7 @@ export const useAuthStore = defineStore('auth', () => {
     recoveryKeys,
     checkUsers,
     pendingCode,
+    linked,
     checkSession,
   };
 });

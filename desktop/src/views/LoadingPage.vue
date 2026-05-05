@@ -29,18 +29,33 @@ async function logout() {
 </script>
 
 <template>
-  <IconComponent :height="'44'" :width="'44'"></IconComponent>
+  <IconComponent
+    :height="'44'"
+    :width="'44'"
+  ></IconComponent>
   <LoadingCircle />
   <!-- LOGOUT -->
-  <SubmitButton :disabled="false" :content="buttonContent" @click="logout"></SubmitButton>
-  <SubmitButton :disabled="false" :content="'go to settings'" @click="
-    () => {
-      router.replace('/main/settings');
-    }
-  "></SubmitButton>
-  <SubmitButton :disabled="false" :content="'go to dashboard'" @click="
-    () => {
-      router.replace('/main/dashboard');
-    }
-  "></SubmitButton>
+  <SubmitButton
+    :disabled="false"
+    :content="buttonContent"
+    @click="logout"
+  ></SubmitButton>
+  <SubmitButton
+    :disabled="false"
+    :content="'go to settings'"
+    @click="
+      () => {
+        router.replace('/main/settings');
+      }
+    "
+  ></SubmitButton>
+  <SubmitButton
+    :disabled="false"
+    :content="'go to dashboard'"
+    @click="
+      () => {
+        router.replace('/main/dashboard');
+      }
+    "
+  ></SubmitButton>
 </template>

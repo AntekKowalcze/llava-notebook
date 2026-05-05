@@ -431,7 +431,6 @@ pub fn load_config_backup(
 }
 //change state hashmap, change hashmap on frontend
 #[test]
-
 // fn state_index_map_test() {
 //     let write_config = parse_config(
 //         &crate::services::user_settings::settings_constants::default_config(
@@ -445,7 +444,6 @@ pub fn load_config_backup(
 //         services::user_settings::settings_constants::NUMBER_OF_SETTINGS as usize
 //     );
 // }
-
 #[test]
 fn detect_duplicate_settings_by_length() {
     // Create a WriteConfig with duplicated setting keys across sections

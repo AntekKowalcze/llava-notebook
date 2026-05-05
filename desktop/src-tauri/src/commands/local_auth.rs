@@ -37,7 +37,7 @@ pub async fn register_command(
     let user_config = llava_core::settings::get_config_for_state(&new_paths)?;
 
     app_handle
-        .emit("config-updated", &user_config) 
+        .emit("config-updated", &user_config)
         .map_err(|_| llava_core::Error::FatalError)?;
 
     crate::commands::command_helpers::change_state_after_login(
@@ -203,28 +203,40 @@ pub async fn change_password(
     Ok(())
 }
 
+#[derive(Debug, serde::Serialize)]
+#[serde(tag = "status", content = "data", rename_all = "snake_case")]
+pub enum LoggedInOnline {
+    LoggedIn(String),
+    NotLoggedIn(llava_core::Error),
+    NotLinked,
+}
+
 #[tauri::command]
 pub async fn check_login_on_start(
     app_handle: AppHandle,
     state: tauri::State<'_, AppState>,
-) -> Result<SessionState, llava_core::Error> {
-    let user_db_guard = state
-        .users_db
-        .lock()
-        .map_err(|_| anyhow!("Couldnt get user_db guard"))?;
-    let users_db = user_db_guard.as_ref().ok_or(llava_core::Error::LockError)?;
+) -> Result<(SessionState, LoggedInOnline), llava_core::Error> {
+    let mut is_logged_in_online: LoggedInOnline = LoggedInOnline::NotLinked;
     let program_files = {
         let program_files_guard = state
             .paths
             .lock()
-            .map_err(|_| anyhow!("Couldnt get program filesguard"))?;
+            .map_err(|_| anyhow!("Couldnt get program files guard"))?;
         program_files_guard
             .as_ref()
             .ok_or(llava_core::Error::LockError)?
             .clone()
     };
-    let mut is_logged_in: SessionState =
-        llava_core::local_auth::check_if_user_logged_in(users_db, &program_files)?;
+    let mut is_logged_in: SessionState = {
+        let users_db_guard = state
+            .users_db
+            .lock()
+            .map_err(|_| llava_core::Error::LockError)?;
+        let users_db = users_db_guard
+            .as_ref()
+            .ok_or(llava_core::Error::NotLoggedIn)?;
+        llava_core::local_auth::check_if_user_logged_in(users_db, &program_files)?
+    };
 
     if let SessionState::LoggedIn { user_id, notes_key } = &mut is_logged_in {
         let mut owned_key: chacha20poly1305::Key =
@@ -232,13 +244,24 @@ pub async fn check_login_on_start(
         let parsed_user_uuid =
             uuid::Uuid::parse_str(&user_id).context("Failed to parse user_id to string")?;
 
-        let updated_paths =
-            llava_core::get_paths(program_files.app_home.clone(), &parsed_user_uuid)?;
+        let (updated_paths, notes_db, username, user_config, is_linked) = {
+            let users_db_guard = state
+                .users_db
+                .lock()
+                .map_err(|_| llava_core::Error::LockError)?;
+            let users_db = users_db_guard
+                .as_ref()
+                .ok_or(llava_core::Error::NotLoggedIn)?;
 
-        let notes_db = llava_core::storage::get_connection(&updated_paths)?;
+            let updated_paths =
+                llava_core::get_paths(program_files.app_home.clone(), &parsed_user_uuid)?;
+            let notes_db = llava_core::storage::get_connection(&updated_paths)?;
+            let username = llava_core::get_username_from_uuid(users_db, user_id.clone())?;
+            let user_config = llava_core::settings::get_config_for_state(&updated_paths)?;
+            let is_linked = llava_core::is_online_linked(&parsed_user_uuid, &users_db)?;
+            (updated_paths, notes_db, username, user_config, is_linked)
+        };
 
-        let username = llava_core::get_username_from_uuid(users_db, user_id.clone())?;
-        let user_config = llava_core::settings::get_config_for_state(&updated_paths)?;
         app_handle
             .emit("config-updated", &user_config)
             .map_err(|_| llava_core::Error::FatalError)?;
@@ -252,11 +275,69 @@ pub async fn check_login_on_start(
             user_config,
             owned_key,
         )?;
-        *notes_key = vec![];
+
+        let is_local = {
+            let guard = state
+                .user_config
+                .lock()
+                .map_err(|_| llava_core::Error::LockError)?;
+            match guard
+                .as_ref()
+                .ok_or(llava_core::Error::LockError)?
+                .clone()
+                .get("local.mode")
+            {
+                Some(option) => option == "on",
+                None => false,
+            }
+        };
+
+        if !is_local && is_linked {
+            let online_id = {
+                let users_db_guard = state
+                    .users_db
+                    .lock()
+                    .map_err(|_| llava_core::Error::LockError)?;
+                let users_db = users_db_guard
+                    .as_ref()
+                    .ok_or(llava_core::Error::NotLoggedIn)?;
+
+                match llava_core::get_online_id(&parsed_user_uuid, users_db) {
+                    Ok(id) => Some(id),
+                    Err(err) => {
+                        is_logged_in_online = LoggedInOnline::NotLoggedIn(err);
+                        None
+                    }
+                }
+            };
+
+            if let Some(online_id) = online_id {
+                let client = state.server_client.clone();
+                let res =
+                    llava_core::online_auth::check_if_logged_in_online(&online_id, client).await;
+                if let Ok(token) = res {
+                    *state
+                        .access_token
+                        .lock()
+                        .map_err(|_| llava_core::Error::LockError)? = Some(token);
+                    *state
+                        .online_user_id
+                        .lock()
+                        .map_err(|_| llava_core::Error::LockError)? = Some(online_id.clone());
+
+                    is_logged_in_online = LoggedInOnline::LoggedIn(online_id);
+                } else if let Err(err) = res {
+                    is_logged_in_online = LoggedInOnline::NotLoggedIn(err)
+                }
+            }
+
+            // todo continue from here, add error matching on network error while trying to login after reboot
+        }
+        *notes_key = vec![]; //frontend should not see the key so its correct
         owned_key.zeroize();
     }
 
-    Ok(is_logged_in)
+    Ok((is_logged_in, is_logged_in_online))
 }
 
 #[tauri::command]
@@ -274,6 +355,7 @@ pub async fn local_logout_command(
             .to_string();
         id
     };
+
     *state
         .access_token
         .lock()
@@ -294,7 +376,10 @@ pub async fn local_logout_command(
         .username
         .lock()
         .map_err(|_| anyhow!("Couldnt edit username in state"))? = None;
-    *state.user_config.lock().map_err(|_| anyhow!("Couldnt edit config in state"))? = None;
+    *state
+        .user_config
+        .lock()
+        .map_err(|_| anyhow!("Couldnt edit config in state"))? = None;
     let users_db_guard = state
         .users_db
         .lock()

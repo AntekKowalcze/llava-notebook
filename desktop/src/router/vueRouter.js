@@ -2,6 +2,7 @@ import { createWebHashHistory, createRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { invoke } from '@tauri-apps/api/core';
 import { useToast } from 'vue-toastification';
+import { useOnlineAuthStore } from '../stores/onlineAuth';
 import MainView from '../views/MainView.vue';
 const toast = useToast();
 const routes = [
@@ -11,6 +12,7 @@ const routes = [
 
     beforeEnter: async () => {
       const authStore = useAuthStore();
+      const onlineAuthStore = useOnlineAuthStore();
       try {
         await Promise.all([authStore.checkUsers(), authStore.checkSession()]); //check session should probably return user id and then
 
@@ -20,6 +22,15 @@ const routes = [
           return { path: '/register', replace: true };
         } else if (!hasNoUsers && authStore.loggedIn) {
           toast.success(authStore.loggedInUsername + ' logged in');
+          console.log('HERE', onlineAuthStore.loggedIn);
+          if (onlineAuthStore.loggedIn) {
+            console.log('HEREE');
+
+            toast.success(onlineAuthStore.loggedInEmail + ' logged in to online account');
+          } else {
+            console.log(onlineAuthStore.loggedInEmail, onlineAuthStore.loggedIn);
+            if (authStore.linked) toast.warning('failed to login to online account'); //if not exist do not show anything
+          }
           return { path: '/main/', replace: true };
         } else if (!hasNoUsers && !authStore.loggedIn) {
           console.log('not logged in');
@@ -84,8 +95,8 @@ const routes = [
     path: '/register/online',
     name: 'registerOnline',
     component: () => import('../views/auth/OnlineRegister.vue'),
-    meta: {skipAuth: true}
-  }
+    meta: { skipAuth: true },
+  },
 ];
 export const router = createRouter({
   history: createWebHashHistory(),

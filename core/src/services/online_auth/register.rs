@@ -74,8 +74,12 @@ pub async fn register(
         .json(&request)
         .send()
         .await
-        .context("failed to send request")?;
+        .map_err(|err| crate::errors::Error::from_reqwest_error(&err))?;
     if !res.status().is_success() {
+        let status = res.status().as_u16();
+        if status == 409 {
+            return Err(crate::errors::Error::EmailAlreadyUsed);
+        }
         let err = res.text().await.unwrap_or_default();
         return Err(anyhow::anyhow!("server error: {}", err).into());
     }
@@ -84,8 +88,11 @@ pub async fn register(
         .json::<Tokens>()
         .await
         .context("failed to parse response")?;
-    let entry = keyring::Entry::new("llava_desktop", "refresh_token")
-        .context("failed to create keyring entry")?;
+    let entry = keyring::Entry::new(
+        "llava_desktop",
+        &format!("refresh_token_id:{}", &tokens.user_id),
+    )
+    .context("failed to create keyring entry")?;
     entry
         .set_password(&tokens.refresh_token.0)
         .context("failed to store refresh token in keyring")?;
@@ -106,13 +113,15 @@ fn verify_email(email: &str) -> Result<(), crate::errors::Error> {
 pub fn change_email_in_database(
     email: &str,
     users_db: &Connection,
+    id: &str,
     user_id: String,
 ) -> Result<(), crate::errors::Error> {
     users_db
         .execute(
-            "UPDATE users_data SET online_account_email = :mail WHERE user_id = :id;",
+            "UPDATE users_data SET online_account_email = :mail, online_account_id = :online_id, is_online_linked = 1 WHERE user_id = :id;",
             named_params! {
                 ":mail": email,
+                ":online_id": id,
                 ":id": user_id
             },
         )

@@ -11,7 +11,6 @@ pub async fn register_user_online(
     app_handle: AppHandle,
     current_settings: UserConfig,
 ) -> Result<(), llava_core::Error> {
-    println!("{:?}", current_settings);
     let device_id = {
         let guard = state
             .device_id
@@ -55,7 +54,12 @@ pub async fn register_user_online(
         .as_ref()
         .ok_or(llava_core::Error::LockError)?;
 
-    llava_core::online_auth::change_email_in_database(&email, &users_db, user_id.to_string())?;
+    llava_core::online_auth::change_email_in_database(
+        &email,
+        &users_db,
+        &online_user_id,
+        user_id.to_string(),
+    )?;
     //do it after register/after login function same locally
     *state
         .access_token
@@ -77,7 +81,6 @@ pub async fn register_user_online(
     } else {
         config_map.insert("local.mode".to_string(), "off".to_string());
     }
-    println!("{:?}", config_map);
     let paths = {
         let guard = state
             .paths
@@ -105,4 +108,68 @@ pub async fn register_user_online(
 //     pub device_id: uuid::Uuid,
 // }
 
-//TODO next think what else should change on frontend/backend after online register, then add settings + login + logout
+#[tauri::command]
+pub async fn online_logout(state: tauri::State<'_, AppState>) -> Result<(), llava_core::Error> {
+    let user_id = {
+        let guard = state
+            .online_user_id
+            .lock()
+            .map_err(|_| llava_core::Error::LockError)?;
+        guard
+            .as_ref()
+            .ok_or(llava_core::Error::NotLoggedIn)?
+            .clone()
+    };
+
+    let access_token = {
+        let guard = state
+            .access_token
+            .lock()
+            .map_err(|_| llava_core::Error::LockError)?;
+        guard
+            .as_ref()
+            .ok_or(llava_core::Error::NotLoggedIn)?
+            .clone() // owned AccessToken
+    };
+
+    let device_id = {
+        let guard = state
+            .device_id
+            .lock()
+            .map_err(|_| llava_core::Error::LockError)?;
+        guard
+            .as_ref()
+            .ok_or(llava_core::Error::NotLoggedIn)?
+            .clone()
+    };
+    let client = state.server_client.clone();
+    llava_core::online_auth::logout(user_id, client, &device_id, &access_token).await?;
+
+    *state
+        .online_user_id
+        .lock()
+        .map_err(|_| llava_core::Error::LockError)? = None;
+
+    *state
+        .access_token
+        .lock()
+        .map_err(|_| llava_core::Error::LockError)? = None;
+
+    Ok(())
+    //TODO server przy register device id powinno sprawdzać czy istnieje, jesli istnieje nie dodawać, jelsi nie
+}
+
+//TODO add login
+
+#[tauri::command]
+pub async fn get_email_from_id(
+    online_id: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<String, llava_core::Error> {
+    let conn_guard = state
+        .users_db
+        .lock()
+        .map_err(|_| llava_core::Error::LockError)?;
+    let users_db = conn_guard.as_ref().ok_or(llava_core::Error::LockError)?;
+    Ok(llava_core::get_email_from_online_id(&online_id, users_db)?)
+}

@@ -43,6 +43,8 @@ pub mod stats {
 }
 
 pub mod online_auth {
+    pub use crate::services::online_auth::login::check_if_logged_in_online;
+    pub use crate::services::online_auth::logout::logout;
     pub use crate::services::online_auth::register::change_email_in_database;
     pub use crate::services::online_auth::register::register;
 }
@@ -52,4 +54,7 @@ pub use config::{AppState, ProgramFiles};
 pub use errors::Error;
 pub use models::note::Note;
 pub use services::logger::configure_logger;
-pub use utils::{get_time, get_user_uuid, get_username_from_uuid};
+pub use utils::{
+    get_email_from_online_id, get_online_id, get_time, get_user_uuid, get_username_from_uuid,
+    is_online_linked,
+};

@@ -38,7 +38,7 @@ pub const LOGS_PATH: &str = "llava/logs/app.log";
 //SQL
 
 pub const NOTES_DB_VERSION: i64 = 0;
-pub const USERS_DB_VERSION: i64 = 2;
+pub const USERS_DB_VERSION: i64 = 3;
 pub const LOCAL_USER_DB_INSERT_SQL_SCHEMA: &str = r#"INSERT INTO users_data (
                 user_id,
                 username,
@@ -51,7 +51,8 @@ pub const LOCAL_USER_DB_INSERT_SQL_SCHEMA: &str = r#"INSERT INTO users_data (
                 master_key_nonce,
                 master_kek_salt,
                 is_online_linked,
-                online_account_email, 
+                online_account_email,
+                online_account_id,
                 device_id, 
                 created_at, 
                 last_login,
@@ -70,6 +71,7 @@ pub const LOCAL_USER_DB_INSERT_SQL_SCHEMA: &str = r#"INSERT INTO users_data (
                 :master_kek_salt,
                 :is_online_linked, 
                 :online_account_email, 
+                :online_account_id,
                 :device_id, 
                 :created_at, 
                 :last_login,
@@ -212,6 +214,7 @@ pub const LOCAL_LOGIN_DB_SCHEMA: &str = r#" CREATE TABLE IF NOT EXISTS users_dat
                         master_kek_salt TEXT,
                         is_online_linked INTEGER NOT NULL DEFAULT 0, 
                         online_account_email TEXT DEFAULT NULL, 
+                        online_account_id TEXT DEFAULT NULL,
                         device_id TEXT NOT NULL,
                         created_at INTEGER NOT NULL,  
                         last_login INTEGER NOT NULL, 

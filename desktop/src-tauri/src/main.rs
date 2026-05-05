@@ -95,7 +95,9 @@ pub fn main() {
             commands::settings::get_logfile_content,
             commands::settings::get_recovery_codes,
             commands::settings::change_username,
-            commands::online_auth::register_user_online
+            commands::online_auth::register_user_online,
+            commands::online_auth::online_logout,
+            commands::online_auth::get_email_from_id,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -38,7 +38,7 @@ func main() {
 	app.Get("/", func(c fiber.Ctx) error {
 		return c.SendString("running")
 	})
-	h := routes.NewHandler(client.Database("llava"), validate) // when should i get this?
+	h := routes.NewHandler(client.Database("llava"), validate)
 	h.RegisterJwtRoutes(app)
 	log.Fatal(app.Listen(":3000"))
 }

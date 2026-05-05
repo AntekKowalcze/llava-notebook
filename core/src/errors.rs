@@ -21,6 +21,9 @@ pub enum Error {
     #[error("Username already exists")]
     UsernameExistsError,
 
+    #[error("Email already used")]
+    EmailAlreadyUsed,
+
     #[error("User doesn't exist")]
     UserNotExists,
 
@@ -63,6 +66,18 @@ pub enum Error {
     #[error("Email not verified.")]
     WrongEmail,
 
+    #[error("Not logged in online")]
+    NotLoggedIn,
+
+    #[error("No internet connection")]
+    NoInternetConnection,
+
+    #[error("Server not responding")]
+    ServerNotAvailable,
+
+    #[error("Request error")]
+    RequestError((u16, String)),
+
     #[error("File operation error: {0}")]
     FileOperationError(String),
 
@@ -78,6 +93,60 @@ impl From<std::io::Error> for Error {
 
 impl From<anyhow::Error> for Error {
     fn from(err: anyhow::Error) -> Self {
+        Error::InternalError(err.to_string())
+    }
+}
+
+impl Error {
+    pub fn from_reqwest_error(err: &reqwest::Error) -> Self {
+        let message = err.to_string().to_lowercase();
+
+        let no_internet_signals = [
+            "network is unreachable",
+            "no route to host",
+            "failed to lookup address",
+            "name or service not known",
+            "temporary failure in name resolution",
+            "dns error",
+            "host is down",
+            "host unreachable",
+            "network is down",
+            "cannot assign requested address",
+            "error trying to connect",
+            "error sending request for url",
+            "os error 101",
+            "os error 113",
+            "os error 99",
+        ];
+
+        let server_down_signals = [
+            "connection refused",
+            "connection reset",
+            "broken pipe",
+            "timed out",
+            "timeout",
+            "os error 111",
+        ];
+
+        if no_internet_signals
+            .iter()
+            .any(|signal| message.contains(signal))
+        {
+            return Error::NoInternetConnection;
+        }
+
+        if err.is_timeout()
+            || server_down_signals
+                .iter()
+                .any(|signal| message.contains(signal))
+        {
+            return Error::ServerNotAvailable;
+        }
+
+        if err.is_connect() {
+            return Error::NoInternetConnection;
+        }
+
         Error::InternalError(err.to_string())
     }
 }
