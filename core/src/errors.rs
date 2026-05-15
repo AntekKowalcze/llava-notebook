@@ -13,6 +13,9 @@
 use serde::Serialize;
 use thiserror::Error;
 
+
+
+
 #[derive(Debug, Error, Serialize, Clone)]
 pub enum Error {
     #[error("Password didn't pass validation")]
@@ -29,6 +32,9 @@ pub enum Error {
 
     #[error("Wrong password")]
     WrongPassword,
+
+    #[error("Wrong credentials")]
+    WrongCredentials,
 
     #[error("Account locked until timestamp {0}")]
     AccountLocked(i64),
@@ -75,6 +81,9 @@ pub enum Error {
     #[error("Server not responding")]
     ServerNotAvailable,
 
+    #[error("Refresh token expired")]
+    OnlineSessionExpired,
+
     #[error("Request error")]
     RequestError((u16, String)),
 
@@ -93,60 +102,6 @@ impl From<std::io::Error> for Error {
 
 impl From<anyhow::Error> for Error {
     fn from(err: anyhow::Error) -> Self {
-        Error::InternalError(err.to_string())
-    }
-}
-
-impl Error {
-    pub fn from_reqwest_error(err: &reqwest::Error) -> Self {
-        let message = err.to_string().to_lowercase();
-
-        let no_internet_signals = [
-            "network is unreachable",
-            "no route to host",
-            "failed to lookup address",
-            "name or service not known",
-            "temporary failure in name resolution",
-            "dns error",
-            "host is down",
-            "host unreachable",
-            "network is down",
-            "cannot assign requested address",
-            "error trying to connect",
-            "error sending request for url",
-            "os error 101",
-            "os error 113",
-            "os error 99",
-        ];
-
-        let server_down_signals = [
-            "connection refused",
-            "connection reset",
-            "broken pipe",
-            "timed out",
-            "timeout",
-            "os error 111",
-        ];
-
-        if no_internet_signals
-            .iter()
-            .any(|signal| message.contains(signal))
-        {
-            return Error::NoInternetConnection;
-        }
-
-        if err.is_timeout()
-            || server_down_signals
-                .iter()
-                .any(|signal| message.contains(signal))
-        {
-            return Error::ServerNotAvailable;
-        }
-
-        if err.is_connect() {
-            return Error::NoInternetConnection;
-        }
-
         Error::InternalError(err.to_string())
     }
 }

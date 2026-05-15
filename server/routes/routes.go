@@ -26,6 +26,7 @@ func (h *Handler) RegisterJwtRoutes(app fiber.Router) error { //this is "receive
 	}
 	g := app.Group("/auth")
 	g.Post("/register", h.Register)
+	g.Post("/pre-login", h.PreLogin)
 	g.Post("/login", h.Login)
 	g.Post("/refresh", h.Refresh)
 	g.Post("/logout", middleware.AuthMiddleware(secret), h.Logout)

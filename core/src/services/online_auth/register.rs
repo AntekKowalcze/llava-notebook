@@ -1,3 +1,4 @@
+
 use crate::constants::SERVER_ADDRESS;
 use crate::services::online_auth::models::online_account::{
     AccessToken, ArgonParams, RegisterDevicePayload, RegisterRequest, RegisterUserPayload, Tokens,
@@ -48,7 +49,7 @@ pub async fn register(
 
     kek_bytes.zeroize();
     let params = argon2::Params::default();
-    let argon_params = ArgonParams {
+    let argon2_params = ArgonParams {
         m_cost: params.m_cost(),
         t_cost: params.t_cost(),
         p_cost: params.p_cost(),
@@ -59,7 +60,7 @@ pub async fn register(
         kek_salt: kek_salt.to_string(),
         master_key_enc: wrapped_notes_key,
         master_key_nonce: nonce.to_vec(),
-        argon2_params: argon_params,
+        argon2_params,
     };
     let device = RegisterDevicePayload {
         device_id: device_id,
@@ -74,7 +75,7 @@ pub async fn register(
         .json(&request)
         .send()
         .await
-        .map_err(|err| crate::errors::Error::from_reqwest_error(&err))?;
+        .map_err(|_| crate::Error::ServerNotAvailable)?;
     if !res.status().is_success() {
         let status = res.status().as_u16();
         if status == 409 {
@@ -99,10 +100,10 @@ pub async fn register(
     Ok((tokens.access_token, tokens.user_id))
 }
 
-fn verify_email(email: &str) -> Result<(), crate::errors::Error> {
+pub fn verify_email(email: &str) -> Result<(), crate::errors::Error> {
     let re = Regex::new(
-        r"[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?",
-    ).unwrap(); //regex from RFC2822 so it can not panic 
+            r"[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?",
+        ).unwrap(); //regex from RFC2822 so it can not panic 
     if !re.is_match(email) {
         Err(crate::errors::Error::WrongEmail)
     } else {
@@ -117,15 +118,15 @@ pub fn change_email_in_database(
     user_id: String,
 ) -> Result<(), crate::errors::Error> {
     users_db
-        .execute(
-            "UPDATE users_data SET online_account_email = :mail, online_account_id = :online_id, is_online_linked = 1 WHERE user_id = :id;",
-            named_params! {
-                ":mail": email,
-                ":online_id": id,
-                ":id": user_id
-            },
-        )
-        .inspect_err(|err| println!("{:?}", err))
-        .context("failed to update mail in users_db locally")?;
+            .execute(
+                "UPDATE users_data SET online_account_email = :mail, online_account_id = :online_id, is_online_linked = 1 WHERE user_id = :id;",
+                named_params! {
+                    ":mail": email,
+                    ":online_id": id,
+                    ":id": user_id
+                },
+            )
+            .inspect_err(|err| println!("{:?}", err))
+            .context("failed to update mail in users_db locally")?;
     Ok(())
 }

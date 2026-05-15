@@ -9,7 +9,7 @@ import (
 )
 
 func GetMongoConnection() (*mongo.Client, error) {
-	uri := os.Getenv("MONGODB_URI")
+	uri := os.Getenv("MONGO_DB_URI")
 	if uri == "" {
 		return nil, fmt.Errorf("MONGODB_URI not set")
 	}

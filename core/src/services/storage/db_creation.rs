@@ -47,6 +47,7 @@ fn creating_tables(
     paths: &crate::config::ProgramFiles,
 ) -> Result<Connection, crate::errors::Error> {
     let notes_db_res = Connection::open(&paths.data_base_path);
+    println!("NOTES_DB_RES {:?}", notes_db_res);
     if let Err(ref e) = notes_db_res {
         tracing::error!(
             task = "opening notes db",
@@ -76,9 +77,6 @@ fn creating_tables(
         .pragma_update(None, "journal_mode", "WAL")
         .context("Pragma error while creating notes db, journal mode")?;
 
-    if let Ok(mode) = notes_db.pragma_query_value(None, "journal_mode", |r| r.get::<_, String>(0)) {
-        crate::services::logger::log_success(&format!("Journal mode set to {}", mode));
-    }
     let tx = notes_db
         .transaction()
         .inspect_err(|e| {

@@ -38,13 +38,15 @@
 //! - `zeroize` — Secure memory wiping of passwords and key material
 //! - `uuid` — UUIDv4 generation for session tokens and user identification
 
-use anyhow::Context;
-
-use argon2::{Argon2, PasswordHash, PasswordVerifier};
-
-use crate::services::online_auth::models::online_account::ArgonParams;
+use crate::constants::SERVER_ADDRESS;
+use crate::services::online_auth::login::RefreshRequest;
+use crate::services::online_auth::models::online_account::{AccessToken, RefreshResponse};
+use crate::services::online_auth::models::online_account::{ArgonParams, RefreshToken};
 use crate::{ProgramFiles, errors, utils};
+use anyhow::Context;
+use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use chacha20poly1305::{AeadCore, ChaCha20Poly1305, Key, KeyInit, aead, aead::Aead};
+use reqwest::Client;
 use rusqlite::{Connection, OptionalExtension, named_params};
 use sha2::{Digest, Sha256};
 use zeroize::Zeroize;
@@ -122,7 +124,6 @@ pub fn local_log_in(
         );
         return Err(crate::errors::Error::WrongPassword);
     }
-
     let user_uuid: String = users_db
         .query_row(
             "SELECT user_id FROM users_data WHERE username = :name",
@@ -204,7 +205,7 @@ pub fn local_log_in(
     session_operations(users_db, user_uuid, &notes_key)?;
     change_last_login(users_db, &user_uuid)?;
     decrypted_notes_key.zeroize();
-
+    //check if linked in database, if linked, get online user id, then get keyring refrseh token, if exists, send refresh, if not and linked dialog for email + password to login
     crate::utils::log_helper(
         "logging",
         "success",
@@ -830,6 +831,80 @@ pub fn local_logout(
 
     Ok(())
 }
+
+pub fn get_optional_online_id(
+    users_db: &Connection,
+    user_id: &uuid::Uuid,
+) -> Result<Option<String>, crate::errors::Error> {
+    let online_user_id = users_db
+        .query_one(
+            "SELECT online_account_id FROM users_data WHERE user_id = :id",
+            named_params! {":id": user_id.to_string()},
+            |row| {
+                let online_user_id: Option<String> = row.get(0)?;
+                Ok(online_user_id)
+            },
+        )
+        .map_err(|_| crate::errors::Error::InternalError("failed to query database".to_string()))?;
+    Ok(online_user_id)
+}
+
+pub async fn check_online_login(
+    online_id: String,
+    client: Client,
+) -> Result<AccessToken, crate::errors::Error> {
+    if !utils::is_device_connected_to_server().await {
+        return Err(crate::errors::Error::NoInternetConnection);
+    } 
+    let entry: keyring::Entry =
+        keyring::Entry::new("llava_desktop", &format!("refresh_token_id:{}", online_id))
+            .map_err(|_| crate::errors::Error::NotLoggedIn)?;
+    let refresh_token: String = entry
+        .get_password()
+        .map_err(|_| crate::errors::Error::NotLoggedIn)?;
+    let req: RefreshRequest = RefreshRequest { refresh_token };
+    let response = client
+        .post(format!("{}auth/refresh", SERVER_ADDRESS))
+        .json(&req)
+        .send()
+        .await.map_err(|_| crate::Error::ServerNotAvailable)?;
+    if !response.status().is_success() {
+        let status_code = response.status().as_u16();
+        let body_text = response.text().await.unwrap_or_else(|_| String::new());
+        // Map server responses to local error variants:
+        // - 500 -> RequestError
+        // - 401 with "session_expired" -> OnlineSessionExpired
+        // - 401 otherwise -> NotLoggedIn
+        // - any other non-success -> NotLoggedIn
+        if status_code == 500 {
+            return Err(crate::errors::Error::RequestError((
+                500,
+                if body_text.is_empty() {
+                    "Internal server error, you will be not logged in".to_string()
+                } else {
+                    format!("Internal server error: {}", body_text)
+                },
+            )));
+        } else if status_code == 401 {
+            if body_text.contains("session_expired") {
+                return Err(crate::errors::Error::OnlineSessionExpired);
+            }
+            return Err(crate::errors::Error::NotLoggedIn);
+        } else {
+            return Err(crate::errors::Error::NotLoggedIn);
+        }
+    }
+
+    let tokens = response
+        .json::<RefreshResponse>()
+        .await
+        .context("failed to parse response")?;
+    entry
+        .set_password(&tokens.refresh_token.0)
+        .context("failed to save refresh token in keyring")?;
+    return Ok(tokens.access_token);
+}
+
 //workds only after register test
 #[test]
 fn login_test() {

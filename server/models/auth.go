@@ -11,7 +11,7 @@ type RefreshToken struct {
 	UserID    bson.ObjectID  `bson:"user_id"       json:"user_id" validate:"required"`
 	DeviceID  uuid.UUID      `bson:"device_id" json:"device_id" validate:"required"`
 	TokenHash string         `bson:"token_hash"    json:"-"`
-	JTI       uuid.UUID      `bson:"jti"           json:"jti"`
+	JTI       string         `bson:"jti"           json:"jti"`
 	CreatedAt int64          `bson:"created_at"    json:"created_at"`
 	ExpiresAt int64          `bson:"expires_at"    json:"expires_at"`
 }

@@ -73,6 +73,9 @@ pub fn main() {
                         let _ = app.emit("config-updated", &state_config);
                     }
                 }
+                let handle = app.handle().clone();
+
+                crate::commands::utils::start_connection_monitor(handle);
             }
             Ok(())
         })
@@ -98,6 +101,7 @@ pub fn main() {
             commands::online_auth::register_user_online,
             commands::online_auth::online_logout,
             commands::online_auth::get_email_from_id,
+            commands::online_auth::login_online,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

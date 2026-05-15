@@ -42,7 +42,6 @@ const canSubmit = computed(() => {
     passwordsMatch.value
   );
 });
-
 async function submitRegister() {
   if (!canSubmit.value) return;
   loading.value = true;
@@ -64,13 +63,32 @@ async function submitRegister() {
     toast.success('successfully regisered online user account');
     await router.replace('/main/');
   } catch (err: any) {
+    
+    userConfig.updateSettingValue('local.mode', 'on');
     console.log(err);
-    if (err === 'EmailAlreadyUsed' || err?.EmailAlreadyUsed) {
-      toast.warning('Email already used');
-    } else if (err === 'NoInternetConnection' || err?.NoInternetConnection) {
-      toast.error('No internet connection. Try again later.');
-    } else if (err === 'ServerNotAvailable' || err?.ServerNotAvailable) {
+    const errorKey =
+      typeof err === 'string'
+        ? err
+        : typeof err?.error === 'string'
+        ? err.error
+        : typeof err?.message === 'string'
+        ? err.message
+        : null;
+
+    if (errorKey === 'NoInternetConnection' || err?.NoInternetConnection) {
+      toast.error('No internet connection');
+    } else if (errorKey === 'ServerNotAvailable' || err?.ServerNotAvailable) {
       toast.error('Server unavailable. Try again later.');
+    } else if (errorKey === 'EmailAlreadyUsed' || err?.EmailAlreadyUsed) {
+      toast.warning('Email already used');
+    } else if (errorKey === 'WrongEmail' || err?.WrongEmail) {
+      toast.warning('Invalid email address');
+    } else if (errorKey === 'PasswordValidation' || err?.PasswordValidation) {
+      toast.warning('Password does not meet requirements');
+    } else if (err?.RequestError) {
+      toast.error('Server error. Try again later.');
+    } else if (errorKey === 'InternalError' || err?.InternalError) {
+      toast.error('Registration failed. Try again later.');
     } else {
       toast.error('Internal Error failed to register user, try again');
     }
@@ -121,12 +139,24 @@ async function submitRegister() {
         :content="'Submit'"
         @click="submitRegister"
       ></SubmitButton>
+      
       <RouterLink
         to="/login/online"
         class="mb-0 mt-8 text-note-ivory/80 hover:underline"
       >
         Do you have online account already? Login.
       </RouterLink>
+        
+      <RouterLink
+        to="/main/"
+        class="mb-0 mt-4 text-note-ivory/80 hover:underline"
+      >
+        Cancel
+      </RouterLink>
+      
+
+
+      
     </template>
     <LoadingCircle v-else></LoadingCircle>
   </FormCard>

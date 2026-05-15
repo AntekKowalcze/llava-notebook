@@ -10,7 +10,7 @@ const noLink = '/main/';
     sub-text="Do you want to register online account"
   >
     <RouterLink
-      to="/loginOnline"
+      to="/login/online"
       class="mt-12 text-note-ivory"
     >
       If you have online account log in!

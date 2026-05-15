@@ -3,6 +3,18 @@ const props = defineProps<{
   content: string;
   disabled?: boolean;
 }>();
+
+const emit = defineEmits<{
+  click: [];
+}>();
+
+function handleActivate() {
+  if (props.disabled) {
+    return;
+  }
+
+  emit('click');
+}
 </script>
 
 <template>
@@ -15,8 +27,9 @@ const props = defineProps<{
     ]"
     role="button"
     tabindex="0"
-    @keydown.enter.prevent="$emit('click')"
-    @keydown.space.prevent="$emit('click')"
+    @click="handleActivate"
+    @keydown.enter.prevent="handleActivate"
+    @keydown.space.prevent="handleActivate"
   >
     {{ props.content }}
   </div>

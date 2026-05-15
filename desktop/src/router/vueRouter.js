@@ -14,7 +14,7 @@ const routes = [
       const authStore = useAuthStore();
       const onlineAuthStore = useOnlineAuthStore();
       try {
-        await Promise.all([authStore.checkUsers(), authStore.checkSession()]); //check session should probably return user id and then
+        await authStore.ensureSession(); //check session should probably return user id and then
 
         const hasNoUsers = authStore.hasNoUsers;
         if (hasNoUsers) {
@@ -29,7 +29,9 @@ const routes = [
             toast.success(onlineAuthStore.loggedInEmail + ' logged in to online account');
           } else {
             console.log(onlineAuthStore.loggedInEmail, onlineAuthStore.loggedIn);
-            if (authStore.linked) toast.warning('failed to login to online account'); //if not exist do not show anything
+            if (authStore.onlineStatus === 'not_logged_in') {
+              toast.warning('failed to login to online account');
+            }
           }
           return { path: '/main/', replace: true };
         } else if (!hasNoUsers && !authStore.loggedIn) {
@@ -95,7 +97,31 @@ const routes = [
     path: '/register/online',
     name: 'registerOnline',
     component: () => import('../views/auth/OnlineRegister.vue'),
-    meta: { skipAuth: true },
+    meta: { skipAuth: false },
+    beforeEnter: (to, before, next) => {
+      const onlineAuthStore = useOnlineAuthStore();
+      if (onlineAuthStore.loggedIn) {
+        toast.info('You are already logged in, logout first');
+        next({ name: 'settings' });
+      } else {
+        next();
+      }
+    },
+  },
+  {
+    path: '/login/online',
+    name: 'loginOnline',
+    component: () => import('../views/auth/OnlineLogin.vue'),
+    meta: { skipAuth: false },
+    beforeEnter: (to, before, next) => {
+      const onlineAuthStore = useOnlineAuthStore();
+      if (onlineAuthStore.loggedIn) {
+        toast.info('You are already logged in, logout first');
+        next({ name: 'settings' });
+      } else {
+        next();
+      }
+    },
   },
 ];
 export const router = createRouter({
@@ -112,7 +138,7 @@ router.beforeEach(async (to, from) => {
   }
   const authStore = useAuthStore();
   try {
-    await Promise.all([authStore.checkUsers(), authStore.checkSession()]);
+    await authStore.ensureSession();
   } catch (err) {
     console.error('auth checks failed', err);
     toast.error('Authentication check failed');

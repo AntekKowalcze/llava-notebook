@@ -6,21 +6,30 @@ import { computed, onBeforeUnmount, ref } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import { useRouter } from 'vue-router';
 import { useToast } from 'vue-toastification';
-import { useAuthStore } from '../../stores/auth';
 import SubmitButton from '../../components/commons/SubmitButton.vue';
-
+import { useOnlineAuthStore } from '../../stores/onlineAuth';
+import { useAuthStore } from '../../stores/auth';
+import { useUserConfigStore } from '../../stores/userConfig';
 const toast = useToast();
-
+const authStore = useAuthStore()
+const onlineAuthStore = useOnlineAuthStore()
 const router = useRouter();
 const password = ref<string>();
-const username = ref<string>();
+const email = ref<string>("");
+const userConfig = useUserConfigStore();
 const loading = ref(false);
 const lockoutUntil = ref<number | null>(null);
 let lockoutTimer: ReturnType<typeof setTimeout> | null = null;
 
+const emailPattern =
+  /[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?/ ;
+const correctEmail = computed(() => {
+  return emailPattern.test(email.value);
+});
+
 const submitDisabled = computed(() => {
   const isLocked = lockoutUntil.value !== null && lockoutUntil.value > Date.now();
-  return !username.value || !password.value || loading.value || isLocked;
+  return !correctEmail.value || !password.value || loading.value || isLocked;
 });
 
 function applyLockout(timeoutMs: number) {
@@ -47,50 +56,61 @@ function extractTimeout(err: unknown): number | null {
       return typedErr.AccountLocked;
     }
   }
-
   return null;
 }
 
 async function submitLogin() {
-  const authStore = useAuthStore(); //here before login command check if user is timeouted
   if (submitDisabled.value) {
     return;
   }
 
   loading.value = true;
   try {
-    let timeout: number = await invoke<number>('check_timeout_before_submit', {
-      username: username.value,
-    });
-    if (timeout > 0) {
-      applyLockout(timeout);
-      showTimeout(timeout);
-      return;
-    }
-    let userId = await invoke<string>('login_command', {
-      username: username.value,
+    userConfig.updateSettingValue('local.mode', 'off');
+    let online_user_id = await invoke<string>('login_online', {
+      email: email.value,
       password: password.value,
+      currentSettings: userConfig.settingList,
     });
-    toast.success('Logged in successfully');
-    authStore.$patch({
+    toast.success('Logged in to online account successfully');
+    
+    onlineAuthStore.$patch({
       loggedIn: true,
-      loggedInUsername: username.value,
-      loggedInUserId: userId,
+      loggedInId: online_user_id
     });
+    authStore.$patch({
+      linked: true
+    })
 
+    await onlineAuthStore.fetchEmail()
     router.replace('/main/');
   } catch (err: any) {
+    userConfig.updateSettingValue('local.mode', 'on');
     const timeout = extractTimeout(err);
     if (timeout !== null) {
       applyLockout(timeout);
       showTimeout(timeout);
-    } else if (err == 'WrongPassword' || err?.WrongPassword) {
-      toast.warning('Wrong Password', {});
-    } else if (err.AccountLocked) {
-      applyLockout(err.AccountLocked);
-      showTimeout(err.AccountLocked);
-    } else if (err === 'UserNotExists' || err?.UserNotExists) {
-      toast.warning('User does not exist!');
+      return;
+    }
+
+    if (err?.NoInternetConnection) {
+      toast.error('No internet connection');
+      return;
+    }
+
+    if (err?.ServerNotAvailable) {
+      toast.error('Server unavailable. Try again later.');
+      return;
+    }
+
+    if (err?.WrongPassword) {
+      toast.warning('Wrong password');
+    } else if (err?.WrongCredentials) {
+      toast.warning('Wrong email or password');
+    } else if (err?.RequestError) {
+      toast.error('Server error. Try again later.');
+    } else {
+      toast.error('Login failed');
     }
     return;
   } finally {
@@ -104,7 +124,7 @@ function showTimeout(lengthMs: number) {
   const secs = totalSeconds % 60;
 
   toast.error(`🔒Account locked for ${minutes}m ${String(secs).padStart(2, '0')}s`, {
-    timeout: lengthMs,
+    timeout: lengthMs
   });
 }
 
@@ -117,13 +137,13 @@ onBeforeUnmount(() => {
 <template>
   <FormCard
     header-text="Sign in"
-    sub-text="log in to existing local account"
+    sub-text="log in to existing online account"
   >
     <TextInput
-      :name="'username'"
-      :placeholder="'username'"
-      :type="InputTypes.Text"
-      v-model="username"
+      :name="'email'"
+      :placeholder="'email'"
+      :type="InputTypes.Email"
+      v-model="email"
     ></TextInput>
     <TextInput
       :name="'password'"
@@ -136,18 +156,21 @@ onBeforeUnmount(() => {
       :content="'Submit'"
       @click="submitLogin"
     ></SubmitButton>
+ <RouterLink
+      to="/register/online"
+      class="mt-12 text-note-ivory/80 hover:underline" 
 
-    <RouterLink
-      :to="{ name: 'recovery', query: { origin: 'login' } }"
-      class="mt-12 text-note-ivory/80 hover:underline"
     >
-      Forgot password?
+      Do you want to create online account?
     </RouterLink>
     <RouterLink
-      to="/register"
-      class="mt-12 text-note-ivory/80 hover:underline"
+      :to="'/main/settings'" 
+      class="mt-4 text-note-ivory/80 hover:underline"
     >
-      Do you want to create account?
+      Return
     </RouterLink>
+   
   </FormCard>
 </template>
+<!-- TODO check timeout changes both on frontend and on backend in files login.rs submit button loginPage onlinelogin , test it in application with local account and online account-->
+ <!-- TODO check timeouts, and test them -->

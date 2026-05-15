@@ -12,8 +12,9 @@ pub mod local_auth {
     pub use crate::services::local_auth::database_creation::connect_or_create_local_login_db;
     pub use crate::services::local_auth::logging::SessionState;
     pub use crate::services::local_auth::logging::{
-        autorization, change_last_login, check_error_count, check_if_user_logged_in, get_timeout,
-        local_log_in, local_logout, log_with_code, zero_error_count,
+        autorization, change_last_login, check_error_count, check_if_user_logged_in,
+        check_online_login, get_optional_online_id, get_timeout, local_log_in, local_logout,
+        log_with_code, zero_error_count,
     };
     pub use crate::services::local_auth::register::{
         change_password, recovery_code_handling, register_user_offline,
@@ -44,6 +45,7 @@ pub mod stats {
 
 pub mod online_auth {
     pub use crate::services::online_auth::login::check_if_logged_in_online;
+    pub use crate::services::online_auth::login::login;
     pub use crate::services::online_auth::logout::logout;
     pub use crate::services::online_auth::register::change_email_in_database;
     pub use crate::services::online_auth::register::register;
@@ -55,6 +57,6 @@ pub use errors::Error;
 pub use models::note::Note;
 pub use services::logger::configure_logger;
 pub use utils::{
-    get_email_from_online_id, get_online_id, get_time, get_user_uuid, get_username_from_uuid,
-    is_online_linked,
+    change_account_link_status, check_connection, get_email_from_online_id, get_online_id,
+    get_time, get_user_uuid, get_username_from_uuid, is_online_linked,
 };

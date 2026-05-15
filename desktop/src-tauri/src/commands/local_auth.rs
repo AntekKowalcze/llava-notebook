@@ -3,6 +3,8 @@ use llava_core::local_auth::SessionState;
 use llava_core::AppState;
 use tauri::AppHandle;
 use tauri::Emitter;
+use tauri::Manager;
+use tokio::time::{timeout, Duration};
 use zeroize::Zeroize;
 #[tauri::command]
 pub async fn register_command(
@@ -81,14 +83,53 @@ pub async fn login_command(
         crate::commands::handlers::local_auth::login(username.clone(), password, paths, users_db)?
     };
 
-    {
+    let id = {
         let mut conn_guard = state
             .users_db
             .lock()
             .map_err(|_| anyhow!("failed to lock users_db"))?;
         let users_db = conn_guard.as_mut().ok_or(llava_core::Error::LockError)?;
         llava_core::local_auth::zero_error_count(users_db, &new_uuid)?;
+        llava_core::local_auth::get_optional_online_id(users_db, &new_uuid)?
+    }; // conn_guard dropped here
+
+    let is_connected_to_server = {
+let guard =  state.server_connection.lock().map_err(|_| llava_core::Error::LockError)?;
+        guard.clone()
+    };
+    if is_connected_to_server {
+    if let Some(online_id) = id {
+        let app_handle = app_handle.clone();
+        tauri::async_runtime::spawn(async move {
+            let state = app_handle.state::<AppState>();
+            let client = state.server_client.clone();
+            let res = timeout(
+                Duration::from_secs(3),
+                llava_core::online_auth::check_if_logged_in_online(&online_id, client),
+            )
+            .await;
+            let status = match res {
+                Ok(Ok(token)) => {
+                    if let Ok(mut guard) = state.access_token.lock() {
+                        *guard = Some(token);
+                    }
+                    if let Ok(mut guard) = state.online_user_id.lock() {
+                        *guard = Some(online_id.clone());
+                    }
+                    LoggedInOnline::LoggedIn(online_id)
+                }
+                Ok(Err(err)) => {
+                    if matches!(err, llava_core::Error::OnlineSessionExpired) {
+                        let _ = app_handle.emit("online_session_expired", ());
+                    }
+                    LoggedInOnline::NotLoggedIn(err)
+                }
+                Err(_) => LoggedInOnline::NotLoggedIn(llava_core::Error::ServerNotAvailable),
+            };
+            let _ = app_handle.emit("online_login_status", &status);
+        });
     }
+}
 
     let user_config = llava_core::settings::get_config_for_state(&new_paths)?;
 
@@ -153,6 +194,57 @@ pub async fn log_with_code(
         (user_uuid, paths, notes_conn, one_code, notes_key)
     };
 
+
+    let id = {
+        let mut conn_guard = state
+            .users_db
+            .lock()
+            .map_err(|_| anyhow!("failed to lock users_db"))?;
+        let users_db = conn_guard.as_mut().ok_or(llava_core::Error::LockError)?;
+        let user_uuid = llava_core::get_user_uuid(users_db, &username)?;
+        llava_core::local_auth::zero_error_count(users_db, &user_uuid)?;
+        llava_core::local_auth::get_optional_online_id(users_db, &user_uuid)?
+    };
+   
+    let is_connected_to_server = {
+let guard =  state.server_connection.lock().map_err(|_| llava_core::Error::LockError)?;
+        guard.clone()
+    };
+    if is_connected_to_server {
+
+    
+    if let Some(online_id) = id {
+        let app_handle = app_handle.clone();
+        tauri::async_runtime::spawn(async move {
+            let state = app_handle.state::<AppState>();
+            let client = state.server_client.clone();
+            let res = timeout(
+                Duration::from_secs(3),
+                llava_core::online_auth::check_if_logged_in_online(&online_id, client),
+            )
+            .await;
+            let status = match res {
+                Ok(Ok(token)) => {
+                    if let Ok(mut guard) = state.access_token.lock() {
+                        *guard = Some(token);
+                    }
+                    if let Ok(mut guard) = state.online_user_id.lock() {
+                        *guard = Some(online_id.clone());
+                    }
+                    LoggedInOnline::LoggedIn(online_id)
+                }
+                Ok(Err(err)) => {
+                    if matches!(err, llava_core::Error::OnlineSessionExpired) {
+                        let _ = app_handle.emit("online_session_expired", ());
+                    }
+                    LoggedInOnline::NotLoggedIn(err)
+                }
+                Err(_) => LoggedInOnline::NotLoggedIn(llava_core::Error::ServerNotAvailable),
+            };
+            let _ = app_handle.emit("online_login_status", &status);
+        });
+    }
+    }
     let user_config = llava_core::settings::get_config_for_state(&paths)?;
 
     app_handle
@@ -209,6 +301,7 @@ pub enum LoggedInOnline {
     LoggedIn(String),
     NotLoggedIn(llava_core::Error),
     NotLinked,
+    Checking,
 }
 
 #[tauri::command]
@@ -310,28 +403,41 @@ pub async fn check_login_on_start(
                     }
                 }
             };
-
+            
             if let Some(online_id) = online_id {
-                let client = state.server_client.clone();
-                let res =
-                    llava_core::online_auth::check_if_logged_in_online(&online_id, client).await;
-                if let Ok(token) = res {
-                    *state
-                        .access_token
-                        .lock()
-                        .map_err(|_| llava_core::Error::LockError)? = Some(token);
-                    *state
-                        .online_user_id
-                        .lock()
-                        .map_err(|_| llava_core::Error::LockError)? = Some(online_id.clone());
-
-                    is_logged_in_online = LoggedInOnline::LoggedIn(online_id);
-                } else if let Err(err) = res {
-                    is_logged_in_online = LoggedInOnline::NotLoggedIn(err)
-                }
+                is_logged_in_online = LoggedInOnline::Checking;
+                let app_handle = app_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    let state = app_handle.state::<AppState>();
+                    let client = state.server_client.clone();
+                    let res = timeout(
+                        Duration::from_secs(3),
+                        llava_core::online_auth::check_if_logged_in_online(&online_id, client),
+                    )
+                    .await;
+                    let status = match res {
+                        Ok(Ok(token)) => {
+                            if let Ok(mut guard) = state.access_token.lock() {
+                                *guard = Some(token);
+                            }
+                            if let Ok(mut guard) = state.online_user_id.lock() {
+                                *guard = Some(online_id.clone());
+                            }
+                            LoggedInOnline::LoggedIn(online_id)
+                        }
+                        Ok(Err(err)) => {
+                            if matches!(err, llava_core::Error::OnlineSessionExpired) {
+                                let _ = app_handle.emit("online_session_expired", ());
+                            }
+                            LoggedInOnline::NotLoggedIn(err)
+                        }
+                        Err(_) => {
+                            LoggedInOnline::NotLoggedIn(llava_core::Error::ServerNotAvailable)
+                        }
+                    };
+                    let _ = app_handle.emit("online_login_status", &status);
+                });
             }
-
-            // todo continue from here, add error matching on network error while trying to login after reboot
         }
         *notes_key = vec![]; //frontend should not see the key so its correct
         owned_key.zeroize();
@@ -363,7 +469,7 @@ pub async fn local_logout_command(
     *state
         .notes_key
         .lock()
-        .map_err(|_| anyhow!("couldnt edit access_token"))? = None;
+        .map_err(|_| anyhow!("couldnt edit  notes key"))? = None;
     *state
         .current_user
         .lock()
@@ -378,6 +484,10 @@ pub async fn local_logout_command(
         .map_err(|_| anyhow!("Couldnt edit username in state"))? = None;
     *state
         .user_config
+        .lock()
+        .map_err(|_| anyhow!("Couldnt edit config in state"))? = None;
+    *state
+        .online_user_id
         .lock()
         .map_err(|_| anyhow!("Couldnt edit config in state"))? = None;
     let users_db_guard = state

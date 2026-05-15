@@ -2,12 +2,15 @@ package routes
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/subtle"
+	"encoding/base64"
 	"llava-server/middleware"
 	"llava-server/models"
 	"strings"
 	"time"
 
+	"github.com/alexedwards/argon2id"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/log"
 	"github.com/google/uuid"
@@ -41,10 +44,12 @@ func (h *Handler) Register(c fiber.Ctx) error {
 		return middleware.Conflict("this email exists")
 	}
 	if err != mongo.ErrNoDocuments {
+		log.Errorf("register: email lookup failed: %v", err)
 		return middleware.Internal("database error")
 	}
 	res, err := usersColl.InsertOne(ctx, user)
 	if err != nil {
+		log.Errorf("register: insert user failed: %v", err)
 		return middleware.Internal("Couldnt insert data to collection")
 	}
 	log.Info("inserted id: ", res)
@@ -53,8 +58,9 @@ func (h *Handler) Register(c fiber.Ctx) error {
 	device.UserID = userId
 	device.CreatedAt = time.Now().UnixMilli()
 	device.LastSeen = time.Now().UnixMilli()
-	_, err = devicesColl.InsertOne(ctx, device)
+	_, err = devicesColl.InsertOne(ctx, device) //its not devices database, its users conencted to devices
 	if err != nil {
+		log.Errorf("register: insert device failed: %v", err)
 		return middleware.Internal("Couldnt insert data to collection")
 	}
 	accessToken, err := middleware.GenerateAccessToken(device.DeviceID, userId.Hex())
@@ -70,11 +76,12 @@ func (h *Handler) Register(c fiber.Ctx) error {
 	refreshInsert.CreatedAt = time.Now().UnixMilli()
 	refreshInsert.DeviceID = device.DeviceID
 	refreshInsert.ExpiresAt = time.Now().Add(30 * 24 * time.Hour).UnixMilli()
-	refreshInsert.JTI = jti
+	refreshInsert.JTI = jti.String()
 	refreshInsert.UserID = userId
 	refreshInsert.TokenHash = signature
 	res, err = jwtColl.InsertOne(ctx, refreshInsert)
 	if err != nil {
+		log.Errorf("register: insert refresh token failed: %v", err)
 		return middleware.Internal("Couldnt insert data to collection")
 	}
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
@@ -82,6 +89,45 @@ func (h *Handler) Register(c fiber.Ctx) error {
 		"refresh_token": jti.String() + "." + signature,
 		"user_id":       refreshInsert.UserID.Hex(),
 	})
+}
+
+type PreLoginRequest struct {
+	Email string `json:"email"  validate:"required,email"`
+}
+
+func generateDummySalt() []byte {
+	salt := make([]byte, 16)
+	rand.Read(salt)
+	return salt
+}
+
+func (h *Handler) PreLogin(c fiber.Ctx) error {
+	var request = new(PreLoginRequest)
+	err := c.Bind().Body(request)
+	if err != nil {
+		return middleware.BadRequest("no body")
+	}
+	if err := h.Validator.Struct(request); err != nil {
+		return middleware.BadRequest("Wrong user struct was sent")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	usersColl := h.DB.Collection("users_data")
+	res := usersColl.FindOne(ctx, bson.M{"email": request.Email})
+	var user models.User
+	if err := res.Decode(&user); err != nil {
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{
+			"password_salt": base64.RawStdEncoding.EncodeToString(generateDummySalt()),
+		})
+	}
+	_, salt, _, err := argon2id.DecodeHash(user.PasswordHash)
+	if err != nil {
+		return middleware.Internal("failed to parse hash")
+	}
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"password_salt": base64.RawStdEncoding.EncodeToString(salt),
+	})
+
 }
 
 type LoginRequest struct {
@@ -108,14 +154,23 @@ func (h *Handler) Login(c fiber.Ctx) error {
 	if err := res.Decode(&user); err != nil {
 		return middleware.Unauthorized("invalid_credentials")
 	}
+
 	deviceColl := h.DB.Collection("devices")
+
 	res = deviceColl.FindOne(ctx, bson.M{"user_id": user.ID, "device_id": request.DeviceID})
 	var device models.Device
 	if err := res.Decode(&device); err != nil {
 		return middleware.Unauthorized("invalid_credentials")
 	}
 
-	if subtle.ConstantTimeCompare([]byte(user.PasswordHash), []byte(request.PasswordHash)) == 1 && (user.LockoutUntil == nil || time.Now().UnixMilli() > *user.LockoutUntil) {
+	now := time.Now().UnixMilli()
+	if user.LockoutUntil != nil && now < *user.LockoutUntil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"timeout": *user.LockoutUntil,
+		})
+	}
+
+	if subtle.ConstantTimeCompare([]byte(user.PasswordHash), []byte(request.PasswordHash)) == 1 {
 		accessToken, err := middleware.GenerateAccessToken(device.DeviceID, user.ID.Hex())
 		if err != nil {
 			return middleware.Internal("Couldnt generate Access Token")
@@ -129,7 +184,7 @@ func (h *Handler) Login(c fiber.Ctx) error {
 		refreshInsert := new(models.RefreshToken)
 		refreshInsert.CreatedAt = time.Now().UnixMilli()
 		refreshInsert.ExpiresAt = time.Now().Add(30 * 24 * time.Hour).UnixMilli()
-		refreshInsert.JTI = jti
+		refreshInsert.JTI = jti.String()
 		refreshInsert.UserID = *user.ID
 		refreshInsert.DeviceID = device.DeviceID
 		refreshInsert.TokenHash = signature
@@ -144,22 +199,36 @@ func (h *Handler) Login(c fiber.Ctx) error {
 			},
 		})
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{
-			"access_token":  accessToken,
-			"refresh_token": jti.String() + "." + signature,
-			"user_id":       refreshInsert.UserID.Hex(),
+			"access_token":     accessToken,
+			"refresh_token":    jti.String() + "." + signature,
+			"user_id":          refreshInsert.UserID.Hex(),
+			"master_key_enc":   base64.StdEncoding.EncodeToString(user.MasterKeyEnc),
+			"master_key_nonce": base64.StdEncoding.EncodeToString(user.MasterKeyNonce),
+			"kek_salt":         user.KekSalt,
+			"params":           user.ArgonParams,
 		})
 
 	} else {
-		if (user.FailedAttempts+1)%5 == 0 {
-			err = usersColl.FindOneAndUpdate(ctx, bson.M{"_id": user.ID}, bson.M{"$set": bson.M{"lockout_until": time.Now().UnixMilli() + (user.FailedAttempts+1)/5*1000*30}}).Err()
-			if err != nil {
-				return middleware.Unauthorized("timeout")
-			}
-		}
-		err = usersColl.FindOneAndUpdate(ctx, bson.M{"_id": user.ID}, bson.M{"$set": bson.M{"failed_attempts": user.FailedAttempts + 1}}).Err()
-		if err != nil {
+		failedAttempts := user.FailedAttempts + 1
+		if _, err := usersColl.UpdateOne(ctx, bson.M{"_id": user.ID}, bson.M{
+			"$set": bson.M{
+				"failed_attempts": failedAttempts,
+			},
+		}); err != nil {
 			return middleware.Unauthorized("wrong password")
 		}
+
+		if (user.FailedAttempts+1)%5 == 0 {
+			timeoutUntil := time.Now().Add(30 * time.Second).UnixMilli()
+			_, err = usersColl.UpdateOne(ctx, bson.M{"_id": user.ID}, bson.M{"$set": bson.M{"lockout_until": timeoutUntil}})
+			if err != nil {
+				return middleware.Internal("Internal Error")
+			}
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"timeout": timeoutUntil,
+			})
+		}
+
 		return middleware.Unauthorized("wrong password")
 	}
 }
@@ -190,7 +259,7 @@ func (h *Handler) Refresh(c fiber.Ctx) error {
 
 	now := time.Now().UnixMilli()
 	res := jwtColl.FindOneAndDelete(ctx, bson.M{
-		"jti":        jtiParsed,
+		"jti":        jtiParsed.String(),
 		"token_hash": signature,
 		"expires_at": bson.M{"$gt": now},
 	})
@@ -202,7 +271,7 @@ func (h *Handler) Refresh(c fiber.Ctx) error {
 		}
 
 		expiredRes := jwtColl.FindOneAndDelete(ctx, bson.M{
-			"jti":        jtiParsed,
+			"jti":        jtiParsed.String(),
 			"token_hash": signature,
 			"expires_at": bson.M{"$lte": now},
 		})
@@ -229,7 +298,7 @@ func (h *Handler) Refresh(c fiber.Ctx) error {
 	newRefresh.ExpiresAt = time.Now().Add(30 * 24 * time.Hour).UnixMilli()
 	newRefresh.UserID = refresh.UserID
 	newRefresh.DeviceID = refresh.DeviceID
-	newRefresh.JTI = jtis
+	newRefresh.JTI = jtis.String()
 	newRefresh.TokenHash = signature
 	_, err = jwtColl.InsertOne(ctx, newRefresh)
 	if err != nil {

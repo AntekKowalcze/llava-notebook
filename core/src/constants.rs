@@ -17,6 +17,7 @@
 
 //config.rs
 //folders
+pub const SERVER_ADDRESS_TO_PING: &str = "127.0.0.1:3000";
 pub const SERVER_ADDRESS: &str = "http://127.0.0.1:3000/";
 pub const USER_DIR_PATTERN: &str = "llava/users";
 pub const SUBDIRS: &[&str; 4] = &["notes", "assets", "tmp", "tmp_delete"];

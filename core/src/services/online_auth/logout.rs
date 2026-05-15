@@ -25,8 +25,7 @@ pub async fn logout(
         .bearer_auth(&access_token.0)
         .json(&request)
         .send()
-        .await
-        .map_err(|err| crate::errors::Error::from_reqwest_error(&err))?;
+        .await.map_err(|_| crate::Error::ServerNotAvailable)?;
 
     if !res.status().is_success() {
         return Err(crate::errors::Error::RequestError((

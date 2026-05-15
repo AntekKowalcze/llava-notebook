@@ -82,6 +82,9 @@ pub struct AppState {
     pub access_token: Mutex<Option<AccessToken>>,
     pub online_user_id: Mutex<Option<String>>, //BSON on server
     pub server_client: Client,
+
+    pub internet_connection: Mutex<bool>,
+    pub server_connection: Mutex<bool>,
 }
 
 impl AppState {
@@ -98,6 +101,8 @@ impl AppState {
             access_token: Mutex::new(None),
             online_user_id: Mutex::new(None),
             server_client: Client::new(),
+            internet_connection: Mutex::new(false),
+            server_connection: Mutex::new(false),
         })
     }
 }
@@ -276,7 +281,6 @@ pub fn change_active_user(
     let file_content = serde_json::to_string_pretty(&data)
         .context("failed to parse user uuid to json when changin active user")?;
     std::fs::write(&paths.active_user_path, file_content)?;
-    crate::services::logger::log_success("changed current user");
     Ok(())
 }
 

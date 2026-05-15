@@ -9,13 +9,18 @@ import Toast from 'vue-toastification';
 import 'vue-toastification/dist/index.css';
 import PrimeVue from 'primevue/config';
 import { useUserConfigStore } from './stores/userConfig';
-
+import { useOnlineAuthStore } from './stores/onlineAuth';
+import { useAuthStore } from './stores/auth';
+import { useMetaStore } from './stores/metaStore,';
 const app = createApp(App);
 app.use(PrimeVue);
 app.use(createPinia());
 app.use(router);
 const userConfigStore = useUserConfigStore();
 void userConfigStore.init();
+useOnlineAuthStore()
+useAuthStore()
+useMetaStore()
 app.use(Toast as any, {
   transition: 'Vue-Toastification__bounce',
   maxToasts: 20,

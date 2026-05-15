@@ -1,7 +1,12 @@
 //! modules for useful tools
 
+use std::time::Duration;
+
 use anyhow::Context;
+use reqwest::Client;
 use rusqlite::{Connection, OptionalExtension, named_params};
+
+use crate::constants::SERVER_ADDRESS;
 #[allow(dead_code)]
 pub fn getting_user_input(buffer: &mut String) {
     println!("Podaj treść");
@@ -117,4 +122,42 @@ pub fn is_online_linked(
         .context("failed to get is_online_linked")?;
     return Ok(linked == 1);
 }
-//todo change error on connection so when timed out, its server unavailable and on no connection internet errro
+
+pub fn change_account_link_status(
+    users_data: &Connection,
+    user_id: &uuid::Uuid,
+) -> Result<(), crate::errors::Error> {
+    users_data
+        .execute(
+            "UPDATE users_data SET is_online_linked = 1 WHERE user_id = :id",
+            named_params! {":id": user_id.to_string()},
+        )
+        .context("failed to update linked in users_data")?;
+    Ok(())
+}
+pub async fn is_device_connected_to_server() -> bool {
+    tokio::time::timeout(
+        Duration::from_secs(3),
+        tokio::net::TcpStream::connect(crate::constants::SERVER_ADDRESS_TO_PING),
+    )
+    .await
+    .map(|res| res.is_ok())
+    .unwrap_or(false)
+}
+
+pub async fn is_device_online() -> bool {
+    tokio::time::timeout(
+        Duration::from_secs(3),
+        tokio::net::TcpStream::connect("142.250.120.113:80"),
+    )
+    .await
+    .map(|res| res.is_ok())
+    .unwrap_or(false)
+}
+
+pub async fn check_connection() -> Result<(bool, bool), crate::errors::Error> {
+    Ok(tokio::join!(
+        is_device_connected_to_server(),
+        is_device_online()
+    ))
+}

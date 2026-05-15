@@ -8,8 +8,12 @@ import SubmitButton from '../components/commons/SubmitButton.vue';
 import { useAuthStore } from '../stores/auth';
 import { useToast } from 'vue-toastification';
 import { useRouter } from 'vue-router';
+import { useOnlineAuthStore } from '../stores/onlineAuth';
+import { useUserConfigStore } from '../stores/userConfig';
 const router = useRouter();
 const authStore = useAuthStore();
+const onlineAuthStore = useOnlineAuthStore();
+const userConfigStore = useUserConfigStore();
 const toast = useToast();
 let buttonContent = 'logout';
 async function logout() {
@@ -20,6 +24,14 @@ async function logout() {
       loggedInUsername: null,
       loggedInUserId: null,
     });
+        userConfigStore.settingList = null;
+
+    onlineAuthStore.$patch({
+      loggedIn: false,
+      loggedInEmail: null,
+      loggedInId: null
+    })
+
     toast.success('logged out successfully');
     router.replace('/');
   } catch (err) {

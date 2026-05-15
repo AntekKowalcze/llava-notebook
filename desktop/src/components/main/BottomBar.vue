@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
 import { useUserConfigStore } from '../../stores/userConfig';
-import { Lock, CloudOff, LockOpen, HardDrive, Server, Cloud } from 'lucide-vue-next';
+import { Lock, CloudOff, LockOpen, HardDrive, Server, Cloud, RefreshCwOff } from 'lucide-vue-next';
+import { useMetaStore } from '../../stores/metaStore,';
+import {ref} from "vue"
 const userConfig = useUserConfigStore();
-
+const metaStore = useMetaStore()
 onMounted(() => {
   void userConfig.init();
 });
 
 const encrypted = computed(() => userConfig.config['local.encryption']);
 const local = computed(() => userConfig.config['online.sync'] === 'off');
-const connected = computed(() => userConfig.config['local.mode'] === 'off');
+const connected = computed<boolean | null>(()=> metaStore.isConnectedToServer)
+const isLocal = computed(() => userConfig.config['local.mode'] === 'off');
 
 //, CloudUpload, CloudCheck, RefreshCw,
 defineProps<{ version: string; synced: string }>();
@@ -33,7 +36,7 @@ defineProps<{ version: string; synced: string }>();
       <!-- online -->
       <div
         class="flex items-center gap-1.5 text-green-500"
-        v-if="connected"
+        v-if="connected"  
       >
         <Cloud :size="12" />
         <span>Online</span>
@@ -46,6 +49,14 @@ defineProps<{ version: string; synced: string }>();
         <CloudOff :size="12" />
         <span>Offline</span>
       </div>
+
+ <div class="h-3 w-px bg-white/10" />
+
+      <!-- sync off-->
+       <div class="flex items-center gap-1.5 text-note-garnet" v-if="local">
+                <RefreshCwOff :size="12"  /><span>Sync off</span>
+            </div> 
+            
 
       <!-- syncing -->
       <!-- <div class="flex items-center gap-1.5 text-note-paprika">
@@ -87,10 +98,10 @@ defineProps<{ version: string; synced: string }>();
       <!-- local -->
       <div
         class="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 text-note-pumice"
-        v-if="local"
+        v-if="!isLocal"
       >
         <HardDrive :size="11" />
-        <span>Local</span>
+        <span>Disk</span>
       </div>
 
       <!-- cloud -->
