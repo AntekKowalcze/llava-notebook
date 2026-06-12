@@ -458,7 +458,7 @@ pub fn change_password(
 
     let mut found = 0;
     let mut stmt = users_db
-        .prepare("SELECT code_hash FROM recovery_keys WHERE user_id = :id")
+        .prepare("SELECT code_hash FROM recovery_keys WHERE user_id = :id AND used_at IS NULL" )
         .context("failed to prepare statement")?;
     let mut handle = stmt
         .query(named_params! {

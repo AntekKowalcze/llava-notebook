@@ -66,13 +66,18 @@ async function submitLogin() {
 
   loading.value = true;
   try {
+    await userConfig.init();
+    if (!userConfig.settingList) {
+      toast.error('Settings not loaded. Try again.');
+      return;
+    }
     userConfig.updateSettingValue('local.mode', 'off');
     let online_user_id = await invoke<string>('login_online', {
       email: email.value,
       password: password.value,
       currentSettings: userConfig.settingList,
     });
-    toast.success('Logged in to online account successfully');
+    toast.success('Connected accounts successfully');
     
     onlineAuthStore.$patch({
       loggedIn: true,
@@ -172,5 +177,4 @@ onBeforeUnmount(() => {
    
   </FormCard>
 </template>
-<!-- TODO check timeout changes both on frontend and on backend in files login.rs submit button loginPage onlinelogin , test it in application with local account and online account-->
- <!-- TODO check timeouts, and test them -->
+<!-- todo when watcher check server connection fires to connected try to login online if user were logged in online AND AUTH IS DONE, also add watcher so when status changes try to log in-->

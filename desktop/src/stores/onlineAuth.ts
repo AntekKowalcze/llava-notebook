@@ -21,12 +21,10 @@ export const useOnlineAuthStore = defineStore('onlineAuth', () => {
   listen<void>('online_session_expired', () => {
     sessionExpired.value = true;
   });
-   listen<string>('logged_in_online', async (event) => {
-    loggedIn.value = true
-    loggedInId.value = event.payload
-    await fetchEmail()
-    const toast = useToast();
-    toast.success("logged in to online account: " + loggedInEmail.value)
+  listen<string>('logged_in_online', async (event) => {
+    loggedIn.value = true;
+    loggedInId.value = event.payload;
+    await fetchEmail();
   });
 
 

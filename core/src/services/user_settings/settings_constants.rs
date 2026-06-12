@@ -250,20 +250,20 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
             Setting::new(
                 "online.login".to_string(),
                 "loginOnline".to_string(),
-                "Login".to_string(),
-                "Sign in to your online account.".to_string(),
+                "Connect online account".to_string(),
+                "Conect local account to your online account.".to_string(),
                 "idle".to_string(),
                 SettingInputType::Button,
-                Some("Login".to_string()),
+                Some("Connect".to_string()),
             ),
             Setting::new(
                 "online.logout".to_string(),
                 "logoutOnline".to_string(),
-                "Logout".to_string(),
-                "Sign out from your online account on this device.".to_string(),
+                "Disconnect online account".to_string(),
+                "Disconnect online account from current local account.".to_string(),
                 "idle".to_string(),
                 SettingInputType::Button,
-                Some("Logout".to_string()),
+                Some("Disconnect".to_string()),
             ),
         ],
     );
@@ -503,21 +503,21 @@ pub static SETTINGS_META: phf::Map<&'static str, SettingMeta> = phf_map! {
 
     "online.login" => SettingMeta {
         field: "loginOnline",
-        label: "Login",
-        description: "Sign in to your online account.",
+        label: "Connect online account",
+        description: "Conect local account to your online account.",
         input_type: SettingInputType::Button,
         options: None,
-        button_label: Some("Login")
+        button_label: Some("Connect")
 
     },
 
     "online.logout" => SettingMeta {
         field: "logoutOnline",
-        label: "Logout",
-        description: "Sign out from your online account on this device.",
+        label: "Disconnect online account",
+        description: "Disconnect online account from current local account.",
         input_type: SettingInputType::Button,
         options: None,
-        button_label: Some("Logout")
+        button_label: Some("Disconnect")
 
     },
 

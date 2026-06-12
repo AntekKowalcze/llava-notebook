@@ -3,7 +3,6 @@ import { computed, onMounted } from 'vue';
 import { useUserConfigStore } from '../../stores/userConfig';
 import { Lock, CloudOff, LockOpen, HardDrive, Server, Cloud, RefreshCwOff } from 'lucide-vue-next';
 import { useMetaStore } from '../../stores/metaStore,';
-import {ref} from "vue"
 const userConfig = useUserConfigStore();
 const metaStore = useMetaStore()
 onMounted(() => {
@@ -12,7 +11,7 @@ onMounted(() => {
 
 const encrypted = computed(() => userConfig.config['local.encryption']);
 const local = computed(() => userConfig.config['online.sync'] === 'off');
-const connected = computed<boolean | null>(()=> metaStore.isConnectedToServer)
+const connected = computed<boolean | null>(()=> metaStore.isConnectedToServer && metaStore.isConnectedToInternet)
 const isLocal = computed(() => userConfig.config['local.mode'] === 'off');
 
 //, CloudUpload, CloudCheck, RefreshCw,

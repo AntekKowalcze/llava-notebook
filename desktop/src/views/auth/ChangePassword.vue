@@ -11,7 +11,9 @@ import { useAuthStore } from '../../stores/auth';
 
 import { useToast } from 'vue-toastification';
 import TinyError from '../../components/auth/forms/TinyError.vue';
+import LoadingCircle from '../../components/main/LoadingCircle.vue';
 const authStore = useAuthStore();
+const loading = ref<boolean>(false)
 const username = authStore.loggedInUsername;
 const router = useRouter();
 const password = ref<string>('');
@@ -27,6 +29,7 @@ const canSubmit = computed(() => {
 });
 async function changePassword() {
   try {
+    loading.value = true
     await invoke<void>('change_password', {
       username,
       password: password.value,
@@ -34,9 +37,11 @@ async function changePassword() {
       code: authStore.pendingCode,
     });
     authStore.$patch({ pendingCode: null });
+    loading.value = false
     toast.success('Password changed sucessfully');
     router.replace({ name: 'loading' });
   } catch (err) {
+    loading.value = false
     console.log(err);
     toast.error('error while chaning password');
   }
@@ -48,6 +53,7 @@ async function changePassword() {
     header-text="Change password"
     sub-text=""
   >
+  <template v-if="!loading">
     <TextInput
       v-model:isValid="isPasswordValid"
       :placeholder="'password'"
@@ -71,6 +77,8 @@ async function changePassword() {
       :content="'Submit'"
       @click="changePassword"
     ></SubmitButton>
+    </template>
+    <LoadingCircle v-else></LoadingCircle>
     <RouterLink
       to="/loading"
       class="mb-0 mt-8 text-note-ivory/80 hover:underline"

@@ -15,14 +15,14 @@ pub async fn register_command(
     app_handle: AppHandle,
 ) -> Result<(Vec<String>, String), llava_core::Error> {
     let (new_uuid, new_paths, users_db, codes, notes_key) = {
-        let mut conn_guard = state
-            .users_db
-            .lock()
-            .map_err(|_| anyhow!("failed to lock users_db"))?;
         let paths_guard = state
             .paths
             .lock()
             .map_err(|_| anyhow!("failed to lock paths"))?;
+        let mut conn_guard = state
+            .users_db
+            .lock()
+            .map_err(|_| anyhow!("failed to lock users_db"))?;
 
         let paths = paths_guard.as_ref().ok_or(llava_core::Error::LockError)?;
         let users_db = conn_guard.as_mut().ok_or(llava_core::Error::LockError)?;
@@ -35,14 +35,15 @@ pub async fn register_command(
             users_db,
         )?
     };
+    
 
     let user_config = llava_core::settings::get_config_for_state(&new_paths)?;
-
+ 
     app_handle
         .emit("config-updated", &user_config)
         .map_err(|_| llava_core::Error::FatalError)?;
-
-    crate::commands::command_helpers::change_state_after_login(
+    
+ crate::commands::command_helpers::change_state_after_login(
         &state,
         new_uuid,
         users_db,
@@ -51,6 +52,7 @@ pub async fn register_command(
         user_config,
         notes_key,
     )?;
+  
 
     Ok((codes, new_uuid.to_string()))
 }
@@ -65,14 +67,14 @@ pub async fn login_command(
     app_handle: AppHandle,
 ) -> Result<String, llava_core::Error> {
     let (new_uuid, new_paths, notes_conn, notes_key) = {
-        let mut conn_guard = state
-            .users_db
-            .lock()
-            .map_err(|_| anyhow!("failed to lock users_db"))?;
         let paths_guard = state
             .paths
             .lock()
             .map_err(|_| anyhow!("failed to lock paths"))?;
+        let mut conn_guard = state
+            .users_db
+            .lock()
+            .map_err(|_| anyhow!("failed to lock users_db"))?;
 
         let users_db = conn_guard.as_mut().ok_or(llava_core::Error::LockError)?;
         let paths = paths_guard.as_ref().ok_or(llava_core::Error::LockError)?;
@@ -93,44 +95,9 @@ pub async fn login_command(
         llava_core::local_auth::get_optional_online_id(users_db, &new_uuid)?
     }; // conn_guard dropped here
 
-    let is_connected_to_server = {
-let guard =  state.server_connection.lock().map_err(|_| llava_core::Error::LockError)?;
-        guard.clone()
-    };
-    if is_connected_to_server {
-    if let Some(online_id) = id {
-        let app_handle = app_handle.clone();
-        tauri::async_runtime::spawn(async move {
-            let state = app_handle.state::<AppState>();
-            let client = state.server_client.clone();
-            let res = timeout(
-                Duration::from_secs(3),
-                llava_core::online_auth::check_if_logged_in_online(&online_id, client),
-            )
-            .await;
-            let status = match res {
-                Ok(Ok(token)) => {
-                    if let Ok(mut guard) = state.access_token.lock() {
-                        *guard = Some(token);
-                    }
-                    if let Ok(mut guard) = state.online_user_id.lock() {
-                        *guard = Some(online_id.clone());
-                    }
-                    LoggedInOnline::LoggedIn(online_id)
-                }
-                Ok(Err(err)) => {
-                    if matches!(err, llava_core::Error::OnlineSessionExpired) {
-                        let _ = app_handle.emit("online_session_expired", ());
-                    }
-                    LoggedInOnline::NotLoggedIn(err)
-                }
-                Err(_) => LoggedInOnline::NotLoggedIn(llava_core::Error::ServerNotAvailable),
-            };
-            let _ = app_handle.emit("online_login_status", &status);
-        });
-    }
+ if let Some(online_id) = id {
+    crate::commands::online_auth::try_refresh_if_logged_in(online_id, app_handle.clone()).await?;
 }
-
     let user_config = llava_core::settings::get_config_for_state(&new_paths)?;
 
     app_handle
@@ -173,14 +140,14 @@ pub async fn log_with_code(
     code.retain(|c| c != '-');
 
     let (user_uuid, paths, notes_conn, one_code, notes_key) = {
-        let users_db_guard = state
-            .users_db
-            .lock()
-            .map_err(|_| anyhow!("failed to lock users_db"))?;
         let paths_guard = state
             .paths
             .lock()
             .map_err(|_| anyhow!("failed to lock paths"))?;
+        let users_db_guard = state
+            .users_db
+            .lock()
+            .map_err(|_| anyhow!("failed to lock users_db"))?;
 
         let users_db = users_db_guard
             .as_ref()
@@ -201,49 +168,14 @@ pub async fn log_with_code(
             .lock()
             .map_err(|_| anyhow!("failed to lock users_db"))?;
         let users_db = conn_guard.as_mut().ok_or(llava_core::Error::LockError)?;
-        let user_uuid = llava_core::get_user_uuid(users_db, &username)?;
+        let user_uuid: uuid::Uuid = llava_core::get_user_uuid(users_db, &username)?;
         llava_core::local_auth::zero_error_count(users_db, &user_uuid)?;
         llava_core::local_auth::get_optional_online_id(users_db, &user_uuid)?
+       
     };
-   
-    let is_connected_to_server = {
-let guard =  state.server_connection.lock().map_err(|_| llava_core::Error::LockError)?;
-        guard.clone()
-    };
-    if is_connected_to_server {
-
-    
+    println!("{:?} this is an id", id);
     if let Some(online_id) = id {
-        let app_handle = app_handle.clone();
-        tauri::async_runtime::spawn(async move {
-            let state = app_handle.state::<AppState>();
-            let client = state.server_client.clone();
-            let res = timeout(
-                Duration::from_secs(3),
-                llava_core::online_auth::check_if_logged_in_online(&online_id, client),
-            )
-            .await;
-            let status = match res {
-                Ok(Ok(token)) => {
-                    if let Ok(mut guard) = state.access_token.lock() {
-                        *guard = Some(token);
-                    }
-                    if let Ok(mut guard) = state.online_user_id.lock() {
-                        *guard = Some(online_id.clone());
-                    }
-                    LoggedInOnline::LoggedIn(online_id)
-                }
-                Ok(Err(err)) => {
-                    if matches!(err, llava_core::Error::OnlineSessionExpired) {
-                        let _ = app_handle.emit("online_session_expired", ());
-                    }
-                    LoggedInOnline::NotLoggedIn(err)
-                }
-                Err(_) => LoggedInOnline::NotLoggedIn(llava_core::Error::ServerNotAvailable),
-            };
-            let _ = app_handle.emit("online_login_status", &status);
-        });
-    }
+      crate::commands::online_auth::try_refresh_if_logged_in(online_id, app_handle.clone()).await?;
     }
     let user_config = llava_core::settings::get_config_for_state(&paths)?;
 

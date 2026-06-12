@@ -13,7 +13,7 @@ export const useUserConfigStore = defineStore('userConfig', () => {
   let listening = false;
 
   function updateSettingValue(id: string, value: string): boolean {
-    if (!settingList.value) return false;
+    if (!settingList.value) return false; // mayby it returns false here at start?
     return findAndUpdate(settingList.value.sections, id, value);
   }
 
@@ -70,6 +70,3 @@ export const useUserConfigStore = defineStore('userConfig', () => {
 
   return { config, settingList, isDefault, updateSettingValue, init };
 });
-//get here another listener which gets key and value and then runs find and update with this values so its changed like in setting view
-//config is writen on register, so its created
-//i think the best solution is 1. move settingsList to config store with update handling, and now i will be able to change config from backend emitting event and it will be automaticly upadted in settingsView file as well

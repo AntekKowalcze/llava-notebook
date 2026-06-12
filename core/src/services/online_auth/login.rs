@@ -1,6 +1,5 @@
 use crate::constants::KEY_ENCRYPTED_KEY_LENGTH;
 use crate::constants::SERVER_ADDRESS;
-use crate::services::logger::log_error;
 use crate::services::online_auth::models::online_account::AccessToken;
 use crate::services::online_auth::models::online_account::ArgonParams;
 use crate::services::online_auth::models::online_account::RefreshResponse;
@@ -43,7 +42,8 @@ pub async fn check_if_logged_in_online(
         .post(format!("{}auth/refresh", crate::constants::SERVER_ADDRESS))
         .json(&req)
         .send()
-        .await.map_err(|_| crate::Error::ServerNotAvailable)?;
+        .await
+        .map_err(|_| crate::Error::ServerNotAvailable)?;
 
     if !response.status().is_success() {
         let status = response.status().as_u16();
@@ -121,7 +121,8 @@ pub async fn login(
         .post(format!("{}auth/pre-login", SERVER_ADDRESS))
         .json(&request)
         .send()
-        .await.map_err(|_| crate::Error::ServerNotAvailable)?;
+        .await
+        .map_err(|_| crate::Error::ServerNotAvailable)?;
     if !response.status().is_success() {
         return Err(crate::errors::Error::RequestError((
             response.status().as_u16(),
@@ -148,7 +149,8 @@ pub async fn login(
         .post(format!("{}auth/login", SERVER_ADDRESS))
         .json(&login_request)
         .send()
-        .await.map_err(|_| crate::Error::ServerNotAvailable)?;
+        .await
+        .map_err(|_| crate::Error::ServerNotAvailable)?;
 
     if !result.status().is_success() {
         let status = result.status().as_u16();
@@ -237,9 +239,6 @@ pub async fn login(
         .context("master_key_enc decryption failed")?;
 
     kek_bytes.zeroize();
-    
 
     Ok((result.access_token, result.user_id, notes_key))
 }
-
-//TODO logged in online account indicator 4. if not logged in but linked initialize workek which tries to login every while when online 5. mailer active account link + password recovery (it may be done later)

@@ -280,7 +280,7 @@ async function handleUpdate(id: string) {
           loggedInEmail: null,
           loggedInId: null
         })
-        toast.success('User logged out successfully');
+        toast.success('Disconnected online account from local account successfully');
       } catch (err: any) {
         console.log(err);
         if (err?.NoInternetConnection) {

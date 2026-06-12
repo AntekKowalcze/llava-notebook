@@ -62,7 +62,7 @@ async function submit() {
       password: password.value,
       currentSettings: settingList.value,
     });
-    toast.success('Logged in to online account successfully');
+    toast.success('Connected accounts successfully');
     onlineAuthStore.$patch({
       loggedIn: true,
       loggedInId: onlineUserId,

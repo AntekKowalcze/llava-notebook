@@ -45,14 +45,14 @@ pub fn start_connection_monitor(app_handle: AppHandle) {
         if !is_local_only{
             match llava_core::check_connection().await {
                 Ok((server, internet)) => {
-                    let _ = app_handle.emit("server_connection_status", server);
-                    let _ = app_handle.emit("internet_connection_status", internet);
                     if let Ok(mut lock) = state.server_connection.lock() {
                         *lock = server;
                     }
                     if let Ok(mut lock) = state.internet_connection.lock() {
                         *lock = internet;   
                     }
+                    let _ = app_handle.emit("server_connection_status", server);
+                    let _ = app_handle.emit("internet_connection_status", internet);
                     fail_count = 0;
                 }
                 Err(_) => {

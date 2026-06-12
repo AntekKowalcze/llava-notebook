@@ -17,7 +17,7 @@ app.use(PrimeVue);
 app.use(createPinia());
 app.use(router);
 const userConfigStore = useUserConfigStore();
-void userConfigStore.init();
+void await userConfigStore.init();
 useOnlineAuthStore()
 useAuthStore()
 useMetaStore()

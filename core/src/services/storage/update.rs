@@ -6,9 +6,6 @@ use std::fs::{self};
 
 ///function responsible for updating .md file contents
 pub fn update_md(
-    //todo change to english
-    //możę usunąć note_id/name w sensie jedno z tych ale to zobacze jak będzie łatwiej zaimplementować w taurii
-    //remember about changin state to pending upload when update when adding sync
     notes_db: &rusqlite::Connection,
     name: String,
     note_id: uuid::Uuid, //możliwa zmiana na uuid

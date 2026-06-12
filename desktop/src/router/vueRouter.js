@@ -14,7 +14,7 @@ const routes = [
       const authStore = useAuthStore();
       const onlineAuthStore = useOnlineAuthStore();
       try {
-        await authStore.ensureSession(); //check session should probably return user id and then
+        await authStore.ensureSession();
 
         const hasNoUsers = authStore.hasNoUsers;
         if (hasNoUsers) {
@@ -22,13 +22,9 @@ const routes = [
           return { path: '/register', replace: true };
         } else if (!hasNoUsers && authStore.loggedIn) {
           toast.success(authStore.loggedInUsername + ' logged in');
-          console.log('HERE', onlineAuthStore.loggedIn);
           if (onlineAuthStore.loggedIn) {
-            console.log('HEREE');
-
             toast.success(onlineAuthStore.loggedInEmail + ' logged in to online account');
           } else {
-            console.log(onlineAuthStore.loggedInEmail, onlineAuthStore.loggedIn);
             if (authStore.onlineStatus === 'not_logged_in') {
               toast.warning('failed to login to online account');
             }
@@ -45,7 +41,7 @@ const routes = [
     meta: { skipAuth: true },
   },
   {
-    path: '/main',
+    path: '/main/',
     name: 'main',
 
     component: () => import('../views/MainView.vue'),
@@ -60,6 +56,7 @@ const routes = [
     ],
   },
   {
+    //TODO debug why login page is not showing (somehting in router)
     path: '/chooseRegisterForm',
     name: 'choose',
     component: () => import('../views/auth/RegisterAskPage.vue'),
@@ -123,6 +120,12 @@ const routes = [
       }
     },
   },
+  {
+    path: '/main/editor',
+    name: 'editor',
+    component: () => import('../views/editor/editorView.vue'),
+    meta: { skipAuth: false },
+  }
 ];
 export const router = createRouter({
   history: createWebHashHistory(),

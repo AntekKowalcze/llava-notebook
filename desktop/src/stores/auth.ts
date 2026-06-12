@@ -11,11 +11,10 @@ function getConnectionErrorToast(err: unknown): string | null {
       return 'No internet connection';
     }
     if (err === 'ServerNotAvailable') {
-      return 'Server unavailable. Try again later.';
+      return '!!!Server unavailable. When server will be up, we will try to log you in.';
     }
     return null;
   }
-
   if (err && typeof err === 'object') {
     const typedErr = err as {
       NoInternetConnection?: unknown;
@@ -26,7 +25,7 @@ function getConnectionErrorToast(err: unknown): string | null {
       return 'No internet connection';
     }
     if (typedErr.ServerNotAvailable) {
-      return 'Server unavailable. Try again later.';
+      return '!!!Server unavailable. When server will be up, we will try to log you in.';
     }
   }
 
@@ -200,3 +199,8 @@ export const useAuthStore = defineStore('auth', () => {
 });
 
 
+
+
+//test cases: 
+//logged in online before and connected to server: 
+//logged in online before and disconnected from server -> connection occures after 5-10 seconds

@@ -3,13 +3,13 @@ import { invoke } from '@tauri-apps/api/core';
 import LoadingCircle from '../components/main/LoadingCircle.vue';
 
 import IconComponent from '../components/main/IconComponent.vue';
-//LOGOUT LOGIC
 import SubmitButton from '../components/commons/SubmitButton.vue';
 import { useAuthStore } from '../stores/auth';
 import { useToast } from 'vue-toastification';
 import { useRouter } from 'vue-router';
 import { useOnlineAuthStore } from '../stores/onlineAuth';
 import { useUserConfigStore } from '../stores/userConfig';
+import { UserRoundCheck, UserRoundX } from 'lucide-vue-next';
 const router = useRouter();
 const authStore = useAuthStore();
 const onlineAuthStore = useOnlineAuthStore();
@@ -70,4 +70,6 @@ async function logout() {
       }
     "
   ></SubmitButton>
+  <UserRoundCheck class="text-note-ivory" v-if="onlineAuthStore.loggedIn"></UserRoundCheck>
+  <UserRoundX class="text-note-ivory" v-else></UserRoundX>
 </template>

@@ -47,6 +47,12 @@ async function submitRegister() {
   loading.value = true;
 
   try {
+    await userConfig.init();
+    if (!userConfig.settingList) {
+      toast.error('Settings not loaded. Try again.');
+      return;
+    }
+    console.log(userConfig.settingList + " to jest lista")
     userConfig.updateSettingValue('local.mode', 'off');
     await invoke<void>('register_user_online', {
       email: email.value,
@@ -60,7 +66,7 @@ async function submitRegister() {
       loggedIn: true,
       loggedInEmail: email.value,
     });
-    toast.success('successfully regisered online user account');
+    toast.success('successfully regisered and connected to online account');
     await router.replace('/main/');
   } catch (err: any) {
     

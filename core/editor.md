@@ -1,0 +1,1 @@
+left panel visible on mouse close to left side, editor similar to obsidian, in topbar online login indicator, settings button
