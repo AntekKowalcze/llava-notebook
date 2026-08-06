@@ -135,7 +135,7 @@ pub fn default_config(default_data_dir: &str) -> UserConfig {
             Setting::new(
                 "local.showLogs".to_string(),
                 "showAppLogs".to_string(),
-                "Show application logs".to_string(),
+                "Show app logs".to_string(),
                 "Open a view with recent application logs.".to_string(),
                 "idle".to_string(),
                 SettingInputType::Button,
@@ -335,7 +335,7 @@ pub static SETTINGS_META: phf::Map<&'static str, SettingMeta> = phf_map! {
 
     "local.showLogs" => SettingMeta {
         field: "showAppLogs",
-        label: "Show application logs",
+        label: "Show app logs",
         description: "Open a view with recent application logs.",
         input_type: SettingInputType::Button,
         options: None,

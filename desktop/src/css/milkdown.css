@@ -1,0 +1,304 @@
+/* =========================================================
+   Milkdown Crepe - Graphite Soul Theme
+   =========================================================
+
+   graphite #0F0F10
+   garnet   #9F1239
+   paprika  #F97316
+   glow     #FACC15
+   pumice   #E7E5E4
+   ivory    #FFFBEB
+========================================================= */
+
+
+.milkdown {
+
+  --crepe-color-background: #0F0F10;
+  --crepe-color-surface: #161618;
+  --crepe-color-surface-low: #121214;
+
+  --crepe-color-on-background: #FFFBEB;
+  --crepe-color-on-surface: #FFFBEB;
+  --crepe-color-on-surface-variant: #E7E5E4;
+
+  --crepe-color-primary: #F97316;
+  --crepe-color-secondary: #FFD43B;
+
+  --crepe-color-outline: rgba(255,251,235,.22);
+  --crepe-color-hover: rgba(255,251,235,.10);
+  --crepe-color-selected: rgba(249,115,22,.45);
+
+  --crepe-color-error: #B91C45;
+
+  --crepe-color-inline-code: #FFD43B;
+  --crepe-color-inline-area: #1A1A1D;
+}
+
+
+/* Editor */
+
+.milkdown .crepe-editor {
+
+  max-width:none !important;
+  width:100%;
+  padding:2.5rem 3rem;
+  color:#FFFBEB;
+
+}
+
+
+.milkdown .crepe-editor p {
+
+  color:#FFFBEB;
+  line-height:1.75;
+
+}
+
+
+.milkdown .crepe-editor h1,
+.milkdown .crepe-editor h2,
+.milkdown .crepe-editor h3,
+.milkdown .crepe-editor h4 {
+
+  color:#FFFBEB;
+  font-weight:750;
+
+}
+
+
+
+/* =========================================================
+   Crepe floating UI - black glass
+========================================================= */
+
+
+.milkdown 
+[role="menu"],
+.milkdown 
+[role="listbox"],
+.milkdown 
+[role="dialog"],
+.milkdown 
+[role="tooltip"],
+.milkdown 
+.crepe-toolbar {
+
+  background:rgba(7,7,8,.96) !important;
+
+  backdrop-filter:blur(18px) !important;
+  -webkit-backdrop-filter:blur(18px) !important;
+
+  border:1px solid rgba(255,251,235,.25) !important;
+
+  border-radius:14px !important;
+
+  box-shadow:
+    0 20px 70px rgba(0,0,0,.85),
+    inset 0 1px rgba(255,251,235,.10);
+
+}
+
+
+
+/* Menu text */
+
+.milkdown
+[role="menuitem"],
+.milkdown
+[role="option"] {
+
+  color:#FFFBEB !important;
+
+}
+
+
+
+/* Menu icons */
+
+.milkdown
+[role="menuitem"] svg,
+.milkdown
+[role="option"] svg {
+
+  color:#E7E5E4;
+
+}
+
+
+
+/* Hover */
+
+.milkdown
+[role="menuitem"]:hover,
+.milkdown
+[role="option"]:hover {
+
+  background:#252529 !important;
+
+  color:#FFFFFF !important;
+
+}
+
+
+.milkdown
+[role="menuitem"]:hover svg,
+.milkdown
+[role="option"]:hover svg {
+
+  color:#F97316;
+
+}
+
+
+
+/* Selected item */
+
+.milkdown
+[data-selected="true"],
+.milkdown
+.active {
+
+  background:#F97316 !important;
+
+  color:#0F0F10 !important;
+
+  font-weight:700;
+
+}
+
+
+.milkdown
+[data-selected="true"] svg,
+.milkdown
+.active svg {
+
+  color:#0F0F10 !important;
+
+}
+
+
+
+/* =========================================================
+   Lists - styled with Paprika
+========================================================= */
+
+
+.milkdown .crepe-editor ul li::marker {
+
+  color:#F97316 !important;
+
+  font-size:1.55em;
+
+  font-weight:900;
+
+}
+
+
+.milkdown .crepe-editor ol li::marker {
+
+  color:#F97316 !important;
+
+  font-size:1.25em;
+
+  font-weight:900;
+
+}
+
+
+
+/* Tasks */
+
+.milkdown 
+.crepe-editor 
+input[type="checkbox"] {
+
+  accent-color:#F97316;
+
+  transform:scale(1.2);
+
+}
+
+
+
+/* =========================================================
+   Code blocks
+========================================================= */
+
+
+.milkdown .crepe-editor code {
+
+  color:#FFD43B;
+
+  background:#1A1A1D;
+
+  border:1px solid rgba(255,212,59,.25);
+
+  border-radius:6px;
+
+}
+
+
+.milkdown .crepe-editor pre {
+
+  background:#080809;
+
+  border:1px solid rgba(249,115,22,.25);
+
+  border-radius:14px;
+
+}
+
+
+
+/* Quote */
+
+.milkdown .crepe-editor blockquote {
+
+  border-left:4px solid #F97316 !important;
+
+  background:rgba(249,115,22,.12) !important;
+
+  color:#E7E5E4;
+
+}
+
+
+
+/* Links */
+
+.milkdown .crepe-editor a {
+
+  color:#FFD43B;
+
+}
+
+
+
+/* Selection */
+
+.milkdown ::selection {
+
+  background:rgba(255,212,59,.35);
+
+  color:#FFFBEB;
+
+}
+
+
+
+/* Scrollbar */
+
+.milkdown ::-webkit-scrollbar {
+
+  width:10px;
+
+}
+
+
+.milkdown ::-webkit-scrollbar-thumb {
+
+  background:rgba(255,251,235,.22);
+
+  border-radius:10px;
+
+}

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
 import { useUserConfigStore } from '../../stores/userConfig';
-import { Lock, CloudOff, LockOpen, HardDrive, Server, Cloud, RefreshCwOff } from 'lucide-vue-next';
+import { Lock, CloudOff, LockOpen, HardDrive, Server, Cloud, RefreshCwOff,CloudCheck } from 'lucide-vue-next';
 import { useMetaStore } from '../../stores/metaStore,';
 const userConfig = useUserConfigStore();
 const metaStore = useMetaStore()
@@ -64,13 +64,13 @@ defineProps<{ version: string; synced: string }>();
 
       <!-- pending -->
       <!-- <div class="flex items-center gap-1.5 text-note-pumice">
-                <CloudUpload :size="12" /><span>Pending</span>
+                <CloudUpload :size="12" /><span>Pending</span>  
             </div> -->
 
       <!-- synced -->
-      <!-- <div class="flex items-center gap-1.5 text-note-glow">
-                <CloudCheck :size="12" /><span>Synced 3 min ago</span>
-            </div> -->
+      <div class="flex items-center gap-1.5 text-note-glow" v-if="!local">
+                <CloudCheck :size="12" /><span>Sync on</span>
+            </div> 
 
       <div class="h-3 w-px bg-white/10" />
 

@@ -40,23 +40,29 @@ const routes = [
     },
     meta: { skipAuth: true },
   },
+{
+  path: '/main',
+  name: 'main',
+  component: () => import('../views/MainView.vue'),
+  children: [
+    {
+      path: 'editor',
+      name: 'editor',
+      component: () => import('../views/editor/editorView.vue'),
+    },
+    {
+      path: 'dashboard',
+      name: 'dashboard',
+      component: () => import('../views/DashboardView.vue'),
+    },
+    {
+      path: 'settings',
+      name: 'settings',
+      component: () => import('../views/SettingsView.vue'),
+    },
+  ],
+},
   {
-    path: '/main/',
-    name: 'main',
-
-    component: () => import('../views/MainView.vue'),
-    children: [
-      { path: '', name: 'editor', component: () => import('../views/LoadingPage.vue') }, // /main
-      {
-        path: 'dashboard',
-        name: 'dashboard',
-        component: () => import('../views/DashboardView.vue'),
-      },
-      { path: 'settings', name: 'settings', component: () => import('../views/SettingsView.vue') }, // /main/settings
-    ],
-  },
-  {
-    //TODO debug why login page is not showing (somehting in router)
     path: '/chooseRegisterForm',
     name: 'choose',
     component: () => import('../views/auth/RegisterAskPage.vue'),
@@ -120,12 +126,6 @@ const routes = [
       }
     },
   },
-  {
-    path: '/main/editor',
-    name: 'editor',
-    component: () => import('../views/editor/editorView.vue'),
-    meta: { skipAuth: false },
-  }
 ];
 export const router = createRouter({
   history: createWebHashHistory(),

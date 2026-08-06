@@ -417,8 +417,8 @@ function handleUsernameCancel() {
 </script>
 
 <template>
-  <div class="relative flex h-screen flex-col overflow-hidden px-[10%]">
-    <ArrowBigLeftDash
+<div class="relative flex h-full min-h-0 flex-col overflow-hidden px-[10%]">
+<ArrowBigLeftDash
       class="absolute left-[2%] top-[93%] text-note-paprika/80 transition-transform duration-200 hover:scale-95"
       @click="redirect" />
 
@@ -485,7 +485,7 @@ function handleUsernameCancel() {
       </div>
     </header>
 
-    <ScreenDeviderHorizontal class="shrink-0" />
+    <ScreenDeviderHorizontal class="shrink-0 mt-6" />
 
     <div class="mb-2 mt-4 flex shrink-0">
       <Funnel class="text-note-pumice/90 transition duration-500 ease-out hover:text-note-paprika"
@@ -502,10 +502,10 @@ function handleUsernameCancel() {
       </template>
     </div>
 
-    <main class="my-4 flex min-h-0 flex-1 flex-col gap-4 pb-6">
-      <div
-        class="scrollbar-none min-h-0 w-full flex-1 overflow-y-auto rounded-xl border border-note-pumice/40 bg-black/40 p-4">
-        <SectionComp v-if="settingList" v-for="section in settingList.sections" :section="section"
+  <main class="mb-4 mt-4 flex min-h-0 flex-1 flex-col gap-4">
+  <div
+    class="scrollbar-none min-h-0 flex-1 overflow-y-auto rounded-xl border border-note-pumice/40 bg-black/40 p-4"
+  > <SectionComp v-if="settingList" v-for="section in settingList.sections" :section="section"
           @setting-changed="handleChange"></SectionComp>
       </div>
     </main>

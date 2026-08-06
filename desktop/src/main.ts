@@ -12,6 +12,7 @@ import { useUserConfigStore } from './stores/userConfig';
 import { useOnlineAuthStore } from './stores/onlineAuth';
 import { useAuthStore } from './stores/auth';
 import { useMetaStore } from './stores/metaStore,';
+import './css/milkdown.css'
 const app = createApp(App);
 app.use(PrimeVue);
 app.use(createPinia());

@@ -146,7 +146,7 @@ onUnmounted(() => clearInterval(interval));
 <template>
   <div class="flex flex-1 flex-col">
     <ArrowBigLeftDash
-      class="click:scale-90 absolute left-[2%] top-[93%] text-note-paprika/80 transition-transform duration-200 hover:scale-95"
+      class="active:scale-90 absolute left-[2%] top-[93%] text-note-paprika/80 transition-transform duration-200 hover:scale-95"
       @click="redirect"
     ></ArrowBigLeftDash>
     <!-- greeting -->
@@ -169,7 +169,7 @@ onUnmounted(() => clearInterval(interval));
       </div>
     </div>
 
-    <ScreenDeviderHorizontal />
+    <ScreenDeviderHorizontal class="mt-6" />
     <!-- reszta dashboardu niżej -->
     <div class="flex-1 flex-col items-start">
       <div class="mb-4 h-fit">

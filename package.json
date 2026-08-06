@@ -1,5 +1,8 @@
 {
   "dependencies": {
+    "@milkdown/crepe": "^7.22.0",
+    "@milkdown/kit": "^7.22.0",
+    "@milkdown/vue": "^7.22.0",
     "vue-toastification": "^2.0.0-rc.5"
   }
 }
