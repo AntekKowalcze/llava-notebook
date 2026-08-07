@@ -75,6 +75,7 @@ async function submit() {
     clearFields();
   } catch (err: unknown) {
     console.log(err)
+    // TODO check why its not fireing 
     const message = getErrorText(err).toLowerCase();
     if (message.includes('wrong password')) {
       toast.warning('Wrong Password');
@@ -167,3 +168,6 @@ watch(
     </div>
   </div>
 </template>
+<!-- TODO markdown editor is not full size, and not scrollable -->
+ <!-- TODO add last edition API  -->
+  <!-- TODO add tags manipulation -->

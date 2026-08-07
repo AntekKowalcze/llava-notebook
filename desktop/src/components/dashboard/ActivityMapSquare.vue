@@ -28,3 +28,4 @@ const titleString = computed(() => `${props.numberOfContributions} edition(s) â€
 </template>
 
 <style scoped></style>
+<!-- TODO password reset redirect and workflow, online sign in, wifi connection lost and server connection lost toasts  -->
