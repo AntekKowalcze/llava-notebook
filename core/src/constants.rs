@@ -38,7 +38,7 @@ pub const LOGS_PATH: &str = "llava/logs/app.log";
 //register.rs
 //SQL
 
-pub const NOTES_DB_VERSION: i64 = 0;
+pub const NOTES_DB_VERSION: i64 = 1;
 pub const USERS_DB_VERSION: i64 = 3;
 pub const LOCAL_USER_DB_INSERT_SQL_SCHEMA: &str = r#"INSERT INTO users_data (
                 user_id,
@@ -90,10 +90,8 @@ pub const SESSION_TOKEN_TIME_ALIVE: i64 = 60 * 60 * 24 * 30; //60 seconds* 60 mi
 pub const NOTE_EXTENSION: &str = "md";
 
 //limits
-pub const MAX_NOTE_NAME_LENGTH: usize = 255;
-
 //SQL
-pub const INSERT_NOTE_SQL_SCHEMA: &str = "INSERT INTO notes (local_id, mongo_id, owner_id, name, title, summary, content_path, created_at, updated_at, deleted_at, version, cloud_version, sync_state, is_deleted, encrypted, crypto_meta) VALUES (:local_id, :mongo_id, :owner_id, :name, :title, :summary, :content_path, :created_at, :updated_at, :deleted_at, :version, :cloud_version, :sync_state, :is_deleted, :encrypted, :crypto_meta); ";
+pub const INSERT_NOTE_SQL_SCHEMA: &str = "INSERT INTO notes (local_id, mongo_id, owner_id, title, summary, content_path, created_at, updated_at, deleted_at, version, cloud_version, sync_state, is_deleted, encrypted, crypto_meta) VALUES (:local_id, :mongo_id, :owner_id, :title, :summary, :content_path, :created_at, :updated_at, :deleted_at, :version, :cloud_version, :sync_state, :is_deleted, :encrypted, :crypto_meta); ";
 
 //update.rs
 
@@ -112,7 +110,6 @@ pub const NOTE_DB_SCHEMA: &str = r#"
         mongo_id TEXT,
         owner_id TEXT NOT NULL,
     
-        name TEXT NOT NULL,
         title TEXT NOT NULL,
         summary TEXT NOT NULL,
         content_path TEXT NOT NULL,
@@ -129,8 +126,7 @@ pub const NOTE_DB_SCHEMA: &str = r#"
         
         encrypted INTEGER NOT NULL DEFAULT 1,
         crypto_meta TEXT,
-        
-        UNIQUE(owner_id, name),
+    
         CHECK(sync_state IN ('LocalOnly', 'PendingUpload', 'Synced', 'Conflict', 'Error', 'PendingDeleted'))
     );
 
@@ -248,3 +244,4 @@ pub const LOCAL_LOGIN_DB_SCHEMA: &str = r#" CREATE TABLE IF NOT EXISTS users_dat
                         FOREIGN KEY(user_id) REFERENCES users_data(user_id) ON DELETE CASCADE);
                               
                         "#;
+//TODO add topbar on login screen

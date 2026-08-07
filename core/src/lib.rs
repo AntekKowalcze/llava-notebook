@@ -28,6 +28,8 @@ pub mod storage {
     pub use crate::services::storage::init_note::add_note_to_database;
     pub use crate::services::storage::read::read_note_content;
     pub use crate::services::storage::update::update_md;
+    pub use crate::services::storage::init_note::create_local_note;
+    
 }
 
 pub mod settings {

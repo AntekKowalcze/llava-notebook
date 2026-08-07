@@ -34,3 +34,4 @@ function changed() {
 </template>
 
 <style lang="css" scoped></style>
+<!--! IMPORTANT view-model do note work here, use setting-changed -->

@@ -103,6 +103,7 @@ pub fn main() {
             commands::online_auth::get_email_from_id,
             commands::online_auth::login_online,
             commands::online_auth::try_login_if_connected_with_server,
+            commands::notes::create_note::create_note,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

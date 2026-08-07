@@ -77,6 +77,14 @@ fn creating_tables(
         .pragma_update(None, "journal_mode", "WAL")
         .context("Pragma error while creating notes db, journal mode")?;
 
+    let notes_table_existed: bool = notes_db
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='notes')",
+            [],
+            |r| r.get(0),
+        )
+        .context("failed to check if notes table exists")?;
+
     let tx = notes_db
         .transaction()
         .inspect_err(|e| {
@@ -109,7 +117,17 @@ fn creating_tables(
             );
         })
         .context("failed to create database")?;
-    run_notes_migration(&notes_db).context("failed while running notes db migration")?;
+
+    if notes_table_existed {
+        // Pre-existing db: may be on an older schema version, run migrations.
+        run_notes_migration(&notes_db).context("failed while running notes db migration")?;
+    } else {
+        // Freshly created: schema is already current, just stamp the version.
+        notes_db
+            .pragma_update(None, "user_version", crate::constants::NOTES_DB_VERSION)
+            .context("failed to set initial notes db version")?;
+    }
+
     log_helper(
         "ensuring notes db schema",
         "success",

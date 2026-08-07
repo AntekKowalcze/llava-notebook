@@ -18,7 +18,7 @@ type ActivityRecord = {
   date: string;
 };
 const router = useRouter();
-type LastEdited = [string, string]; // [note_id, date]
+type LastEdited = [string, string, string]; // [title, note_id, date]
 type FavouriteTag = [string, string]; // [tag_name, color]
 
 type DashboardData = {
@@ -212,7 +212,7 @@ onUnmounted(() => clearInterval(interval));
             <p class="text-xs uppercase tracking-widest text-note-pumice/60">Last 365 days</p>
           </div>
           <!-- month names  -->
-          <div class="flex h-4 w-[92%] select-none flex-row justify-evenly text-note-pumice/60">
+          <div class="flex h-4 w-[96%] select-none flex-row justify-evenly text-note-pumice/60">
             <span
               v-for="(label, idx) in monthLabels"
               :key="idx"
@@ -280,12 +280,12 @@ onUnmounted(() => clearInterval(interval));
           class="flex flex-col gap-2"
         >
           <div
-            v-for="([noteId, ts], idx) in lastThreeEdited"
+            v-for="([title, noteId, ts] ) in lastThreeEdited"
             :key="noteId + ts"
             class="flex items-center justify-between rounded-xl border border-note-pumice/15 bg-note-graphite px-3 py-2"
           >
             <div class="flex flex-col">
-              <span class="text-sm font-medium text-note-ivory">Note #{{ idx + 1 }}</span>
+              <span class="text-sm font-medium text-note-ivory">{{ title }}</span>
               <span class="text-xs text-note-pumice/70">
                 {{ noteId }}
               </span>
@@ -347,3 +347,5 @@ onUnmounted(() => clearInterval(interval));
 </template>
 
 <style scoped></style>
+
+<!-- TODO think how to redirect to note after ading, mabe with parameter, you should then add reading content and some place for chosing note, then encryption and sync-->

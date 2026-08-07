@@ -4,3 +4,4 @@ pub mod delete;
 pub mod init_note;
 pub mod read;
 pub mod update;
+pub mod note_utils;

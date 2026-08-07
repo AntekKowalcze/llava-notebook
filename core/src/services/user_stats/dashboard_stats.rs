@@ -1,5 +1,5 @@
 use anyhow::Context;
-use rusqlite::Connection;
+use rusqlite::{Connection, named_params};
 use serde::Serialize;
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +15,7 @@ pub struct DashboardData {
     pub number_of_encrypted_notes: i64,
     pub account_creation: i64,
     pub activity_vec: Vec<ActivityRecord>,
-    pub last_three_edited: Vec<(String, String)>, //note_id, date
+    pub last_three_edited: Vec<(String, String, String)>, //title, note_id, date
     pub favourite_tags: Vec<(String, String)>,    // tag_name, color
 }
 pub fn get_dashboard_stats(
@@ -94,7 +94,7 @@ pub fn get_dashboard_stats(
             date,
         });
     }
-    let mut last_three_edited: Vec<(String, String)> = Vec::new();
+    let mut last_three_edited: Vec<(String, String, String)> = Vec::new();
     let mut stmt = notes_db
         .prepare(
             "SELECT note_id, MAX(datetime(date)) AS last_edit
@@ -112,7 +112,15 @@ pub fn get_dashboard_stats(
     while let Some(row) = handle.next().context("failed to get next row")? {
         let note_id: String = row.get(0).inspect_err(|err| tracing::error!(task="getting dashboard stats", error=?err, %user_uuid, "Failed to get note_id")).context("Db error while getting dashboard data")?;
         let datetime: String =row.get(1).inspect_err(|err| tracing::error!(task="getting dashboard stats", error=?err, %user_uuid, "Failed to get date")).context("Db error while getting dashboard data")?;
-        last_three_edited.push((note_id, datetime));
+        let title: String = notes_db
+    .query_row(
+        "SELECT title FROM notes WHERE local_id = :note_id",
+        named_params! { ":note_id": note_id },
+        |row| row.get(0),
+    )
+    .context("failed to get title")?;
+
+        last_three_edited.push((title, note_id, datetime));
     }
     let mut favourite_tags: Vec<(String, String)> = Vec::new();
 

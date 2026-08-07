@@ -5,3 +5,4 @@ pub mod local_auth;
 pub mod online_auth;
 pub mod settings;
 pub mod utils;
+pub mod notes;

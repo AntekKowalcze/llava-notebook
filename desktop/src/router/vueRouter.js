@@ -46,6 +46,11 @@ const routes = [
   component: () => import('../views/MainView.vue'),
   children: [
     {
+      path: '',
+      name: 'create',
+      component: () => import('../views/NoteCreationView.vue')
+    },
+    {
       path: 'editor',
       name: 'editor',
       component: () => import('../views/editor/editorView.vue'),

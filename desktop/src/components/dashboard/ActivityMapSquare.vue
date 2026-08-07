@@ -16,7 +16,7 @@ const titleString = computed(() => `${props.numberOfContributions} edition(s) â€
 
 <template>
   <div
-    class="mr-1 h-4 w-4 rounded-[3px] border border-note-pumice/10"
+    class="mr-0.5 h-4 w-4 rounded-[3px] border border-note-pumice/10"
     :class="props.numberOfContributions === 0 ? 'bg-note-graphite' : 'bg-note-graphite/40'"
     :title="titleString"
   >

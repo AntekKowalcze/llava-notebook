@@ -1,4 +1,5 @@
 use anyhow::Context;
+use rusqlite::Connection;
 
 fn column_exists(
     conn: &rusqlite::Connection,
@@ -127,22 +128,114 @@ pub fn run_users_migration(users_db: &rusqlite::Connection) -> Result<(), crate:
 
     Ok(())
 }
-
-pub fn run_notes_migration(notes_db: &rusqlite::Connection) -> Result<(), crate::errors::Error> {
-    let version = notes_db
+pub fn run_notes_migration(
+    notes_db: &rusqlite::Connection,
+) -> Result<(), crate::errors::Error> {
+    let version: i64 = notes_db
         .query_row("PRAGMA user_version;", [], |r| r.get(0))
-        .unwrap_or(0);
+        .context("failed to read notes db version")?;
 
-    if version < crate::constants::NOTES_DB_VERSION {
+    if version >= crate::constants::NOTES_DB_VERSION {
+        return Ok(());
+    }
+
+    if version < 1 && column_exists(notes_db, "notes", "name")? {
+        // `name` carries UNIQUE(owner_id, name), implemented as an automatic
+        // index SQLite will not let ALTER TABLE ... DROP COLUMN remove.
+        // Full table rebuild is the only way to drop it.
+        notes_db
+            .pragma_update(None, "foreign_keys", "OFF")
+            .context("failed to disable foreign_keys for notes table rebuild")?;
+
         let tx = notes_db
             .unchecked_transaction()
-            .context("failed to create transaction")?;
-        // Notes DB has no step migrations yet; keep this path for future versions.
-        tx.pragma_update(None, "user_version", crate::constants::NOTES_DB_VERSION)
-            .context("failed to update notes db version")?;
+            .context("failed to create migration transaction")?;
+
+        tx.execute_batch(
+            "
+            CREATE TABLE notes_new (
+                local_id TEXT PRIMARY KEY,
+                mongo_id TEXT,
+                owner_id TEXT NOT NULL,
+
+                title TEXT NOT NULL,
+                summary TEXT NOT NULL,
+                content_path TEXT NOT NULL,
+
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                deleted_at INTEGER,
+
+                version INTEGER NOT NULL DEFAULT 1,
+                cloud_version INTEGER DEFAULT NULL,
+
+                sync_state TEXT NOT NULL DEFAULT 'LocalOnly',
+                is_deleted INTEGER NOT NULL DEFAULT 0,
+
+                encrypted INTEGER NOT NULL DEFAULT 1,
+                crypto_meta TEXT,
+
+                CHECK(sync_state IN ('LocalOnly', 'PendingUpload', 'Synced', 'Conflict', 'Error', 'PendingDeleted'))
+            );
+
+            INSERT INTO notes_new (
+                local_id, mongo_id, owner_id, title, summary, content_path,
+                created_at, updated_at, deleted_at, version, cloud_version,
+                sync_state, is_deleted, encrypted, crypto_meta
+            )
+            SELECT
+                local_id, mongo_id, owner_id,
+                COALESCE(title, ''), COALESCE(summary, ''), COALESCE(content_path, ''),
+                created_at, updated_at, deleted_at, version, cloud_version,
+                sync_state, is_deleted, encrypted, crypto_meta
+            FROM notes;
+
+            DROP TABLE notes;
+            ALTER TABLE notes_new RENAME TO notes;
+
+            CREATE INDEX IF NOT EXISTS idx_notes_owner_updated ON notes(owner_id, updated_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_notes_sync_state ON notes(sync_state);
+            CREATE INDEX IF NOT EXISTS idx_notes_mongo_id ON notes(mongo_id);
+            ",
+        )
+        .context("failed to rebuild notes table without name column")?;
+
         tx.commit()
+            .inspect_err(|e| {
+                tracing::error!(
+                    task = "notes database migration",
+                    status = "error",
+                    error = ?e,
+                    version,
+                    "failed to commit migration transaction"
+                )
+            })
             .context("failed to commit notes migration transaction")?;
+
+        let violation_count: i64 = notes_db
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_foreign_key_check",
+                [],
+                |r| r.get(0),
+            )
+            .context("failed to run foreign_key_check after notes rebuild")?;
+        if violation_count > 0 {
+            return Err(crate::errors::Error::InternalError(
+                "notes table rebuild left dangling foreign key references".into(),
+            ));
+        }
+
+        notes_db
+            .pragma_update(None, "foreign_keys", "ON")
+            .context("failed to re-enable foreign_keys after notes table rebuild")?;
     }
+
+    // Future migrations:
+    // if version < 2 { ... }
+
+    notes_db
+        .pragma_update(None, "user_version", crate::constants::NOTES_DB_VERSION)
+        .context("failed to update notes db version")?;
 
     Ok(())
 }

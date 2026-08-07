@@ -882,7 +882,7 @@ pub async fn check_online_login(
                 if body_text.is_empty() {
                     "Internal server error, you will be not logged in".to_string()
                 } else {
-                    format!("Internal server error: {}", body_text)
+                    String::from(format!("Internal server error: {}", body_text))
                 },
             )));
         } else if status_code == 401 {

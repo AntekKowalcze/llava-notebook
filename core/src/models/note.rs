@@ -8,8 +8,7 @@ pub struct Note {
     pub mongo_id: Option<String>, //change to ObjectId with serde rename tag check user model
     #[serde(with = "uuid::serde::simple")]
     pub owner_id: uuid::Uuid,
-
-    pub name: String,
+    
     pub title: String,
     pub summary: String,
     pub content_path: PathBuf,
