@@ -23,7 +23,6 @@ const toast = useToast();
 const passwordsMatch = computed(() => {
   return password.value === repeatPassword.value;
 });
-
 const canSubmit = computed(() => {
   return isPasswordValid.value && passwordsMatch.value && repeatPassword.value.length > 0;
 });
@@ -39,10 +38,9 @@ async function changePassword() {
     authStore.$patch({ pendingCode: null });
     loading.value = false
     toast.success('Password changed sucessfully');
-    router.replace({ name: 'loading' });
+    router.replace({ name: 'create' });
   } catch (err) {
     loading.value = false
-    console.log(err);
     toast.error('error while chaning password');
   }
 }
@@ -80,7 +78,7 @@ async function changePassword() {
     </template>
     <LoadingCircle v-else></LoadingCircle>
     <RouterLink
-      to="/loading"
+      to="/main"
       class="mb-0 mt-8 text-note-ivory/80 hover:underline"
     >
       Go to main

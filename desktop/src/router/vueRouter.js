@@ -51,7 +51,7 @@ const routes = [
       component: () => import('../views/NoteCreationView.vue')
     },
     {
-      path: 'editor',
+      path: 'editor/:noteId',
       name: 'editor',
       component: () => import('../views/editor/editorView.vue'),
     },

@@ -5,14 +5,19 @@ import { LockKeyhole, Cloud } from "lucide-vue-next";
 import SwitchInput from "../components/settings/SwitchInput.vue";
 import TextInput from "../components/auth/forms/TextInput.vue";
 import { InputTypes } from "../types/inputTypes";
-
 import { ref } from "vue";
 import { useToast } from "vue-toastification";
 import { invoke } from "@tauri-apps/api/core";
+import { Note } from "../types/note.ts";
+import { useCurrentNoteStore } from "../stores/currentNoteStore.ts";
+import { useRouter } from "vue-router";
+const router = useRouter()
 const toast = useToast()
+const currentNoteStore = useCurrentNoteStore();
 const sync = ref<string>("")
 const encryption = ref<string>("")
 const title = ref<string>("")
+    
     function settingChanged(id: string, value: string) {
     if (id === "sync") {
         sync.value = value
@@ -21,19 +26,83 @@ const title = ref<string>("")
         encryption.value = value
     }
 }
-async function createNote() {
-if(title.value.trim().length == 0 ){
-    
-    toast.warning("Title can not be empty")
-    return
-}
-console.log(encryption.value + "encryption")
-try{
-await invoke<void>("create_note", {title: title.value, encryption: encryption.value == "on" , synchronizing: sync.value == "on"})
+function getErrorText(err: unknown): string {
+  if (typeof err === "string") {
+    return err
+  }
 
-}catch(err){
-    toast.error(err)
+  if (err && typeof err === "object") {
+    const typedErr = err as {
+      message?: unknown
+      error?: unknown
+      reason?: unknown
+    }
+
+    if (typeof typedErr.message === "string") {
+      return typedErr.message
+    }
+
+    if (typeof typedErr.error === "string") {
+      return typedErr.error
+    }
+
+    if (typeof typedErr.reason === "string") {
+      return typedErr.reason
+    }
+  }
+
+  return String(err ?? "")
 }
+
+async function createNote(): Promise<void> {
+  if (title.value.trim().length === 0) {
+    toast.warning("Title cannot be empty")
+    return
+  }
+
+  const useEncryption = encryption.value === "on"
+  console.log("TO JEST TO", useEncryption + encryption.value)
+  const useSynchronization = sync.value === "on"
+
+  try {
+    const createdNote = await invoke<Note>("create_note", {
+      title: title.value.trim(),
+      encryption: useEncryption,
+      synchronizing: useSynchronization,
+    })
+
+    currentNoteStore.$patch({
+      currentNote: createdNote,
+    })
+
+    toast.success("Note created successfully")
+
+    await router.push(`/main/editor/${createdNote.local_id}`)
+  } catch (err: unknown) {
+    console.error("Failed to create note:", err)
+
+    const message = getErrorText(err).toLowerCase()
+
+    if (message.includes("note name already exists")) {
+      toast.warning("A note with this name already exists.")
+    } else if (message.includes("note name after sanitization is empty")) {
+      toast.warning("The note title is invalid.")
+    } else if (message.includes("title too long")) {
+      toast.warning("The note title is too long.")
+    } else if (message.includes("name too long")) {
+      toast.warning("The note name is too long.")
+    } else if (message.includes("encryption key is unavailable")) {
+      toast.error("Encryption key is unavailable.")
+    } else if (message.includes("file operation error")) {
+      toast.error("Failed to create the note file.")
+    } else if (message.includes("couldn't lock state")) {
+      toast.error("Failed to access application state.")
+    } else if (message.includes("internal error")) {
+      toast.error("An internal error occurred while creating the note.")
+    } else {
+      toast.error("Failed to create note.")
+    }
+  }
 }
 
 </script>
@@ -150,12 +219,12 @@ await invoke<void>("create_note", {title: title.value, encryption: encryption.va
                             </div>
 
                         </div>
-
 <SwitchInput
     :current-value="sync"
     id="sync"
     @setting-changed="settingChanged"
 />
+
 
 
                     </div>
@@ -214,7 +283,6 @@ await invoke<void>("create_note", {title: title.value, encryption: encryption.va
     id="encryption"
     @setting-changed="settingChanged"
 />
-
                     </div>
 
                 </div>

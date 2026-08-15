@@ -302,3 +302,14 @@ input[type="checkbox"] {
   border-radius:10px;
 
 }
+.milkdown {
+  min-height: 100%;
+}
+
+.milkdown .crepe-editor {
+  max-width: none !important;
+  width: 100%;
+  min-height: 100%;
+  padding: 2.5rem 3rem;
+  color: #FFFBEB;
+}

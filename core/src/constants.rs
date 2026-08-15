@@ -36,6 +36,7 @@ pub const LOCAL_USERS_DB: &str = "llava/users/local_login_db.sqlite";
 pub const LOGS_PATH: &str = "llava/logs/app.log";
 
 //register.rs
+pub const RECOVERY_CHANGE_WINDOW_MS: i64 = 180_000;
 //SQL
 
 pub const NOTES_DB_VERSION: i64 = 1;
@@ -101,7 +102,7 @@ pub const TEMP_NOTE_EXTENSION: &str = ".md.tmp";
 pub const SUMMARY_LENGTH: usize = 10;
 pub const MAX_TITLE_LENGTH: usize = 30;
 //SQL
-pub const UPDATE_NOTE_SQL_QUERY: &str = "UPDATE notes SET updated_at = :updated_time , summary = :summary ,version = version + 1, title = :title WHERE local_id = :id";
+pub const UPDATE_NOTE_SQL_QUERY: &str = "UPDATE notes SET updated_at = :updated_time ,version = version + 1 WHERE local_id = :id";
 
 //db_creation
 pub const NOTE_DB_SCHEMA: &str = r#"
@@ -244,4 +245,3 @@ pub const LOCAL_LOGIN_DB_SCHEMA: &str = r#" CREATE TABLE IF NOT EXISTS users_dat
                         FOREIGN KEY(user_id) REFERENCES users_data(user_id) ON DELETE CASCADE);
                               
                         "#;
-//TODO add topbar on login screen

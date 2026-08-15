@@ -1,4 +1,4 @@
-use llava_core::AppState;
+use llava_core::{AppState, Note};
 
 #[tauri::command]
 pub async fn create_note(
@@ -6,8 +6,8 @@ pub async fn create_note(
     encryption: bool,
     synchronizing: bool,
     state: tauri::State<'_, AppState>,
-) -> Result<(), llava_core::Error> {
-    println!("SYNC {:?}", synchronizing);
+) -> Result<Note, llava_core::Error> {
+    println!("ENCRYPTION {:?}", encryption);
     if title.trim().is_empty() {
         return Err(llava_core::Error::NoteNameError);
     }
@@ -35,6 +35,17 @@ pub async fn create_note(
             .notes_path
             .clone()
     };
+    let notes_key = {
+         let guard = state
+            .notes_key
+            .lock()
+            .map_err(|_| llava_core::Error::LockError)?;
+
+        guard
+            .as_ref()
+            .ok_or(llava_core::Error::LockError)?
+            .clone()
+    };
 
     let note = llava_core::storage::create_local_note(
         title,
@@ -42,6 +53,7 @@ pub async fn create_note(
         synchronizing,
         &user_id,
         &notes_path,
+        notes_key
     )
     .await?;
 
@@ -54,7 +66,7 @@ pub async fn create_note(
         .as_mut()
         .ok_or(llava_core::Error::LockError)?;
 
-    llava_core::storage::add_note_to_database(db, note)?;
+    llava_core::storage::add_note_to_database(db, &note)?;
 
-    Ok(())
+    Ok(note)
 }

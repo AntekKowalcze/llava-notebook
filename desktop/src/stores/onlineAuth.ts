@@ -2,7 +2,6 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { useToast } from 'vue-toastification';
 export const useOnlineAuthStore = defineStore('onlineAuth', () => {
   const loggedIn = ref<boolean>(false);
   const loggedInEmail = ref<string | null>(null);

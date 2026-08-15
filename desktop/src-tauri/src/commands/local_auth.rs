@@ -1,3 +1,47 @@
+//! # Authentication command module
+//!
+//! **Purpose**: This module exposes Tauri commands responsible for local authentication,
+//! account registration, password recovery, session restoration, and local logout.
+//!
+//! ## Exports
+//! * `register_command` — Registers a new local user and initialises the user's application state.
+//! * `login_command` — Authenticates a user with username and password and initialises the
+//!   authenticated application state.
+//! * `check_if_user_exists` — Checks whether a registered user exists.
+//! * `log_with_code` — Authenticates a user using a recovery code.
+//! * `check_timeout_before_submit` — Returns the remaining account lockout time.
+//! * `change_password` — Changes a user's password after recovery-code validation.
+//! * `check_login_on_start` — Restores a previous local session and optionally checks the
+//!   associated online session.
+//! * `local_logout_command` — Clears the current local session and sensitive runtime state.
+//! * `LoggedInOnline` — Represents the current online authentication state.
+//!
+//! ## Key design decisions
+//! Authentication state is stored in `AppState` behind synchronisation primitives. Database
+//! locks are kept for the shortest practical scope to avoid unnecessary contention.
+//!
+//! Passwords, recovery codes, access tokens, and encryption keys are never logged or exposed
+//! to the frontend. Temporary copies of the notes encryption key are explicitly zeroized after
+//! they are no longer required.
+//!
+//! Local authentication is independent from online authentication. A local session can be
+//! restored without a working network connection. When an online account is linked, the online
+//! session is checked asynchronously with a short timeout so that server unavailability does
+//! not block local application startup.
+//!
+//! Local logout clears sensitive runtime state, including the access token, notes encryption key,
+//! current user, notes database, username, configuration, and online user identifier.
+//!
+//! ## Dependencies
+//! - `tauri` — Provides Tauri commands, application state, and event emission.
+//! - `tokio` — Provides asynchronous execution and timeout handling.
+//! - `zeroize` — Securely clears temporary encryption-key copies from memory.
+//! - `anyhow` — Provides contextual errors for state and lock operations.
+//! - `llava_core` — Provides authentication, session, database, configuration, and application
+//!   state functionality.
+//! - `uuid` — Handles authenticated user identifiers.
+//! - `serde` — Serialises `LoggedInOnline` for frontend communication.
+
 use anyhow::{anyhow, Context};
 use llava_core::local_auth::SessionState;
 use llava_core::AppState;
@@ -76,13 +120,13 @@ pub async fn login_command(
             .lock()
             .map_err(|_| anyhow!("failed to lock users_db"))?;
 
-        let users_db = conn_guard.as_mut().ok_or(llava_core::Error::LockError)?;
+        let mut users_db = conn_guard.as_mut().ok_or(llava_core::Error::LockError)?;
         let paths = paths_guard.as_ref().ok_or(llava_core::Error::LockError)?;
         let timeout = crate::commands::handlers::local_auth::check_timeout(&username, users_db)?; //returns diff between current timestamp and end of lock timestamp
         if timeout > 0 {
             return Err(llava_core::Error::AccountLocked(0));
         }
-        crate::commands::handlers::local_auth::login(username.clone(), password, paths, users_db)?
+        crate::commands::handlers::local_auth::login(username.clone(), password, paths, &mut users_db)?
     };
 
     let id = {

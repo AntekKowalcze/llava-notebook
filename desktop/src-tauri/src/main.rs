@@ -60,7 +60,7 @@ pub fn main() {
     state.paths = std::sync::Mutex::from(Some(program_paths));
 
     builder
-        .setup(|app| {
+        .setup(|app: &mut tauri::App| {
             app.manage(state);
             let app_state = app.state::<llava_core::AppState>();
 
@@ -104,6 +104,11 @@ pub fn main() {
             commands::online_auth::login_online,
             commands::online_auth::try_login_if_connected_with_server,
             commands::notes::create_note::create_note,
+            commands::sliding_panel::get_panel_data,
+            crate::commands::utils::get_connection_status, 
+            commands::notes::note_operations::get_note_content,
+            commands::notes::note_operations::save_note,
+            
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

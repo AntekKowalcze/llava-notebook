@@ -212,11 +212,11 @@ onUnmounted(() => clearInterval(interval));
             <p class="text-xs uppercase tracking-widest text-note-pumice/60">Last 365 days</p>
           </div>
           <!-- month names  -->
-          <div class="flex h-4 w-[96%] select-none flex-row justify-evenly text-note-pumice/60">
+          <div class="flex h-4 w-[69vw] select-none flex-row justify-start gap-[3.5rem] pl-8 text-note-pumice/60">
             <span
               v-for="(label, idx) in monthLabels"
               :key="idx"
-              class="h-4 text-[10px] leading-4 text-note-pumice/60"
+              class="h-4 text-[11px] leading-4 text-note-pumice/60"
             >
               {{ label }}
             </span>
@@ -235,7 +235,7 @@ onUnmounted(() => clearInterval(interval));
               </div>
 
               <!-- heatmap -->
-              <div class="inline-grid grid-flow-col grid-rows-7 gap-1">
+              <div class="inline-grid grid-flow-col grid-rows-7 gap-[0.28rem]">
                 <ActivityMapSquare
                   v-for="day in weeks.flat()"
                   :key="day.date"
@@ -348,4 +348,3 @@ onUnmounted(() => clearInterval(interval));
 
 <style scoped></style>
 
-<!-- TODO think how to redirect to note after ading, mabe with parameter, you should then add reading content and some place for chosing note, then encryption and sync-->

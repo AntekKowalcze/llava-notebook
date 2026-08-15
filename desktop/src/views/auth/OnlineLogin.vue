@@ -14,15 +14,16 @@ const toast = useToast();
 const authStore = useAuthStore()
 const onlineAuthStore = useOnlineAuthStore()
 const router = useRouter();
-const password = ref<string>();
+const password = ref<string>("");
 const email = ref<string>("");
 const userConfig = useUserConfigStore();
 const loading = ref(false);
 const lockoutUntil = ref<number | null>(null);
 let lockoutTimer: ReturnType<typeof setTimeout> | null = null;
-
-const emailPattern =
-  /[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?/ ;
+  const emailPattern = new RegExp(
+  "^[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$",
+  "i"
+);
 const correctEmail = computed(() => {
   return emailPattern.test(email.value);
 });
@@ -66,17 +67,24 @@ async function submitLogin() {
 
   loading.value = true;
   try {
+    console.log("in try clause")
     await userConfig.init();
     if (!userConfig.settingList) {
       toast.error('Settings not loaded. Try again.');
       return;
     }
+      console.log("after getting config ")
+
     userConfig.updateSettingValue('local.mode', 'off');
+        console.log("setting updated")
+
     let online_user_id = await invoke<string>('login_online', {
       email: email.value,
       password: password.value,
       currentSettings: userConfig.settingList,
     });
+        console.log("connected")
+
     toast.success('Connected accounts successfully');
     
     onlineAuthStore.$patch({
@@ -90,6 +98,7 @@ async function submitLogin() {
     await onlineAuthStore.fetchEmail()
     router.replace('/main/');
   } catch (err: any) {
+    console.log(err)
     userConfig.updateSettingValue('local.mode', 'on');
     const timeout = extractTimeout(err);
     if (timeout !== null) {
@@ -177,4 +186,3 @@ onBeforeUnmount(() => {
    
   </FormCard>
 </template>
-<!-- todo when watcher check server connection fires to connected try to login online if user were logged in online AND AUTH IS DONE, also add watcher so when status changes try to log in-->

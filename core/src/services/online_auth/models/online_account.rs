@@ -27,6 +27,7 @@ pub struct RegisterRequest {
 pub struct RegisterUserPayload {
     pub email: String,
     pub password_hash: String,
+    pub password_salt: String,
     #[serde_as(as = "Base64")]
     pub master_key_enc: Vec<u8>,
     #[serde_as(as = "Base64")]

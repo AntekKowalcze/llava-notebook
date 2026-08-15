@@ -84,6 +84,15 @@ pub enum Error {
     #[error("Refresh token expired")]
     OnlineSessionExpired,
 
+    #[error("User is not owner of this note")]
+    UserIsNotOwner,
+
+    #[error("Note not found")]
+    NoteNotFound,
+
+    #[error("Encryption Error")]
+    NoKeyToDecryptANote,
+
     #[error("Request error")]
     RequestError((u16, String)),
 
@@ -92,6 +101,8 @@ pub enum Error {
 
     #[error("Internal error: {0}")]
     InternalError(String),
+
+
 }
 
 impl From<std::io::Error> for Error {

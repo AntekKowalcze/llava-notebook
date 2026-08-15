@@ -1,11 +1,38 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
-import { PanelLeft, Minus, Maximize2, Minimize2, X, UserRound } from 'lucide-vue-next'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
+import {
+  PanelLeft,
+  Minus,
+  Maximize2,
+  Minimize2,
+  X,
+  UserRound
+} from 'lucide-vue-next'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { useLayoutStore } from '../stores/layoutStore'
+import { useLayoutStore } from '../../stores/layoutStore'
+import StatusBox from './StatusBox.vue'
+import { useMetaStore } from '../../stores/metaStore.ts'
+import { useAuthStore } from '../../stores/auth.ts'
+import { useOnlineAuthStore } from '../../stores/onlineAuth.ts'
+
 const layout = useLayoutStore()
-function showSidebar(){
-layout.toggleLeftPanel()
+const metaStore = useMetaStore()
+const authStore = useAuthStore()
+const onlineAuthStore = useOnlineAuthStore()
+
+const email = computed(() => onlineAuthStore.loggedInEmail)
+const username = computed(() => authStore.loggedInUsername)
+
+const internetConnection = computed(
+  () => metaStore.isConnectedToInternet
+)
+
+const serverConnection = computed(
+  () => metaStore.isConnectedToServer
+)
+
+function showSidebar() {
+  layout.toggleLeftPanel()
 }
 
 const win = getCurrentWindow()
@@ -52,8 +79,29 @@ const closeWin = async () => {
       </span>
     </div>
 
-    <div data-tauri-drag-region class="flex flex-1 h-full items-center justify-center">
-      <UserRound class="text-note-ivory cursor-pointer" :stroke-width="1"></UserRound>
+   <div
+    data-tauri-drag-region
+    class="flex h-full flex-1 items-center justify-center"
+>
+    <div class="group relative flex h-8 w-8 cursor-pointer items-center justify-center">
+        <UserRound
+            class="h-6 w-6 text-note-ivory transition-colors duration-150 group-hover:text-note-paprika"
+            :stroke-width="1.5"
+        />
+
+  <StatusBox
+  v-if="username"
+  :current-user="username"
+  :online-account="email"
+  :internet-connection="internetConnection"
+  :server-connection="serverConnection"
+  class="pointer-events-none absolute left-1/2 top-full z-50 mt-2
+         hidden -translate-x-1/2 border border-note-pumice/10
+         group-hover:flex"
+/>
+    </div>
+
+
     </div>
 
     <div class="flex">

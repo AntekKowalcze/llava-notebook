@@ -13,7 +13,7 @@ Content-Type: application/json
 
 {
     "user": {
-        "email": "abc@example.com",
+        "email": "d@example.com",
         "password_hash": "$argon2id$v=19$m=65536,t=3,p=4$c2FsdHNhbHRzYWx0c2FsdA$hash",
         "master_key_enc": "AQID/xAQEB8fHx8=",
         "master_key_nonce": "CQgHBgUEAwIB",
@@ -36,7 +36,7 @@ POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
-    "email": "abc@example.com",
+    "email": "d@example.com",
     "password_hash": "$argon2id$v=19$m=65536,t=3,p=4$c2FsdHNhbHRzYWx0c2FsdA$hash",
     "device_id": "550e8400-e29b-41d4-a716-446655440000"
 }
@@ -48,7 +48,7 @@ POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
-    "email": "abc@example.com",
+    "email": "d@example.com",
     "password_hash": "$wrongPassword",
     "device_id": "550e8400-e29b-41d4-a716-446655440000"
 }

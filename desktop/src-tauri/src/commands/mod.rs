@@ -6,3 +6,4 @@ pub mod online_auth;
 pub mod settings;
 pub mod utils;
 pub mod notes;
+pub mod sliding_panel;

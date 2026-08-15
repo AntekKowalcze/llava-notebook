@@ -9,30 +9,54 @@ import { computed ,ref} from 'vue';
 import { Milkdown, useEditor } from '@milkdown/vue'
 import { Crepe } from '@milkdown/crepe'
 
-const date = ref<Date>(new Date());
-const h = computed(() => date.value.getHours());
-
-const defaultValue = computed(() => {
-
-  if (h.value < 6) {
-    return "# Deep night thoughts? 🌌\n\n> The rest of the world is sleeping, but your mind is awake. \n\nJot down your late-night inspiration before it fades...";
-  } 
-  else if (h.value >= 6 && h.value < 12) {
-    return "# Good morning! ☀️\n\nA fresh day, a blank canvas. **What are we focusing on today?**\n\n- [ ] Task 1\n- [ ] Task 2";
-  } 
-  else if (h.value >= 12 && h.value < 18) {
-    return "# Good afternoon! ☕\n\nMid-day inspiration striking? \n\nDrop your notes, ideas, or meeting summaries right here.";
-  } 
-  else if (h.value >= 18 && h.value < 22) {
-    return "# Good evening! 🌇\n\nWinding down? It's the perfect time to reflect on the day or plan for tomorrow.";
-  } 
-  else {
-return "# Entering Stealth Mode 🥷\n\nDistractions are asleep. It's just you, the keyboard, and the glow of the screen. \n\n**Execute your final thoughts for the day:**";  }
-});
-useEditor((root) => {
-  return new Crepe({
+import { Editor, rootCtx } from '@milkdown/kit/core'
+import { commonmark } from '@milkdown/kit/preset/commonmark'
+import { listener, listenerCtx } from '@milkdown/kit/plugin/listener'
+import { defineComponent } from 'vue'
+const props = defineProps<{defaultValue: string}>()
+const emit = defineEmits<{(e: 'change', content: string):void}>()
+const { get } = useEditor((root) => {
+  const crepe = new Crepe({
     root,
-    defaultValue: defaultValue.value
+    defaultValue: props.defaultValue,
   })
+  crepe.editor.config((ctx) => {
+    ctx.get(listenerCtx).markdownUpdated((ctx, markdown) => {
+      emit('change', markdown)
+    })
+  })
+
+  return crepe
 })
+
+
+ // const { get } = useEditor((root) =>
+  //     Editor.make()
+  //       .config((ctx) => {
+  //         ctx.set(rootCtx, root)
+  //         // Add markdown listener for auto-save
+  //         ctx.get(listenerCtx).markdownUpdated((ctx, markdown) => {
+  //           if(!isDirty){
+  //             setSafeSaveTimeout()
+  //             isDirty = true
+  //           }
+  //           if(debounceTimeout){
+  //             clearTimeout(debounceTimeout)
+  //           }
+  //           if(!debounceTimeout){
+  //             setDebounceTimeout();
+  //           }
+           
+
+  //             // If 2 second from last update save, if 60 seconds from last save, save 
+           
+
+
+
+
+  //         })
+  //       })
+  //       .use(commonmark)
+  //       .use(listener)
+  //   )
 </script>

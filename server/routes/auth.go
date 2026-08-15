@@ -2,15 +2,17 @@ package routes
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
+	"llava-server/config"
 	"llava-server/middleware"
 	"llava-server/models"
 	"strings"
 	"time"
 
-	"github.com/alexedwards/argon2id"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/log"
 	"github.com/google/uuid"
@@ -21,73 +23,132 @@ import (
 
 func (h *Handler) Register(c fiber.Ctx) error {
 	registerRequest := new(models.RegisterRequest)
-	err := c.Bind().Body(registerRequest)
-	if err != nil {
+
+	if err := c.Bind().Body(registerRequest); err != nil {
 		return middleware.BadRequest("Couldnt read body data")
 	}
 
 	if err := h.Validator.Struct(registerRequest); err != nil {
 		return middleware.BadRequest("Wrong user struct was sent")
 	}
-	user := registerRequest.User
-	user.CreatedAt = time.Now().UnixMilli()
-	user.LastLogin = time.Now().UnixMilli()
+
+	pepperSecret, err := config.GetPepperSecret()
+	if err != nil {
+		log.Errorf("register: failed to get pepper secret: %v", err)
+		return middleware.Internal("Internal server configuration error")
+	}
+
+	localUser := registerRequest.LocalUserModel
+
+	mac := hmac.New(sha256.New, pepperSecret)
+	mac.Write([]byte(localUser.PasswordHash))
+	passwordVerifier := mac.Sum(nil)
+
+	user := &models.User{
+		ID:               localUser.ID,
+		Email:            localUser.Email,
+		EmailVerified:    localUser.EmailVerified,
+		PasswordVerifier: passwordVerifier,
+		PasswordSalt:     localUser.PasswordSalt,
+		MasterKeyEnc:     localUser.MasterKeyEnc,
+		MasterKeyNonce:   localUser.MasterKeyNonce,
+		KekSalt:          localUser.KekSalt,
+		ArgonParams:      localUser.ArgonParams,
+
+		StorageUsed:    localUser.StorageUsed,
+		QuotaBytes:     localUser.QuotaBytes,
+		FailedAttempts: 0,
+		LockoutUntil:   nil,
+
+		CreatedAt: time.Now().UnixMilli(),
+		LastLogin: time.Now().UnixMilli(),
+	}
+
 	device := registerRequest.Device
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		5*time.Second,
+	)
 	defer cancel()
 
 	usersColl := h.DB.Collection("users_data")
+
 	opts := options.FindOne().SetProjection(bson.M{"_id": 1})
-	err = usersColl.FindOne(ctx, bson.M{"email": user.Email}, opts).Err()
+
+	err = usersColl.FindOne(
+		ctx,
+		bson.M{"email": user.Email},
+		opts,
+	).Err()
+
 	if err == nil {
 		return middleware.Conflict("this email exists")
 	}
+
 	if err != mongo.ErrNoDocuments {
 		log.Errorf("register: email lookup failed: %v", err)
 		return middleware.Internal("database error")
 	}
+
 	res, err := usersColl.InsertOne(ctx, user)
 	if err != nil {
 		log.Errorf("register: insert user failed: %v", err)
 		return middleware.Internal("Couldnt insert data to collection")
 	}
-	log.Info("inserted id: ", res)
-	userId := res.InsertedID.(bson.ObjectID)
+
+	userID, ok := res.InsertedID.(bson.ObjectID)
+	if !ok {
+		log.Errorf("register: inserted ID is not ObjectID")
+		return middleware.Internal("database error")
+	}
+
 	devicesColl := h.DB.Collection("devices")
-	device.UserID = userId
+
+	device.UserID = userID
 	device.CreatedAt = time.Now().UnixMilli()
 	device.LastSeen = time.Now().UnixMilli()
-	_, err = devicesColl.InsertOne(ctx, device) //its not devices database, its users conencted to devices
+
+	_, err = devicesColl.InsertOne(ctx, device)
 	if err != nil {
 		log.Errorf("register: insert device failed: %v", err)
 		return middleware.Internal("Couldnt insert data to collection")
 	}
-	accessToken, err := middleware.GenerateAccessToken(device.DeviceID, userId.Hex())
+
+	accessToken, err := middleware.GenerateAccessToken(
+		device.DeviceID,
+		userID.Hex(),
+	)
 	if err != nil {
 		return middleware.Internal("Couldnt generate access token")
 	}
+
 	jti, signature, err := middleware.GenerateRefreshToken()
 	if err != nil {
-		return middleware.Internal("Couldnt generate refresh tokne")
+		return middleware.Internal("Couldnt generate refresh token")
 	}
+
 	jwtColl := h.DB.Collection("jwt")
-	refreshInsert := new(models.RefreshToken)
-	refreshInsert.CreatedAt = time.Now().UnixMilli()
-	refreshInsert.DeviceID = device.DeviceID
-	refreshInsert.ExpiresAt = time.Now().Add(30 * 24 * time.Hour).UnixMilli()
-	refreshInsert.JTI = jti.String()
-	refreshInsert.UserID = userId
-	refreshInsert.TokenHash = signature
-	res, err = jwtColl.InsertOne(ctx, refreshInsert)
+
+	refreshInsert := &models.RefreshToken{
+		CreatedAt: time.Now().UnixMilli(),
+		ExpiresAt: time.Now().Add(30 * 24 * time.Hour).UnixMilli(),
+		JTI:       jti.String(),
+		UserID:    userID,
+		DeviceID:  device.DeviceID,
+		TokenHash: signature,
+	}
+
+	_, err = jwtColl.InsertOne(ctx, refreshInsert)
 	if err != nil {
 		log.Errorf("register: insert refresh token failed: %v", err)
 		return middleware.Internal("Couldnt insert data to collection")
 	}
+
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"access_token":  accessToken,
 		"refresh_token": jti.String() + "." + signature,
-		"user_id":       refreshInsert.UserID.Hex(),
+		"user_id":       userID.Hex(),
 	})
 }
 
@@ -100,34 +161,39 @@ func generateDummySalt() []byte {
 	rand.Read(salt)
 	return salt
 }
-
 func (h *Handler) PreLogin(c fiber.Ctx) error {
-	var request = new(PreLoginRequest)
-	err := c.Bind().Body(request)
-	if err != nil {
+	request := new(PreLoginRequest)
+
+	if err := c.Bind().Body(request); err != nil {
 		return middleware.BadRequest("no body")
 	}
+
 	if err := h.Validator.Struct(request); err != nil {
-		return middleware.BadRequest("Wrong user struct was sent")
+		return middleware.BadRequest("Wrong pre login struct was sent")
 	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
 	usersColl := h.DB.Collection("users_data")
-	res := usersColl.FindOne(ctx, bson.M{"email": request.Email})
+
 	var user models.User
-	if err := res.Decode(&user); err != nil {
+
+	err := usersColl.FindOne(
+		ctx,
+		bson.M{"email": request.Email},
+	).Decode(&user)
+
+	if err != nil {
+		// Nie ujawniamy, czy email istnieje.
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{
 			"password_salt": base64.RawStdEncoding.EncodeToString(generateDummySalt()),
 		})
 	}
-	_, salt, _, err := argon2id.DecodeHash(user.PasswordHash)
-	if err != nil {
-		return middleware.Internal("failed to parse hash")
-	}
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"password_salt": base64.RawStdEncoding.EncodeToString(salt),
-	})
 
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"password_salt": user.PasswordSalt,
+	})
 }
 
 type LoginRequest struct {
@@ -169,8 +235,16 @@ func (h *Handler) Login(c fiber.Ctx) error {
 			"timeout": *user.LockoutUntil,
 		})
 	}
+	pepperSecret, err := config.GetPepperSecret()
+	if err != nil {
+		log.Errorf("register: failed to get pepper secret: %v", err)
+		return middleware.Internal("Internal server configuration error")
+	}
+	mac := hmac.New(sha256.New, pepperSecret)
+	mac.Write([]byte(request.PasswordHash))
+	passwordVerifier := mac.Sum(nil)
 
-	if subtle.ConstantTimeCompare([]byte(user.PasswordHash), []byte(request.PasswordHash)) == 1 {
+	if subtle.ConstantTimeCompare([]byte(user.PasswordVerifier), []byte(passwordVerifier)) == 1 {
 		accessToken, err := middleware.GenerateAccessToken(device.DeviceID, user.ID.Hex())
 		if err != nil {
 			return middleware.Internal("Couldnt generate Access Token")

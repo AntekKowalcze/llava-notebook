@@ -2,13 +2,17 @@
 import { computed, onMounted } from 'vue';
 import { useUserConfigStore } from '../../stores/userConfig';
 import { Lock, CloudOff, LockOpen, HardDrive, Server, Cloud, RefreshCwOff,CloudCheck } from 'lucide-vue-next';
-import { useMetaStore } from '../../stores/metaStore,';
+import { useMetaStore } from '../../stores/metaStore';
+import { useRoute } from 'vue-router';
 const userConfig = useUserConfigStore();
 const metaStore = useMetaStore()
 onMounted(() => {
   void userConfig.init();
 });
 
+const route = useRoute();
+const currentLocation = computed(() => route.name);
+let isEditor = computed(()=> route.name == "editor")
 const encrypted = computed(() => userConfig.config['local.encryption']);
 const local = computed(() => userConfig.config['online.sync'] === 'off');
 const connected = computed<boolean | null>(()=> metaStore.isConnectedToServer && metaStore.isConnectedToInternet)
@@ -22,13 +26,15 @@ defineProps<{ version: string; synced: string }>();
   <div
     class="flex h-7 w-full select-none flex-row items-center justify-between border-t border-white/5 bg-black/40 px-4 text-xs"
   >
-    <!-- LEFT: placeholder info -->
-    <div class="flex items-center gap-3 text-note-pumice">
+    <div v-if="isEditor" class="flex items-center gap-3 text-note-pumice">
       <span>Last edited 3 min ago</span>
       <div class="h-3 w-px bg-white/10" />
       <span>342 words</span>
       <div class="h-3 w-px bg-white/10" />
       <span>Markdown</span>
+    </div>
+    <div v-else class="flex items-center gap-3 text-note-pumice">
+      <span>Llava / {{ currentLocation }}</span>
     </div>
 
     <div class="flex items-center gap-2">

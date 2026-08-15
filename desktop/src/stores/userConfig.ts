@@ -67,6 +67,26 @@ export const useUserConfigStore = defineStore('userConfig', () => {
     }
     return false;
   }
+  function getValueBySettingId(sections: Section[], id: string): string {
+    for (const section of sections) {
+        for (const setting of section.sectionSettings) {
+            if (setting.id === id) {
+                return setting.currentValue;
+            }
+        }
 
-  return { config, settingList, isDefault, updateSettingValue, init };
+        if (section.subsections) {
+            const value = getValueBySettingId(section.subsections, id);
+
+            if (value !== "ID NOT EXISTS") {
+                return value;
+            }
+        }
+    }
+
+    return "ID NOT EXISTS";
+}
+
+  return { config, settingList, isDefault, updateSettingValue, init, getValueBySettingId };
 });
+

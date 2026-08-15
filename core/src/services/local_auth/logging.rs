@@ -871,7 +871,7 @@ pub async fn check_online_login(
     if !response.status().is_success() {
         let status_code = response.status().as_u16();
         let body_text = response.text().await.unwrap_or_else(|_| String::new());
-        // Map server responses to local error variants:
+        //local error variants:
         // - 500 -> RequestError
         // - 401 with "session_expired" -> OnlineSessionExpired
         // - 401 otherwise -> NotLoggedIn

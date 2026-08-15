@@ -3,7 +3,6 @@ use std::path::PathBuf;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Note {
-    #[serde(with = "uuid::serde::simple")]
     pub local_id: uuid::Uuid,
     pub mongo_id: Option<String>, //change to ObjectId with serde rename tag check user model
     #[serde(with = "uuid::serde::simple")]
@@ -24,7 +23,7 @@ pub struct Note {
 
     pub encrypted: bool,
 
-    pub crypto_meta: Option<serde_json::Value>,
+    pub crypto_meta: String,
 }
 //add here vec of attachments, but attachment stuct should be changed or rethinked so its good to go
 //add vector clock, so its good for sync

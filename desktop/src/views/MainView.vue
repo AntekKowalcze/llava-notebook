@@ -9,7 +9,6 @@ const layout = useLayoutStore();
 
 <template>
   <div class="flex h-screen flex-col overflow-hidden">
-    <TitleBar class="shrink-0" />
     <div class="flex flex-1 min-h-0">
       <Transition
     enter-active-class="transition-all duration-300 ease-out"

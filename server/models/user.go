@@ -6,25 +6,49 @@ import (
 )
 
 type RegisterRequest struct {
-	User   User   `json:"user"   validate:"required"`
-	Device Device `json:"device" validate:"required"`
+	LocalUserModel LocalUserModel `json:"user"   validate:"required"`
+	Device         Device         `json:"device" validate:"required"`
 }
 
 type User struct {
-	ID             *bson.ObjectID `bson:"_id,omitempty"      json:"_id,omitempty"`
-	Email          string         `bson:"email"              json:"email"              validate:"required,email"`
-	EmailVerified  bool           `bson:"email_verified"     json:"email_verified"`
-	PasswordHash   string         `bson:"password_hash"      json:"password_hash"      validate:"required"`
-	MasterKeyEnc   []byte         `bson:"master_key_enc"     json:"master_key_enc"     validate:"required"`
-	MasterKeyNonce []byte         `bson:"master_key_nonce"   json:"master_key_nonce"   validate:"required"`
-	KekSalt        string         `bson:"kek_salt"           json:"kek_salt"           validate:"required"`
-	ArgonParams    ArgonParams    `bson:"argon2_params"      json:"argon2_params"      validate:"required"`
-	StorageUsed    int64          `bson:"storage_used_bytes" json:"storage_used_bytes"`
-	QuotaBytes     int64          `bson:"quota_bytes"        json:"quota_bytes"`
-	FailedAttempts int64          `bson:"failed_attempts"    json:"failed_attempts"`
-	LockoutUntil   *int64         `bson:"lockout_until"      json:"lockout_until"`
-	CreatedAt      int64          `bson:"created_at"         json:"created_at"`
-	LastLogin      int64          `bson:"last_login"         json:"last_login"`
+	ID               *bson.ObjectID `bson:"_id,omitempty" json:"_id,omitempty"`
+	Email            string         `bson:"email" json:"email" validate:"required,email"`
+	EmailVerified    bool           `bson:"email_verified" json:"email_verified"`
+	PasswordVerifier []byte         `bson:"password_verifier" json:"-" validate:"required"`
+	PasswordSalt     string         `bson:"password_salt" json:"-" validate:"required"`
+
+	MasterKeyEnc   []byte      `bson:"master_key_enc" json:"master_key_enc" validate:"required"`
+	MasterKeyNonce []byte      `bson:"master_key_nonce" json:"master_key_nonce" validate:"required"`
+	KekSalt        string      `bson:"kek_salt" json:"kek_salt" validate:"required"`
+	ArgonParams    ArgonParams `bson:"argon2_params" json:"argon2_params" validate:"required"`
+
+	StorageUsed    int64  `bson:"storage_used_bytes" json:"storage_used_bytes"`
+	QuotaBytes     int64  `bson:"quota_bytes" json:"quota_bytes"`
+	FailedAttempts int64  `bson:"failed_attempts" json:"failed_attempts"`
+	LockoutUntil   *int64 `bson:"lockout_until" json:"lockout_until"`
+	CreatedAt      int64  `bson:"created_at" json:"created_at"`
+	LastLogin      int64  `bson:"last_login" json:"last_login"`
+}
+
+type LocalUserModel struct {
+	ID            *bson.ObjectID `bson:"_id,omitempty" json:"_id,omitempty"`
+	Email         string         `bson:"email" json:"email" validate:"required,email"`
+	EmailVerified bool           `bson:"email_verified" json:"email_verified"`
+
+	PasswordHash string `bson:"password_hash" json:"password_hash" validate:"required"`
+	PasswordSalt string `json:"password_salt" validate:"required"`
+
+	MasterKeyEnc   []byte      `bson:"master_key_enc" json:"master_key_enc" validate:"required"`
+	MasterKeyNonce []byte      `bson:"master_key_nonce" json:"master_key_nonce" validate:"required"`
+	KekSalt        string      `bson:"kek_salt" json:"kek_salt" validate:"required"`
+	ArgonParams    ArgonParams `bson:"argon2_params" json:"argon2_params" validate:"required"`
+
+	StorageUsed    int64  `bson:"storage_used_bytes" json:"storage_used_bytes"`
+	QuotaBytes     int64  `bson:"quota_bytes" json:"quota_bytes"`
+	FailedAttempts int64  `bson:"failed_attempts" json:"failed_attempts"`
+	LockoutUntil   *int64 `bson:"lockout_until" json:"lockout_until"`
+	CreatedAt      int64  `bson:"created_at" json:"created_at"`
+	LastLogin      int64  `bson:"last_login" json:"last_login"`
 }
 
 type ArgonParams struct {

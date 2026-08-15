@@ -5,7 +5,6 @@ import TextInput from '../../components/auth/forms/TextInput.vue';
 import { InputTypes } from '../../types/inputTypes';
 import { ref } from 'vue';
 import { useAuthStore } from '../../stores/auth';
-//logout not redirecting
 import { useRoute } from 'vue-router';
 import { invoke } from '@tauri-apps/api/core';
 import { useToast } from 'vue-toastification';
@@ -46,6 +45,7 @@ async function checkCode() {
       loggedInUserId: userId,
       pendingCode: code.value,
     });
+    console.log(authStore.pendingCode)
     toast.success('Code correct, logged in successfully');
     router.replace({ path: '/changePassword' });
     loading.value = false
@@ -60,7 +60,6 @@ async function checkCode() {
           : typeof err?.message === 'string'
             ? err.message
             : null;
-
     if (errorKey === 'WrongPassword' || errorKey === 'CodeNotFound' || err?.WrongPassword || err?.CodeNotFound) {
       toast.warning('Code does not exist');
     } else if (errorKey === 'UserNotExists' || err?.UserNotExists) {

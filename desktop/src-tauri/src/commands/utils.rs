@@ -1,3 +1,4 @@
+use std::println;
 use std::time::Duration;
 
 use anyhow::anyhow;
@@ -24,7 +25,6 @@ pub async fn get_username_from_uuid(
 
 pub fn start_connection_monitor(app_handle: AppHandle) {
     let mut fail_count = 0u32;
-
     async_runtime::spawn(async move {
         
         let state = app_handle.state::<AppState>();
@@ -92,4 +92,18 @@ let guard =  state.server_connection.lock().map_err(|_| llava_core::Error::LockE
 
     }
     Ok(())
+}
+#[tauri::command]
+pub fn get_connection_status(
+    state: tauri::State<'_, AppState>,
+) -> Result<(bool, bool), llava_core::Error> {
+    let server = *state
+        .server_connection
+        .lock()
+        .map_err(|_| llava_core::Error::LockError)?;
+    let internet = *state
+        .internet_connection
+        .lock()
+        .map_err(|_| llava_core::Error::LockError)?;
+    Ok((server, internet))
 }

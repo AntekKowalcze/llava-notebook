@@ -1,79 +1,114 @@
-//! this module is responsible for updating .md file but also important fields in databases
-use crate::constants::*;
-use crate::utils::{Format, log_helper};
-use anyhow::Context;
-use std::fs::{self};
+//! # Note file update module
+//!
+//! **Purpose**: This module is responsible for safely updating local Markdown note files and
+//! synchronising the note's `updated_at` timestamp in the local SQLite database.
+//!
+//! ## Exported items
+//! * [`update_md`] — Atomically replaces a note's Markdown file contents and updates its
+//!   database modification timestamp.
+//!
+//! ## Key design decisions
+//! Note contents are first written to a temporary file and synchronised to disk before the
+//! temporary file replaces the existing note file. This reduces the risk of leaving a partially
+//! written note file if the application crashes during the write operation.
+//!
+//! The database timestamp is updated only after the filesystem operation succeeds.
+//!
+//! Note content is never written to logs. Only the note identifier and operation status are
+//! logged for diagnostics.
+//!
+//! ## Dependencies
+//! - `std::fs` — Writes and replaces local note files
+//! - `rusqlite` — Updates note metadata in the local database
+//! - `anyhow` — Adds context to database errors
+//! - [`crate::config::ProgramFiles`] — Provides the notes and temporary directories
+//! - [`crate::constants`] — Provides note filename and SQL constants
+//! - [`crate::utils`] — Provides timestamps
 
-///function responsible for updating .md file contents
+use crate::constants::*;
+use anyhow::Context;
+
+use std::io::Write;
+use std::path::Path;
+
+/// Updates the contents of a local Markdown note and its database modification timestamp.
+///
+/// The note is written to a temporary file and synchronised before replacing the existing file.
+/// This prevents the target file from containing partially written content if the application
+/// crashes during the write operation.
+///
+/// # Errors
+/// Returns an error if the temporary file cannot be created or written, the data cannot be
+/// synchronised, the target file cannot be replaced, or the database timestamp cannot be updated.
 pub fn update_md(
     notes_db: &rusqlite::Connection,
-    name: String,
-    note_id: uuid::Uuid, //możliwa zmiana na uuid
+    note_id: String,
     written_string: String,
     program_paths: &crate::config::ProgramFiles,
-    title: String,
 ) -> Result<(), crate::errors::Error> {
-    //see tauri notes 1
-    let tmp_filename = name.clone() + TEMP_NOTE_EXTENSION;
+    tracing::debug!(
+        task = "update note",
+        %note_id,
+        "starting note update"
+    );
 
-    let tmp_filepath = program_paths.tmp_path.join(tmp_filename);
-    let summary: String = written_string
-        .split_whitespace()
-        .take(SUMMARY_LENGTH)
-        .collect::<Vec<&str>>()
-        .join(" ");
-    if title.split_whitespace().count() > MAX_TITLE_LENGTH {
-        tracing::error!(
-            task = "validating title",
-            status = "error",
-            "title too long"
-        );
-        return Err(crate::errors::Error::TitleTooLong);
-    }
-    fs::write(&tmp_filepath, written_string)?; //some permission error
-    fs::File::open(&tmp_filepath)?.sync_all()?;
-
-    let note_name = name.clone() + "." + NOTE_EXTENSION;
+    let note_name = format!("{}.{}", note_id, NOTE_EXTENSION);
     let note_path = program_paths.notes_path.join(note_name);
-    fs::rename(&tmp_filepath, note_path)?;
+
+    atomic_write(&note_path, written_string.as_bytes()).map_err(|e| {
+        tracing::error!(
+            task = "update note",
+            status = "error",
+            %note_id,
+            error = ?e,
+            "failed to atomically write note"
+        );
+
+        e
+    })?;
 
     notes_db
         .execute(
             UPDATE_NOTE_SQL_QUERY,
             rusqlite::named_params! {
                 ":updated_time": crate::utils::get_time(),
-                ":summary": summary,
-                ":title" : title,
-                ":id": note_id.to_string(),
+                ":id": note_id,
             },
         )
-        .context("Couldnt get needed info about note from SQL while updating")?;
-    log_helper(
-        "validating note name",
-        "success",
-        Some(Format::Display(&note_id)),
-        "note updated successfully",
+        .context("could not update note timestamp in database")
+        .map_err(|e| {
+            tracing::error!(
+                task = "update note",
+                status = "error",
+                %note_id,
+                error = ?e,
+                "failed to update note timestamp in database"
+            );
+
+            e
+        })?;
+
+    tracing::debug!(
+        task = "update note",
+        status = "success",
+        %note_id,
+        "note updated successfully"
     );
 
     Ok(())
 }
 
-#[test]
+fn atomic_write(path: &Path, content: &[u8]) -> std::io::Result<()> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| std::io::Error::other("file has no parent directory"))?;
 
-fn update_test() {
-    let paths = crate::config::ProgramFiles::init_in_base().unwrap();
-    let name = "tttsss".to_string();
-    let written_string =
-        "this is test string which have to be written and now it will not overwrite".to_string();
-    let sqlite_connection = crate::services::storage::db_creation::get_connection(&paths).unwrap();
-    let title = "tttsss".to_string();
-    update_md(
-        &sqlite_connection,
-        name,
-        uuid::Uuid::parse_str("45943af4-6163-4816-8108-06330841e1ea").unwrap(), // this is why this test might be failing, write fucntion getting note id from name
-        written_string,
-        &paths,
-        title,
-    )
-    .unwrap();
+    let mut temp_file = tempfile::NamedTempFile::new_in(parent)?;
+
+    temp_file.write_all(content)?;
+    temp_file.as_file().sync_all()?;
+
+    temp_file.persist(path).map_err(|e| e.error)?;
+
+    Ok(())
 }

@@ -1,5 +1,4 @@
 use anyhow::Context;
-use rusqlite::Connection;
 
 fn column_exists(
     conn: &rusqlite::Connection,

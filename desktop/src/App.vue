@@ -3,7 +3,7 @@ import { computed, onMounted } from 'vue';
 import { useAuthStore } from './stores/auth';
 import LoadingCircle from './components/main/LoadingCircle.vue';
 import SessionExpired from './components/main/SessionExpired.vue';
-
+import TitleBar from './components/TitleBar/TitleBar.vue';
 const authStore = useAuthStore();
 const showSessionLoader = computed(() => !authStore.sessionReady);
 
@@ -15,7 +15,9 @@ onMounted(() => {
 
 </script>
 <template>
+
   <div class="flex min-h-dvh h-full flex-col bg-note-graphite bg-cover bg-center">
+    <TitleBar class="shrink-0"></TitleBar>
     <session-expired></session-expired>
     <div
       v-if="showSessionLoader"
@@ -25,6 +27,7 @@ onMounted(() => {
         <LoadingCircle />
       </div>
     </div>
+    
     <router-view />
   </div>
 </template>
