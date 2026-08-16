@@ -7,7 +7,7 @@ pub async fn create_note(
     synchronizing: bool,
     state: tauri::State<'_, AppState>,
 ) -> Result<Note, llava_core::Error> {
-    println!("ENCRYPTION {:?}", encryption);
+
     if title.trim().is_empty() {
         return Err(llava_core::Error::NoteNameError);
     }
@@ -70,3 +70,5 @@ pub async fn create_note(
 
     Ok(note)
 }
+// TODO add view, where all notes are visible
+// TODO THEN create sync manager

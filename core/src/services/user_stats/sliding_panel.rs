@@ -23,6 +23,7 @@
 //! - `tracing` — Logs operation status and database failures
 
 use anyhow::Context;
+use chacha20poly1305::Key;
 use rusqlite::Connection;
 use serde::Serialize;
 
@@ -31,6 +32,7 @@ use serde::Serialize;
 pub struct RecentlyEdited {
     pub title: String,
     pub date: String,
+    pub note_id: String
 }
 
 #[derive(Serialize, Debug)]
@@ -58,6 +60,7 @@ pub struct PanelData {
 pub fn get_sliding_panel_stats(
     user_id: &uuid::Uuid,
     notes_db: &Connection,
+    notes_key: &Key
 ) -> Result<PanelData, crate::errors::Error> {
     tracing::debug!(
         task = "getting sliding panel stats",
@@ -90,7 +93,7 @@ pub fn get_sliding_panel_stats(
              FROM note_tags nt
              JOIN tags t ON nt.tag_id = t.tag_id
              JOIN notes n ON nt.note_local_id = n.local_id
-             WHERE t.name = 'favourite'
+             WHERE t.name = 'favourites'
                AND n.deleted_at IS NULL",
             [],
             |row| row.get(0),
@@ -113,7 +116,7 @@ pub fn get_sliding_panel_stats(
 
     let mut stmt = notes_db
         .prepare(
-            "SELECT title, updated_at
+            "SELECT title, updated_at, encrypted, local_id
              FROM notes
              WHERE deleted_at IS NULL
              ORDER BY updated_at DESC
@@ -166,6 +169,26 @@ pub fn get_sliding_panel_stats(
                 );
             })
             .context("failed to get title")?;
+        let is_encrypted: bool =row.get(2).inspect_err(|err| {
+                tracing::error!(
+                    task = "getting sliding panel stats",
+                    status = "error",
+                    %user_id,
+                    error = ?err,
+                    "failed to get is encrypted"
+                );
+            })
+            .context("failed to get title")?;
+        let note_id: String = row.get(3).inspect_err(|err| {
+                tracing::error!(
+                    task = "getting sliding panel stats",
+                    status = "error",
+                    %user_id,
+                    error = ?err,
+                    "failed to get local id"
+                );
+            })
+            .context("failed to get title")?;
 
         let last_edited: i64 = row
             .get(1)
@@ -182,8 +205,12 @@ pub fn get_sliding_panel_stats(
 
         let edited_ago = crate::utils::get_time() - last_edited;
         let date = format_time_ago(edited_ago);
-
-        recently_edited.push(RecentlyEdited { title, date });
+            if is_encrypted {
+               let decrypted_title = crate::crypto::decrypt_title(&note_id, notes_key, notes_db)?;
+                recently_edited.push(RecentlyEdited { title: decrypted_title, date, note_id });
+            }else{
+                 recently_edited.push(RecentlyEdited { title, date, note_id });
+            }  
     }
 
     tracing::debug!(

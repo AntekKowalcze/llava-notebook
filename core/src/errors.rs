@@ -93,6 +93,12 @@ pub enum Error {
     #[error("Encryption Error")]
     NoKeyToDecryptANote,
 
+    #[error("Invalid tag name")]
+    InvalidTagName,
+    
+    #[error("Tag already exists")]
+    TagAlreadyExists,
+
     #[error("Request error")]
     RequestError((u16, String)),
 

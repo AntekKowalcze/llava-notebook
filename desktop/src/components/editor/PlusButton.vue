@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import PlusHoverMenu from './PlusHoverMenu.vue'
-
 const isMenuOpen = ref<boolean>(false)
-//TODO FIRST TASK add to menu encrypt and sync buttons based on v-if shown if not encrypted/not synced
+const emit = defineEmits<{(e: "change_encryption_method", to: boolean): void}>()
+
 </script>
 
 <template>
@@ -33,6 +33,6 @@ const isMenuOpen = ref<boolean>(false)
       </div>
     </button>
 
-    <PlusHoverMenu v-if="isMenuOpen" />
+    <PlusHoverMenu v-if="isMenuOpen" @change_encryption_method="(to) => emit('change_encryption_method', to)"/>
   </div>
 </template>

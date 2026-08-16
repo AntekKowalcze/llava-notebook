@@ -169,4 +169,3 @@ watch(
   </div>
 </template>
 
-  <!--  TODO  SECOND TASK add tags manipulation -->

@@ -1,17 +1,34 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, onUnmounted } from 'vue';
 import { useAuthStore } from './stores/auth';
 import LoadingCircle from './components/main/LoadingCircle.vue';
 import SessionExpired from './components/main/SessionExpired.vue';
 import TitleBar from './components/TitleBar/TitleBar.vue';
+import { useLayoutStore } from './stores/layoutStore.ts';
 const authStore = useAuthStore();
 const showSessionLoader = computed(() => !authStore.sessionReady);
+const layoutStore = useLayoutStore();
+
+
+
+function handleKeyDown(event: KeyboardEvent) {
+  if (event.ctrlKey && event.key.toLowerCase() === 'b') {
+    event.preventDefault()
+
+    layoutStore.$patch({
+      leftPanelOpen: !layoutStore.leftPanelOpen
+    })
+  }
+}
 
 onMounted(() => {
   void authStore.ensureSession();
-});
+  window.addEventListener('keydown', handleKeyDown)
+})
 
-
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyDown)
+})
 
 </script>
 <template>

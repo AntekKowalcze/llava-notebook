@@ -7,3 +7,4 @@ pub mod settings;
 pub mod utils;
 pub mod notes;
 pub mod sliding_panel;
+pub mod tags;

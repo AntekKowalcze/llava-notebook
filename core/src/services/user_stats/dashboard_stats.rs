@@ -23,6 +23,7 @@
 //! - `tracing` — Logs dashboard operation status and database failures
 
 use anyhow::Context;
+use chacha20poly1305::Key;
 use rusqlite::{named_params, Connection};
 use serde::Serialize;
 
@@ -41,7 +42,7 @@ pub struct DashboardData {
     pub account_creation: i64,
     pub activity_vec: Vec<ActivityRecord>,
     pub last_three_edited: Vec<(String, String, String)>,
-    pub favourite_tags: Vec<(String, String)>,
+    pub favourite_tags: Vec<(String, String)>
 }
 
 /// Collects all statistics required by the application dashboard.
@@ -55,6 +56,7 @@ pub fn get_dashboard_stats(
     user_uuid: String,
     notes_db: &Connection,
     users_db: &Connection,
+    notes_key: &Key
 ) -> Result<DashboardData, crate::errors::Error> {
     tracing::debug!(
         task = "getting dashboard stats",
@@ -256,15 +258,15 @@ pub fn get_dashboard_stats(
             })
             .context("failed to get recent note date")?;
 
-        let title: String = notes_db
+        let (title, encrypted): (String,bool) = notes_db
             .query_row(
-                "SELECT title
+                "SELECT title, encrypted
                  FROM notes
                  WHERE local_id = :note_id",
                 named_params! {
                     ":note_id": note_id,
                 },
-                |row| row.get(0),
+                |row|  Ok((row.get(0)?, row.get(1)?)),
             )
             .inspect_err(|err| {
                 tracing::error!(
@@ -276,8 +278,16 @@ pub fn get_dashboard_stats(
                 );
             })
             .context("failed to get recent note title")?;
+            if encrypted {
+               let decrypted_title = crate::crypto::decrypt_title(&note_id, notes_key, notes_db)?;
+                  last_three_edited.push((decrypted_title, note_id, datetime));
+            }else{
+                  last_three_edited.push((title, note_id, datetime));
+            }
 
-        last_three_edited.push((title, note_id, datetime));
+
+
+      
     }
 
     let mut favourite_tags = Vec::new();

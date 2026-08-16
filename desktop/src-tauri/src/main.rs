@@ -108,7 +108,12 @@ pub fn main() {
             crate::commands::utils::get_connection_status, 
             commands::notes::note_operations::get_note_content,
             commands::notes::note_operations::save_note,
-            
+            commands::notes::note_operations::toggle_note_sync,
+            commands::notes::note_operations::get_note_object,
+            commands::tags::tags::add_tag_to_note,
+            commands::tags::tags::remove_tag_from_note,
+            commands::tags::tags::get_all_tags,
+            commands::tags::tags::get_all_tags_for_note,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

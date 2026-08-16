@@ -17,14 +17,14 @@ const currentNoteStore = useCurrentNoteStore();
 const sync = ref<string>("")
 const encryption = ref<string>("")
 const title = ref<string>("")
-    
-    function settingChanged(id: string, value: string) {
-    if (id === "sync") {
-        sync.value = value
-    }
-    if (id === "encryption") {
-        encryption.value = value
-    }
+
+function settingChanged(id: string, value: string) {
+  if (id === "sync") {
+    sync.value = value
+  }
+  if (id === "encryption") {
+    encryption.value = value
+  }
 }
 function getErrorText(err: unknown): string {
   if (typeof err === "string") {
@@ -108,23 +108,23 @@ async function createNote(): Promise<void> {
 </script>
 
 <template>
-   
-    <div class="flex h-full w-full items-center justify-center bg-note-graphite px-8">
-        <div class="w-full max-w-4xl">
 
-            <!-- Icon -->
-            <div class="flex justify-center">
+  <div class="flex h-full w-full items-center justify-center bg-note-graphite px-8">
+    <div class="w-full max-w-4xl">
 
-                <IconComponent width="w-56" height="h-56" />
+      <!-- Icon -->
+      <div class="flex justify-center">
 
-            </div>
+        <IconComponent width="w-56" height="h-56" />
 
-
-            <!-- Heading -->
-            <div class="mt-10 text-center">
+      </div>
 
 
-                <h1 class="
+      <!-- Heading -->
+      <div class="mt-10 text-center">
+
+
+        <h1 class="
           mx-auto
           mt-6
           max-w-2xl
@@ -133,18 +133,18 @@ async function createNote(): Promise<void> {
           leading-relaxed
           text-note-pumice
           ">
-                    <span class="text-note-paprika">
-                        Your ideas
-                    </span>
-                    deserve a place to stay.
-                    <br />
-                    Give them a home.
-                </h1>
+          <span class="text-note-paprika">
+            Your ideas
+          </span>
+          deserve a place to stay.
+          <br />
+          Give them a home.
+        </h1>
 
-            </div>
+      </div>
 
 
-            <div class="
+      <div class="
         mt-14
         rounded-3xl
         border border-note-pumice/10
@@ -154,8 +154,8 @@ async function createNote(): Promise<void> {
         shadow-2xl
         ">
 
-                <div>
-                    <label class="
+        <div>
+          <label class="
             mb-3
             block
             text-sm
@@ -163,20 +163,21 @@ async function createNote(): Promise<void> {
             tracking-[0.25em]
             text-note-pumice/50
             ">
-                        Note title
-                    </label>
+            Note title
+          </label>
 
-                    <TextInput name="" placeholder="Give your note a title" :type="InputTypes.Text" class="w-full" v-model="title">
-                    </TextInput>
+          <TextInput name="" placeholder="Give your note a title" :type="InputTypes.Text" class="w-full"
+            v-model="title">
+          </TextInput>
 
-                </div>
-
-
-                <!-- Settings -->
-                <div class="mt-10 space-y-4">
+        </div>
 
 
-                    <div class="
+        <!-- Settings -->
+        <div class="mt-10 space-y-4">
+
+
+          <div class="
             flex
             items-center
             justify-between
@@ -187,9 +188,9 @@ async function createNote(): Promise<void> {
             py-5
             ">
 
-                        <div class="flex items-center gap-5">
+            <div class="flex items-center gap-5">
 
-                            <div class="
+              <div class="
                 flex
                 h-14
                 w-14
@@ -198,40 +199,36 @@ async function createNote(): Promise<void> {
                 rounded-xl
                 bg-note-paprika/10
                 ">
-                                <LockKeyhole class="h-7 w-7 text-note-paprika" />
-                            </div>
+                <LockKeyhole class="h-7 w-7 text-note-paprika" />
+              </div>
 
 
-                            <div>
-                                <p class="
+              <div>
+                <p class="
                   text-lg
                   text-note-ivory
                   ">
-                                    Encryption
-                                </p>
+                  Encryption
+                </p>
 
-                                <p class="
+                <p class="
                   text-sm
                   text-note-pumice/50
                   ">
-                                    Protect your private thoughts
-                                </p>
-                            </div>
+                  Protect your private thoughts
+                </p>
+              </div>
 
-                        </div>
-<SwitchInput
-    :current-value="sync"
-    id="sync"
-    @setting-changed="settingChanged"
-/>
+            </div>
+            <SwitchInput :current-value="encryption" id="encryption" @setting-changed="settingChanged" />
 
 
 
-                    </div>
+          </div>
 
 
 
-                    <div class="
+          <div class="
             flex
             items-center
             justify-between
@@ -242,9 +239,9 @@ async function createNote(): Promise<void> {
             py-5
             ">
 
-                        <div class="flex items-center gap-5">
+            <div class="flex items-center gap-5">
 
-                            <div class="
+              <div class="
                 flex
                 h-14
                 w-14
@@ -253,50 +250,42 @@ async function createNote(): Promise<void> {
                 rounded-xl
                 bg-note-glow/10
                 ">
-                                <Cloud class="h-7 w-7 text-note-glow" />
-                            </div>
+                <Cloud class="h-7 w-7 text-note-glow" />
+              </div>
 
 
-                            <div>
+              <div>
 
-                                <p class="
+                <p class="
                   text-lg
                   text-note-ivory
                   ">
-                                    Synchronization
-                                </p>
+                  Synchronization
+                </p>
 
-                                <p class="
+                <p class="
                   text-sm
                   text-note-pumice/50
                   ">
-                                    Keep your knowledge everywhere
-                                </p>
+                  Keep your knowledge everywhere
+                </p>
 
-                            </div>
-
-                        </div>
-
-
-<SwitchInput
-    :current-value="encryption"
-    id="encryption"
-    @setting-changed="settingChanged"
-/>
-                    </div>
-
-                </div>
-
-<SubmitButton
-    content="Create note"
-    class="mt-8 w-full h-14 text-xl active:scale-[98%]"
-    @click="createNote"
-/>
-               
-
+              </div>
 
             </div>
+            <SwitchInput :current-value="sync" id="sync" @setting-changed="settingChanged" />
+
+
+          </div>
 
         </div>
+
+        <SubmitButton content="Create note" class="mt-8 w-full h-14 text-xl active:scale-[98%]" @click="createNote" />
+
+
+
+      </div>
+
     </div>
+  </div>
 </template>

@@ -23,10 +23,22 @@ pub async fn get_panel_data(
     let notes_db = notes_db_guard
         .as_ref()
         .ok_or(llava_core::Error::LockError)?;
+     let notes_key = {
+                let notes_key_guard = state
+                    .notes_key
+                    .lock()
+                    .map_err(|_| llava_core::Error::LockError)?;
+
+                notes_key_guard
+                    .as_ref()
+                    .ok_or(llava_core::Error::NoKeyToDecryptANote)?
+                    .clone()
+            };
     let stats = llava_core::stats::get_sliding_panel_stats(
         user_id,
         notes_db,
+        &notes_key
     )?;
-    println!("{:?}", stats );
+
     Ok(stats)
 }

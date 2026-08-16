@@ -10,7 +10,7 @@
 //! * [`encrypt_data`] — Encrypts note content and updates its content nonce in the database.
 //! * [`encrypt_title`] — Encrypts a note title and updates its title nonce in the database.
 //! * [`update_title_metadata`] — Updates the stored title nonce for a note.
-//!
+//! * [`decrypt title`] — Decrypts a title
 //! ## Key design decisions
 //! Each encrypted field uses a newly generated random nonce. Nonces are not secret and are
 //! stored as Base64-encoded strings in the note's `crypto_meta` JSON object.
@@ -42,6 +42,8 @@ use chacha20poly1305::{AeadCore, KeyInit, Nonce};
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use serde::{Deserialize, Serialize};
 use chacha20poly1305::{ChaCha20Poly1305, Key};
+
+use crate::models::note;
 
 pub fn decrypt_note(
     notes_key: &Key,
@@ -282,6 +284,97 @@ pub fn encrypt_title(
     );
 
     Ok(BASE64.encode(encrypted_data))
+}
+
+
+pub fn decrypt_title(note_id:&str, notes_key: &Key, notes_db: &Connection) -> Result<String, crate::errors::Error>{ 
+   tracing::debug!(
+        task = "decrypt title",
+        %note_id,
+        "starting title decryption"
+    );
+
+    let crypto_metadata = get_current_crypto_metadata(note_id, notes_db)?;
+
+    let base64_nonce = crypto_metadata.title_nonce;
+
+    let nonce = BASE64
+        .decode(base64_nonce)
+        .context("failed to decode nonce for title")
+        .map_err(|e| {
+            tracing::error!(
+                task = "decrypt title",
+                status = "error",
+                %note_id,
+                error = ?e,
+                "failed to decode title nonce"
+            );
+            e
+        })?;
+    let title = notes_db.query_row("SELECT title FROM notes WHERE local_id = :note_id", named_params! {":note_id": note_id}, |row| 
+{
+    let title:String = row.get(0)?;
+    Ok(title)
+}
+
+).context("Failed to get title from database")?;
+
+
+    let content = BASE64
+        .decode(title)
+        .context("failed to decode content from base64")
+        .map_err(|e| {
+            tracing::error!(
+                task = "decrypt title",
+                status = "error",
+                %note_id,
+                error = ?e,
+                "failed to decode encrypted title"
+            );
+            e
+        })?;
+
+    let cipher = ChaCha20Poly1305::new(notes_key);
+    let nonce = Nonce::from_slice(&nonce);
+
+    let decrypted = cipher
+        .decrypt(nonce, content.as_ref())
+        .context("failed to decrypt note content")
+        .map_err(|e| {
+            tracing::error!(
+                task = "decrypt title",
+                status = "error",
+                %note_id,
+                error = ?e,
+                "failed to decrypt note title"
+            );
+            e
+        })?;
+
+    let decrypted_content = String::from_utf8(decrypted)
+        .context("failed to convert decrypted title to UTF-8")
+        .map_err(|e| {
+            tracing::error!(
+                task = "decrypt title",
+                status = "error",
+                %note_id,
+                error = ?e,
+                "decrypted title is not valid UTF-8"
+            );
+            e
+        })?;
+
+    tracing::debug!(
+        task = "decrypt title",
+        status = "success",
+        %note_id,
+        "title decrypted successfully"
+    );
+
+    Ok(decrypted_content)
+
+
+
 }
 
 

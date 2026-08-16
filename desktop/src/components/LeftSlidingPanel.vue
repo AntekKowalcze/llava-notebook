@@ -15,7 +15,6 @@ import { useLayoutStore } from "../stores/layoutStore";
 import { useRouter } from "vue-router";
 import ScreenDeviderHorizontal from "./dashboard/ScreenDeviderHorizontal.vue";
 import IconComponent from "./main/IconComponent.vue";
-
 const layout = useLayoutStore();
 const router = useRouter();
 const userConfig = useUserConfigStore();
@@ -24,6 +23,7 @@ type PanelData = {
     recentlyEdited: {
         title: string;
         date: string;
+        noteId: string
     }[];
     boxStats: {
         numberOfNotes: number;
@@ -70,6 +70,11 @@ function redirect(direction: string) {
             break;
     }
 }
+
+function redirectToNote(noteId: string){
+    router.push(`/main/editor/${noteId}`)  
+}
+
 </script>
 
 <template>
@@ -152,6 +157,7 @@ function redirect(direction: string) {
                 <button
                     v-for="note in panelData.recentlyEdited"
                     :key="note.title"
+                    @click="redirectToNote(note.noteId)"
                     class="group flex w-full items-center justify-between rounded-xl border border-transparent px-3 py-3 text-left transition-all duration-200 hover:border-note-paprika/20 hover:bg-white/[0.04]"
                 >
                     <div class="flex min-w-0 items-center gap-3">
@@ -220,7 +226,7 @@ function redirect(direction: string) {
                         >
                             <Star class="h-4 w-4" />
                             <span>Favorites</span>
-                        </div>
+                        </div>      
 
                         <span class="text-note-ivory">
                             {{ panelData.boxStats.favourites }}

@@ -324,4 +324,3 @@ pub fn add_note_to_database(
         }
     }
 }
-// todo check pending upload when sync is on, adding is correct, check also this stats adding how does it work in dashboard

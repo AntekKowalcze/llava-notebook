@@ -15,13 +15,11 @@ pub fn change_state_after_login(
         .current_user
         .lock()
         .map_err(|_| anyhow!("couldnt edit current user"))? = Some(user_uuid);
-    // println!("{:?}", &notes_conn);
     *state
         .notes_db
         .lock()
         .map_err(|_| anyhow!("Couldnt edit notes db in state"))? = Some(notes_conn);
-    // println!("{:?}", state.notes_db);
-
+  
     *state
         .paths
         .lock()

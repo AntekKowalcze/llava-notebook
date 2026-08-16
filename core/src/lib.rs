@@ -8,6 +8,8 @@ mod models;
 mod services;
 mod utils;
 mod crypto;
+mod tags;
+
 pub mod local_auth {
     pub use crate::services::local_auth::database_creation::connect_or_create_local_login_db;
     pub use crate::services::local_auth::logging::SessionState;
@@ -28,9 +30,22 @@ pub mod storage {
     pub use crate::services::storage::init_note::add_note_to_database;
     pub use crate::services::storage::update::update_md;
     pub use crate::services::storage::init_note::create_local_note;
-    pub use crate::services::storage::note_operations::{verify_note_owner, get_note, get_note_content, check_if_note_is_encrypted};
+    pub use crate::services::storage::note_operations::{verify_note_owner, get_note, get_note_content, check_if_note_is_encrypted, toggle_note_encryption, toggle_note_sync};
+    pub use crate::services::storage::note_operations::update_title;
+    pub use crate::services::storage::note_operations::get_title;
+    pub use crate::services::storage::note_operations::get_note_struct;
 
     
+}
+pub mod tags_handling {
+    pub use crate::tags::add_tag_to_note;
+    pub use crate::tags::add_tag_to_database;
+    pub use crate::tags::remove_tag;
+    pub use crate::tags::remove_tag_from_note;
+    pub use crate::tags::UiTag;
+    pub use crate::tags::find_tag_id;
+    pub use crate::tags::get_all_tags;
+    pub use crate::tags::get_all_tags_for_note;
 }
 
 pub mod settings {
@@ -58,6 +73,8 @@ pub mod online_auth {
 pub mod crypto_operations {
     pub use crate::crypto::decrypt_note;
     pub use crate::crypto::encrypt_data;
+    pub use crate::crypto::encrypt_title;
+    pub use crate::crypto::decrypt_title;
 }
 
 pub use config::get_device_id;
@@ -70,3 +87,4 @@ pub use utils::{
     change_account_link_status, check_connection, get_email_from_online_id, get_online_id,
     get_time, get_user_uuid, get_username_from_uuid, is_online_linked,
 };
+
