@@ -10,7 +10,7 @@ function getConnectionErrorToast(err: unknown): string | null {
     if (err === 'NoInternetConnection') {
       return 'No internet connection';
     }
-   
+
     return null;
   }
   if (err && typeof err === 'object') {
@@ -21,7 +21,6 @@ function getConnectionErrorToast(err: unknown): string | null {
     if (typedErr.NoInternetConnection) {
       return 'No internet connection';
     }
-    
   }
   return null;
 }
@@ -48,7 +47,6 @@ export const useAuthStore = defineStore('auth', () => {
   let notLoggedInToastShown = false;
   let pendingNotLoggedInTimeout: ReturnType<typeof setTimeout> | null = null;
 
-
   let onlineCheckSettleResolvers: Array<() => void> = [];
 
   function resolveOnlineCheckSettleWaiters() {
@@ -56,7 +54,7 @@ export const useAuthStore = defineStore('auth', () => {
     onlineCheckSettleResolvers = [];
     resolvers.forEach((resolve) => resolve());
   }
-   function waitForOnlineCheckToSettle(): Promise<void> {
+  function waitForOnlineCheckToSettle(): Promise<void> {
     if (onlineStatus.value !== 'checking') {
       return Promise.resolve();
     }
@@ -72,9 +70,6 @@ export const useAuthStore = defineStore('auth', () => {
       onlineCheckSettleResolvers.push(wrapped);
     });
   }
-
-
-
 
   function cancelPendingNotLoggedInToast() {
     if (pendingNotLoggedInTimeout) {
@@ -123,9 +118,8 @@ export const useAuthStore = defineStore('auth', () => {
   async function checkSession() {
     const onlineAuthStore = useOnlineAuthStore();
     try {
-      const [sessionState, loggedInOnline] = await invoke<
-        [SessionStatusPayload, SessionStatusPayload]
-      >('check_login_on_start');
+      const [sessionState, loggedInOnline] =
+        await invoke<[SessionStatusPayload, SessionStatusPayload]>('check_login_on_start');
       console.log(loggedInOnline, sessionState);
 
       if (sessionState.status === 'logged_in') {
@@ -144,30 +138,30 @@ export const useAuthStore = defineStore('auth', () => {
         loggedIn.value = false;
       }
 
-       if (loggedInOnline.status === 'logged_in') {
-      onlineStatus.value = 'logged_in';
-      linked.value = true;
-      markLoggedIn();
-      onlineAuthStore.$patch({ loggedIn: true, loggedInId: loggedInOnline.data ?? null });
-      await onlineAuthStore.fetchEmail();
-      resolveOnlineCheckSettleWaiters();
-    } else if (loggedInOnline.status === 'not_linked') {
-      onlineStatus.value = 'not_linked';
-      linked.value = false;
-      onlineAuthStore.$patch({ loggedIn: false, loggedInId: null });
-      resolveOnlineCheckSettleWaiters();
-    } else if (loggedInOnline.status === 'not_logged_in') {
-      onlineStatus.value = 'not_logged_in';
-      linked.value = true;
-      onlineAuthStore.$patch({ loggedIn: false, loggedInId: null });
-      toastNotLoggedInIfNeeded(loggedInOnline.data);
-      resolveOnlineCheckSettleWaiters();
-    } else if (loggedInOnline.status === 'checking') {
-      onlineStatus.value = 'checking';
-      linked.value = true;
-      onlineAuthStore.$patch({ loggedIn: false, loggedInId: null });
-      // deliberately do NOT resolve settle-waiters here — still pending
-    }
+      if (loggedInOnline.status === 'logged_in') {
+        onlineStatus.value = 'logged_in';
+        linked.value = true;
+        markLoggedIn();
+        onlineAuthStore.$patch({ loggedIn: true, loggedInId: loggedInOnline.data ?? null });
+        await onlineAuthStore.fetchEmail();
+        resolveOnlineCheckSettleWaiters();
+      } else if (loggedInOnline.status === 'not_linked') {
+        onlineStatus.value = 'not_linked';
+        linked.value = false;
+        onlineAuthStore.$patch({ loggedIn: false, loggedInId: null });
+        resolveOnlineCheckSettleWaiters();
+      } else if (loggedInOnline.status === 'not_logged_in') {
+        onlineStatus.value = 'not_logged_in';
+        linked.value = true;
+        onlineAuthStore.$patch({ loggedIn: false, loggedInId: null });
+        toastNotLoggedInIfNeeded(loggedInOnline.data);
+        resolveOnlineCheckSettleWaiters();
+      } else if (loggedInOnline.status === 'checking') {
+        onlineStatus.value = 'checking';
+        linked.value = true;
+        onlineAuthStore.$patch({ loggedIn: false, loggedInId: null });
+        // deliberately do NOT resolve settle-waiters here — still pending
+      }
     } catch (err) {
       console.error('checkSession error:', err);
       loggedIn.value = false;
@@ -208,7 +202,6 @@ export const useAuthStore = defineStore('auth', () => {
     });
   }
 
-
   async function ensureSession() {
     if (sessionReady.value) {
       return;
@@ -239,4 +232,3 @@ export const useAuthStore = defineStore('auth', () => {
     waitForOnlineCheckToSettle,
   };
 });
-

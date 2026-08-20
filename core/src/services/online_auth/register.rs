@@ -69,10 +69,7 @@ pub async fn register(
 
     verify_email(&email)?;
 
-    crate::services::local_auth::register::password_validation(
-        &password,
-        &password_repeated,
-    )?;
+    crate::services::local_auth::register::password_validation(&password, &password_repeated)?;
 
     let argon2 = Argon2::default();
 
@@ -139,14 +136,10 @@ pub async fn register(
 
     let device = RegisterDevicePayload {
         device_id,
-        device_name: crate::utils::get_host_name()
-            .context("failed to get hostname")?,
+        device_name: crate::utils::get_host_name().context("failed to get hostname")?,
     };
 
-    let request = RegisterRequest {
-        user,
-        device,
-    };
+    let request = RegisterRequest { user, device };
 
     let res = client
         .post(format!("{}auth/register", SERVER_ADDRESS))

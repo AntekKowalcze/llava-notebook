@@ -84,21 +84,18 @@ pub async fn check_if_logged_in_online(
         "starting online session refresh"
     );
 
-    let entry = keyring::Entry::new(
-        "llava_desktop",
-        &format!("refresh_token_id:{}", online_id),
-    )
-    .map_err(|e| {
-        tracing::error!(
-            task = "online session refresh",
-            status = "error",
-            %online_id,
-            error = ?e,
-            "failed to create keyring entry"
-        );
+    let entry = keyring::Entry::new("llava_desktop", &format!("refresh_token_id:{}", online_id))
+        .map_err(|e| {
+            tracing::error!(
+                task = "online session refresh",
+                status = "error",
+                %online_id,
+                error = ?e,
+                "failed to create keyring entry"
+            );
 
-        crate::errors::Error::NotLoggedIn
-    })?;
+            crate::errors::Error::NotLoggedIn
+        })?;
 
     let refresh_token = entry.get_password().map_err(|e| {
         tracing::error!(
@@ -251,29 +248,22 @@ pub async fn login(
     client: Client,
     device_id: &uuid::Uuid,
 ) -> Result<(AccessToken, String, Vec<u8>), crate::errors::Error> {
-    tracing::debug!(
-        task = "online login",
-        "starting online login"
-    );
+    tracing::debug!(task = "online login", "starting online login");
 
     let argon2 = Argon2::default();
 
-    crate::services::online_auth::register::verify_email(&email)
-        .map_err(|e| {
-            tracing::warn!(
-                task = "online login",
-                status = "error",
-                error = ?e,
-                "email validation failed"
-            );
+    crate::services::online_auth::register::verify_email(&email).map_err(|e| {
+        tracing::warn!(
+            task = "online login",
+            status = "error",
+            error = ?e,
+            "email validation failed"
+        );
 
-            crate::errors::Error::WrongEmail
-        })?;
+        crate::errors::Error::WrongEmail
+    })?;
 
-    tracing::debug!(
-        task = "online login",
-        "email validation successful"
-    );
+    tracing::debug!(task = "online login", "email validation successful");
 
     let request = PreLoginRequest {
         email: email.clone(),
@@ -311,26 +301,18 @@ pub async fn login(
         )));
     }
 
-    let response = response
-        .json::<PreLoginResponse>()
-        .await
-        .map_err(|e| {
-            tracing::error!(
-                task = "online pre-login",
-                status = "error",
-                error = ?e,
-                "failed to decode pre-login response"
-            );
+    let response = response.json::<PreLoginResponse>().await.map_err(|e| {
+        tracing::error!(
+            task = "online pre-login",
+            status = "error",
+            error = ?e,
+            "failed to decode pre-login response"
+        );
 
-            crate::errors::Error::InternalError(
-                "Failed to decode response".to_string(),
-            )
-        })?;
+        crate::errors::Error::InternalError("Failed to decode response".to_string())
+    })?;
 
-    tracing::debug!(
-        task = "online login",
-        "received password salt from server"
-    );
+    tracing::debug!(task = "online login", "received password salt from server");
 
     let salt = SaltString::from_b64(&response.password_salt)
         .context("failed to create salt string")
@@ -341,10 +323,9 @@ pub async fn login(
                 error = ?e,
                 "failed to parse password salt"
             );
-
             e
         })?;
-
+    //issues may come from chagned hash method in go login method
     let hash = argon2
         .hash_password(password.as_bytes(), &salt)
         .context("failed to hash password")
@@ -365,10 +346,7 @@ pub async fn login(
         device_id: device_id.to_string(),
     };
 
-    tracing::debug!(
-        task = "online login",
-        "sending authentication request"
-    );
+    tracing::debug!(task = "online login", "sending authentication request");
 
     let result = client
         .post(format!("{}auth/login", SERVER_ADDRESS))
@@ -398,12 +376,9 @@ pub async fn login(
         );
 
         if status == 401 {
-            if let Ok(server_error) =
-                serde_json::from_str::<LoginErrorResponse>(&body)
-            {
+            if let Ok(server_error) = serde_json::from_str::<LoginErrorResponse>(&body) {
                 if let Some(timeout_until) = server_error.timeout {
-                    let timeout_left =
-                        timeout_until.saturating_sub(crate::utils::get_time());
+                    let timeout_left = timeout_until.saturating_sub(crate::utils::get_time());
 
                     tracing::warn!(
                         task = "online login",
@@ -412,9 +387,7 @@ pub async fn login(
                         "account is temporarily locked"
                     );
 
-                    return Err(crate::errors::Error::AccountLocked(
-                        timeout_left.max(0),
-                    ));
+                    return Err(crate::errors::Error::AccountLocked(timeout_left.max(0)));
                 }
 
                 if let Some(error) = server_error.error {
@@ -472,11 +445,7 @@ pub async fn login(
             )));
         }
 
-        return Err(anyhow::anyhow!(
-            "server error: {}",
-            body
-        )
-        .into());
+        return Err(anyhow::anyhow!("server error: {}", body).into());
     }
 
     let result = result
@@ -551,11 +520,7 @@ pub async fn login(
         e
     })?;
 
-    let argon2 = Argon2::new(
-        argon2::Algorithm::Argon2id,
-        argon2::Version::V0x13,
-        params,
-    );
+    let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
 
     let mut kek_bytes = [0u8; KEY_ENCRYPTED_KEY_LENGTH];
 
@@ -614,11 +579,9 @@ pub async fn login(
             e
         })?;
 
-    let kek =
-        chacha20poly1305::ChaCha20Poly1305::new(&kek_bytes.into());
+    let kek = chacha20poly1305::ChaCha20Poly1305::new(&kek_bytes.into());
 
-    let nonce =
-        chacha20poly1305::Nonce::from_slice(&master_key_nonce);
+    let nonce = chacha20poly1305::Nonce::from_slice(&master_key_nonce);
 
     let notes_key = kek
         .decrypt(nonce, master_key_enc.as_ref())

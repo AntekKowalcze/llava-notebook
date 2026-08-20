@@ -105,7 +105,7 @@ pub fn main() {
             commands::online_auth::try_login_if_connected_with_server,
             commands::notes::create_note::create_note,
             commands::sliding_panel::get_panel_data,
-            crate::commands::utils::get_connection_status, 
+            crate::commands::utils::get_connection_status,
             commands::notes::note_operations::get_note_content,
             commands::notes::note_operations::save_note,
             commands::notes::note_operations::toggle_note_sync,
@@ -114,6 +114,11 @@ pub fn main() {
             commands::tags::tags::remove_tag_from_note,
             commands::tags::tags::get_all_tags,
             commands::tags::tags::get_all_tags_for_note,
+            commands::tags::tags::remove_tag,
+            commands::notes::note_operations::change_note_title,
+            commands::all_notes_view::get_all_notes_data,
+            commands::notes::note_operations::toggle_note_encryption,
+            commands::notes::note_operations::remove_note,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

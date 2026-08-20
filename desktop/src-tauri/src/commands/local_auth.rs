@@ -79,15 +79,14 @@ pub async fn register_command(
             users_db,
         )?
     };
-    
 
     let user_config = llava_core::settings::get_config_for_state(&new_paths)?;
- 
+
     app_handle
         .emit("config-updated", &user_config)
         .map_err(|_| llava_core::Error::FatalError)?;
-    
- crate::commands::command_helpers::change_state_after_login(
+
+    crate::commands::command_helpers::change_state_after_login(
         &state,
         new_uuid,
         users_db,
@@ -96,7 +95,6 @@ pub async fn register_command(
         user_config,
         notes_key,
     )?;
-  
 
     Ok((codes, new_uuid.to_string()))
 }
@@ -126,7 +124,12 @@ pub async fn login_command(
         if timeout > 0 {
             return Err(llava_core::Error::AccountLocked(0));
         }
-        crate::commands::handlers::local_auth::login(username.clone(), password, paths, &mut users_db)?
+        crate::commands::handlers::local_auth::login(
+            username.clone(),
+            password,
+            paths,
+            &mut users_db,
+        )?
     };
 
     let id = {
@@ -139,9 +142,10 @@ pub async fn login_command(
         llava_core::local_auth::get_optional_online_id(users_db, &new_uuid)?
     }; // conn_guard dropped here
 
- if let Some(online_id) = id {
-    crate::commands::online_auth::try_refresh_if_logged_in(online_id, app_handle.clone()).await?;
-}
+    if let Some(online_id) = id {
+        crate::commands::online_auth::try_refresh_if_logged_in(online_id, app_handle.clone())
+            .await?;
+    }
     let user_config = llava_core::settings::get_config_for_state(&new_paths)?;
 
     app_handle
@@ -205,7 +209,6 @@ pub async fn log_with_code(
         (user_uuid, paths, notes_conn, one_code, notes_key)
     };
 
-
     let id = {
         let mut conn_guard = state
             .users_db
@@ -215,11 +218,11 @@ pub async fn log_with_code(
         let user_uuid: uuid::Uuid = llava_core::get_user_uuid(users_db, &username)?;
         llava_core::local_auth::zero_error_count(users_db, &user_uuid)?;
         llava_core::local_auth::get_optional_online_id(users_db, &user_uuid)?
-       
     };
     println!("{:?} this is an id", id);
     if let Some(online_id) = id {
-      crate::commands::online_auth::try_refresh_if_logged_in(online_id, app_handle.clone()).await?;
+        crate::commands::online_auth::try_refresh_if_logged_in(online_id, app_handle.clone())
+            .await?;
     }
     let user_config = llava_core::settings::get_config_for_state(&paths)?;
 
@@ -379,7 +382,7 @@ pub async fn check_login_on_start(
                     }
                 }
             };
-            
+
             if let Some(online_id) = online_id {
                 is_logged_in_online = LoggedInOnline::Checking;
                 let app_handle = app_handle.clone();

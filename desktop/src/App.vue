@@ -9,31 +9,27 @@ const authStore = useAuthStore();
 const showSessionLoader = computed(() => !authStore.sessionReady);
 const layoutStore = useLayoutStore();
 
-
-
 function handleKeyDown(event: KeyboardEvent) {
   if (event.ctrlKey && event.key.toLowerCase() === 'b') {
-    event.preventDefault()
+    event.preventDefault();
 
     layoutStore.$patch({
-      leftPanelOpen: !layoutStore.leftPanelOpen
-    })
+      leftPanelOpen: !layoutStore.leftPanelOpen,
+    });
   }
 }
 
 onMounted(() => {
   void authStore.ensureSession();
-  window.addEventListener('keydown', handleKeyDown)
-})
+  window.addEventListener('keydown', handleKeyDown);
+});
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeyDown)
-})
-
+  window.removeEventListener('keydown', handleKeyDown);
+});
 </script>
 <template>
-
-  <div class="flex min-h-dvh h-full flex-col bg-note-graphite bg-cover bg-center">
+  <div class="flex h-dvh flex-col overflow-hidden bg-note-graphite bg-cover bg-center">
     <TitleBar class="shrink-0"></TitleBar>
     <session-expired></session-expired>
     <div
@@ -44,7 +40,7 @@ onUnmounted(() => {
         <LoadingCircle />
       </div>
     </div>
-    
+
     <router-view />
   </div>
 </template>

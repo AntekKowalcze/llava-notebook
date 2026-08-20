@@ -34,14 +34,18 @@
 //! this check before accessing a note whenever the operation is initiated by an untrusted
 //! frontend request.
 
+use crate::errors::Error;
+use anyhow::Context;
 use chacha20poly1305::Key;
 use rusqlite::{Connection, OptionalExtension, named_params, params};
 use std::path::PathBuf;
 use uuid::Uuid;
-use crate::errors::Error;
-use anyhow::Context;
 
-use crate::{Note, crypto::decrypt_title, storage::SyncState::{self, PendingUpload}};
+use crate::{
+    Note,
+    crypto::decrypt_title,
+    storage::SyncState::{self, PendingUpload},
+};
 
 /// Verifies that a note belongs to the specified user.
 ///
@@ -103,10 +107,7 @@ pub fn verify_note_owner(
 /// # Errors
 /// Returns [`crate::errors::Error::NoteNotFound`] if the note does not exist or the database
 /// query cannot be completed.
-pub fn get_note(
-    note_id: &str,
-    notes_db: &Connection,
-) -> Result<Note, crate::errors::Error> {
+pub fn get_note(note_id: &str, notes_db: &Connection) -> Result<Note, crate::errors::Error> {
     tracing::debug!(
         task = "get note",
         %note_id,
@@ -138,9 +139,11 @@ pub fn get_note(
             },
             |row| {
                 Ok(Note {
-local_id: uuid::Uuid::parse_str(&row.get::<_, String>(0)?).map_err(|_| rusqlite::Error::QueryReturnedNoRows )?,
-mongo_id: row.get(1)?,
-                    owner_id: uuid::Uuid::parse_str(&row.get::<_, String>(2)?).map_err(|_| rusqlite::Error::QueryReturnedNoRows )?,
+                    local_id: uuid::Uuid::parse_str(&row.get::<_, String>(0)?)
+                        .map_err(|_| rusqlite::Error::QueryReturnedNoRows)?,
+                    mongo_id: row.get(1)?,
+                    owner_id: uuid::Uuid::parse_str(&row.get::<_, String>(2)?)
+                        .map_err(|_| rusqlite::Error::QueryReturnedNoRows)?,
 
                     title: row.get(3)?,
                     summary: row.get(4)?,
@@ -186,9 +189,7 @@ mongo_id: row.get(1)?,
 ///
 /// # Errors
 /// Returns an error if the note file cannot be read.
-pub fn get_note_content(
-    note_path: &PathBuf,
-) -> Result<String, crate::errors::Error> {
+pub fn get_note_content(note_path: &PathBuf) -> Result<String, crate::errors::Error> {
     tracing::debug!(
         task = "read note content",
         path = %note_path.display(),
@@ -266,8 +267,6 @@ pub fn check_if_note_is_encrypted(
     Ok(is_encrypted)
 }
 
-
-
 pub fn toggle_note_encryption(
     note_id: String,
     notes_db: &Connection,
@@ -297,7 +296,7 @@ pub fn toggle_note_sync(
                     "UPDATE notes SET sync_state = 'LocalOnly' WHERE local_id = :note_id",
                     named_params! {
                         ":note_id": note_id,
-                    },      
+                    },
                 )
                 .context("failed to toggle sync state")?;
         }
@@ -319,24 +318,33 @@ pub fn toggle_note_sync(
     Ok(())
 }
 
-
-pub fn update_title(notes_db: &Connection, note_id: &str, title: String) -> Result<(), crate::errors::Error>{
-    notes_db.execute("UPDATE notes SET title = :content WHERE local_id = :note_id", named_params! {":content": title, ":note_id": note_id}).context("Failed to update note title")?;
+pub fn update_title(
+    notes_db: &Connection,
+    note_id: &str,
+    title: String,
+) -> Result<(), crate::errors::Error> {
+    notes_db
+        .execute(
+            "UPDATE notes SET title = :content WHERE local_id = :note_id",
+            named_params! {":content": title, ":note_id": note_id},
+        )
+        .context("Failed to update note title")?;
     Ok(())
-
-}
-   
-pub fn get_title(note_id: &str, notes_db: &Connection) -> Result<String, crate::errors::Error>{
-let data = notes_db.query_row("SELECT title FROM notes WHERE local_id = :note_id", named_params! {":note_id":note_id}, |row|
-{
-    let title: String = row.get(0)?;
-    Ok(title)
-}).context("Failed to get title")?;
-Ok(data)
 }
 
-
-
+pub fn get_title(note_id: &str, notes_db: &Connection) -> Result<String, crate::errors::Error> {
+    let data = notes_db
+        .query_row(
+            "SELECT title FROM notes WHERE local_id = :note_id",
+            named_params! {":note_id":note_id},
+            |row| {
+                let title: String = row.get(0)?;
+                Ok(title)
+            },
+        )
+        .context("Failed to get title")?;
+    Ok(data)
+}
 
 pub fn get_note_struct(
     notes_key: &Key,
@@ -353,31 +361,44 @@ pub fn get_note_struct(
             params![note_id],
             |row| {
                 Ok((
-                    row.get::<_, String>(0)?,           // local_id (text -> parse to Uuid below)
-                    row.get::<_, Option<String>>(1)?,   // mongo_id
-                    row.get::<_, String>(2)?,           // owner_id (text -> parse to Uuid below)
-                    row.get::<_, String>(3)?,           // raw title, decrypted below if needed
-                    row.get::<_, String>(4)?,           // summary
-                    row.get::<_, String>(5)?,           // content_path (text -> PathBuf below)
-                    row.get::<_, i64>(6)?,              // created_at
-                    row.get::<_, i64>(7)?,              // updated_at
-                    row.get::<_, Option<i64>>(8)?,      // deleted_at
-                    row.get::<_, i64>(9)?,              // version
-                    row.get::<_, Option<i64>>(10)?,     // cloud_version
-                    row.get::<_, SyncState>(11)?,        // decoded directly via FromSql impl
-                    row.get::<_, bool>(12)?,             // is_deleted
-                    row.get::<_, bool>(13)?,             // encrypted
-                    row.get::<_, Option<String>>(14)?,  // crypto_meta
+                    row.get::<_, String>(0)?,          // local_id (text -> parse to Uuid below)
+                    row.get::<_, Option<String>>(1)?,  // mongo_id
+                    row.get::<_, String>(2)?,          // owner_id (text -> parse to Uuid below)
+                    row.get::<_, String>(3)?,          // raw title, decrypted below if needed
+                    row.get::<_, String>(4)?,          // summary
+                    row.get::<_, String>(5)?,          // content_path (text -> PathBuf below)
+                    row.get::<_, i64>(6)?,             // created_at
+                    row.get::<_, i64>(7)?,             // updated_at
+                    row.get::<_, Option<i64>>(8)?,     // deleted_at
+                    row.get::<_, i64>(9)?,             // version
+                    row.get::<_, Option<i64>>(10)?,    // cloud_version
+                    row.get::<_, SyncState>(11)?,      // decoded directly via FromSql impl
+                    row.get::<_, bool>(12)?,           // is_deleted
+                    row.get::<_, bool>(13)?,           // encrypted
+                    row.get::<_, Option<String>>(14)?, // crypto_meta
                 ))
             },
         )
-        .optional().context("Failed to get note from Db")?
+        .optional()
+        .context("Failed to get note from Db")?
         .ok_or(Error::NoteNotFound)?; // rename if your Error enum differs
 
     let (
-        raw_local_id, mongo_id, raw_owner_id, raw_title, summary, raw_content_path,
-        created_at, updated_at, deleted_at, version, cloud_version,
-        sync_state, is_deleted, encrypted, raw_crypto_meta,
+        raw_local_id,
+        mongo_id,
+        raw_owner_id,
+        raw_title,
+        summary,
+        raw_content_path,
+        created_at,
+        updated_at,
+        deleted_at,
+        version,
+        cloud_version,
+        sync_state,
+        is_deleted,
+        encrypted,
+        raw_crypto_meta,
     ) = row;
 
     let local_id = Uuid::parse_str(&raw_local_id)
@@ -416,3 +437,82 @@ pub fn get_note_struct(
         crypto_meta,
     })
 }
+
+use std::fs;
+use std::path::Path;
+
+pub fn remove_note(
+    notes_db: &Connection,
+    note_id: &str,
+    tmp_delete_path: &Path,
+) -> Result<(), crate::errors::Error> {
+    let tx: rusqlite::Transaction<'_> = notes_db
+        .unchecked_transaction()
+        .context("failed to start remove note transaction")?;
+
+    let (content_path, is_deleted): (String, i64) = tx
+        .query_row(
+            r#"
+            SELECT content_path, is_deleted
+            FROM notes
+            WHERE local_id = ?1
+            "#,
+            params![note_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .context("failed to get note before deletion")
+        .map_err(|e| crate::errors::Error::InternalError(e.to_string()))?;
+
+    if is_deleted != 0 {
+        return Ok(());
+    }
+
+    let source = std::path::PathBuf::from(content_path);
+
+    if !source.exists() {
+        return Err(crate::errors::Error::FileOperationError(
+            "note content path does not exist".to_string(),
+        ));
+    }
+
+    fs::create_dir_all(tmp_delete_path)
+        .context("failed to create tmp_delete directory")
+        .map_err(|e| crate::errors::Error::FileOperationError(e.to_string()))?;
+
+    let target = tmp_delete_path.join(note_id);
+
+    fs::rename(&source, &target)
+        .context("failed to move note to tmp_delete")
+        .map_err(|e| crate::errors::Error::FileOperationError(e.to_string()))?;
+
+    let deleted_at = crate::utils::get_time();
+
+    tx.execute(
+        r#"
+        UPDATE notes
+        SET
+            is_deleted = 1,
+            deleted_at = ?1,
+            sync_state = 'PendingDeleted',
+            updated_at = ?1
+        WHERE local_id = ?2
+        "#,
+        params![deleted_at, note_id,],
+    )
+    .context("failed to mark note as deleted")
+    .map_err(|e| crate::errors::Error::InternalError(e.to_string()))?;
+
+    tx.commit()
+        .context("failed to commit note deletion")
+        .map_err(|e| crate::errors::Error::InternalError(e.to_string()))?;
+
+    crate::utils::log_helper(
+        "remove note",
+        "success",
+        Some(crate::utils::Format::Display(&note_id.to_string())),
+        "note moved to tmp_delete and marked as deleted",
+    );
+
+    Ok(())
+}
+// TODO dodać widok kosza i przywracania zachowanie przywracania z kosza

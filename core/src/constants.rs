@@ -102,7 +102,8 @@ pub const TEMP_NOTE_EXTENSION: &str = ".md.tmp";
 pub const SUMMARY_LENGTH: usize = 10;
 pub const MAX_TITLE_LENGTH: usize = 30;
 //SQL
-pub const UPDATE_NOTE_SQL_QUERY: &str = "UPDATE notes SET updated_at = :updated_time ,version = version + 1 WHERE local_id = :id";
+pub const UPDATE_NOTE_SQL_QUERY: &str =
+    "UPDATE notes SET updated_at = :updated_time ,version = version + 1 WHERE local_id = :id";
 
 //db_creation
 pub const NOTE_DB_SCHEMA: &str = r#"
@@ -197,8 +198,8 @@ pub const NOTE_DB_SCHEMA: &str = r#"
         updated_at INTEGER NOT NULL
     );
     "#;
-//local login db creation
 
+//local login db creation
 pub const LOCAL_LOGIN_DB_SCHEMA: &str = r#" CREATE TABLE IF NOT EXISTS users_data (
                         user_id TEXT PRIMARY KEY,
                         username TEXT NOT NULL,

@@ -10,297 +10,204 @@
    ivory    #FFFBEB
 ========================================================= */
 
-
 .milkdown {
-
-  --crepe-color-background: #0F0F10;
+  --crepe-color-background: #0f0f10;
   --crepe-color-surface: #161618;
   --crepe-color-surface-low: #121214;
 
-  --crepe-color-on-background: #FFFBEB;
-  --crepe-color-on-surface: #FFFBEB;
-  --crepe-color-on-surface-variant: #E7E5E4;
+  --crepe-color-on-background: #fffbeb;
+  --crepe-color-on-surface: #fffbeb;
+  --crepe-color-on-surface-variant: #e7e5e4;
 
-  --crepe-color-primary: #F97316;
-  --crepe-color-secondary: #FFD43B;
+  --crepe-color-primary: #f97316;
+  --crepe-color-secondary: #ffd43b;
 
-  --crepe-color-outline: rgba(255,251,235,.22);
-  --crepe-color-hover: rgba(255,251,235,.10);
-  --crepe-color-selected: rgba(249,115,22,.45);
+  --crepe-color-outline: rgba(255, 251, 235, 0.22);
+  --crepe-color-hover: rgba(255, 251, 235, 0.1);
+  --crepe-color-selected: rgba(249, 115, 22, 0.45);
 
-  --crepe-color-error: #B91C45;
+  --crepe-color-error: #b91c45;
 
-  --crepe-color-inline-code: #FFD43B;
-  --crepe-color-inline-area: #1A1A1D;
+  --crepe-color-inline-code: #ffd43b;
+  --crepe-color-inline-area: #1a1a1d;
 }
-
 
 /* Editor */
 
 .milkdown .crepe-editor {
-
-  max-width:none !important;
-  width:100%;
-  padding:2.5rem 3rem;
-  color:#FFFBEB;
-
+  max-width: none !important;
+  width: 100%;
+  padding: 2.5rem 3rem;
+  color: #fffbeb;
 }
-
 
 .milkdown .crepe-editor p {
-
-  color:#FFFBEB;
-  line-height:1.75;
-
+  color: #fffbeb;
+  line-height: 1.75;
 }
-
 
 .milkdown .crepe-editor h1,
 .milkdown .crepe-editor h2,
 .milkdown .crepe-editor h3,
 .milkdown .crepe-editor h4 {
-
-  color:#FFFBEB;
-  font-weight:750;
-
+  color: #fffbeb;
+  font-weight: 750;
 }
-
-
 
 /* =========================================================
    Crepe floating UI - black glass
 ========================================================= */
+/* .milkdown[role="menu"]{
+z-index: 120;
+} */
 
+.milkdown [role='menu'],
+.milkdown [role='listbox'],
+.milkdown [role='dialog'],
+.milkdown [role='tooltip'],
+.milkdown .crepe-toolbar {
+  background: rgba(7, 7, 8, 0.96) !important;
 
-.milkdown 
-[role="menu"],
-.milkdown 
-[role="listbox"],
-.milkdown 
-[role="dialog"],
-.milkdown 
-[role="tooltip"],
-.milkdown 
-.crepe-toolbar {
+  backdrop-filter: blur(18px) !important;
+  -webkit-backdrop-filter: blur(18px) !important;
 
-  background:rgba(7,7,8,.96) !important;
+  border: 1px solid rgba(255, 251, 235, 0.25) !important;
 
-  backdrop-filter:blur(18px) !important;
-  -webkit-backdrop-filter:blur(18px) !important;
-
-  border:1px solid rgba(255,251,235,.25) !important;
-
-  border-radius:14px !important;
+  border-radius: 14px !important;
 
   box-shadow:
-    0 20px 70px rgba(0,0,0,.85),
-    inset 0 1px rgba(255,251,235,.10);
-
+    0 20px 70px rgba(0, 0, 0, 0.85),
+    inset 0 1px rgba(255, 251, 235, 0.1);
 }
-
-
 
 /* Menu text */
 
-.milkdown
-[role="menuitem"],
-.milkdown
-[role="option"] {
-
-  color:#FFFBEB !important;
-
+.milkdown [role='menuitem'],
+.milkdown [role='option'] {
+  color: #fffbeb !important;
 }
-
-
 
 /* Menu icons */
 
-.milkdown
-[role="menuitem"] svg,
-.milkdown
-[role="option"] svg {
-
-  color:#E7E5E4;
-
+.milkdown [role='menuitem'] svg,
+.milkdown [role='option'] svg {
+  color: #e7e5e4;
 }
-
-
 
 /* Hover */
 
-.milkdown
-[role="menuitem"]:hover,
-.milkdown
-[role="option"]:hover {
+.milkdown [role='menuitem']:hover,
+.milkdown [role='option']:hover {
+  background: #252529 !important;
 
-  background:#252529 !important;
-
-  color:#FFFFFF !important;
-
+  color: #ffffff !important;
 }
 
-
-.milkdown
-[role="menuitem"]:hover svg,
-.milkdown
-[role="option"]:hover svg {
-
-  color:#F97316;
-
+.milkdown [role='menuitem']:hover svg,
+.milkdown [role='option']:hover svg {
+  color: #f97316;
 }
-
-
 
 /* Selected item */
 
-.milkdown
-[data-selected="true"],
-.milkdown
-.active {
+.milkdown [data-selected='true'],
+.milkdown .active {
+  background: #f97316 !important;
 
-  background:#F97316 !important;
+  color: #0f0f10 !important;
 
-  color:#0F0F10 !important;
-
-  font-weight:700;
-
+  font-weight: 700;
 }
 
-
-.milkdown
-[data-selected="true"] svg,
-.milkdown
-.active svg {
-
-  color:#0F0F10 !important;
-
+.milkdown [data-selected='true'] svg,
+.milkdown .active svg {
+  color: #0f0f10 !important;
 }
-
-
 
 /* =========================================================
    Lists - styled with Paprika
 ========================================================= */
 
-
 .milkdown .crepe-editor ul li::marker {
+  color: #f97316 !important;
 
-  color:#F97316 !important;
+  font-size: 1.55em;
 
-  font-size:1.55em;
-
-  font-weight:900;
-
+  font-weight: 900;
 }
-
 
 .milkdown .crepe-editor ol li::marker {
+  color: #f97316 !important;
 
-  color:#F97316 !important;
+  font-size: 1.25em;
 
-  font-size:1.25em;
-
-  font-weight:900;
-
+  font-weight: 900;
 }
-
-
 
 /* Tasks */
 
-.milkdown 
-.crepe-editor 
-input[type="checkbox"] {
+.milkdown .crepe-editor input[type='checkbox'] {
+  accent-color: #f97316;
 
-  accent-color:#F97316;
-
-  transform:scale(1.2);
-
+  transform: scale(1.2);
 }
-
-
 
 /* =========================================================
    Code blocks
 ========================================================= */
 
-
 .milkdown .crepe-editor code {
+  color: #ffd43b;
 
-  color:#FFD43B;
+  background: #1a1a1d;
 
-  background:#1A1A1D;
+  border: 1px solid rgba(255, 212, 59, 0.25);
 
-  border:1px solid rgba(255,212,59,.25);
-
-  border-radius:6px;
-
+  border-radius: 6px;
 }
-
 
 .milkdown .crepe-editor pre {
+  background: #080809;
 
-  background:#080809;
+  border: 1px solid rgba(249, 115, 22, 0.25);
 
-  border:1px solid rgba(249,115,22,.25);
-
-  border-radius:14px;
-
+  border-radius: 14px;
 }
-
-
 
 /* Quote */
 
 .milkdown .crepe-editor blockquote {
+  border-left: 4px solid #f97316 !important;
 
-  border-left:4px solid #F97316 !important;
+  background: rgba(249, 115, 22, 0.12) !important;
 
-  background:rgba(249,115,22,.12) !important;
-
-  color:#E7E5E4;
-
+  color: #e7e5e4;
 }
-
-
 
 /* Links */
 
 .milkdown .crepe-editor a {
-
-  color:#FFD43B;
-
+  color: #ffd43b;
 }
-
-
 
 /* Selection */
 
 .milkdown ::selection {
+  background: rgba(255, 212, 59, 0.35);
 
-  background:rgba(255,212,59,.35);
-
-  color:#FFFBEB;
-
+  color: #fffbeb;
 }
-
-
 
 /* Scrollbar */
 
 .milkdown ::-webkit-scrollbar {
-
-  width:10px;
-
+  width: 10px;
 }
 
-
 .milkdown ::-webkit-scrollbar-thumb {
+  background: rgba(255, 251, 235, 0.22);
 
-  background:rgba(255,251,235,.22);
-
-  border-radius:10px;
-
+  border-radius: 10px;
 }
 .milkdown {
   min-height: 100%;
@@ -311,5 +218,33 @@ input[type="checkbox"] {
   width: 100%;
   min-height: 100%;
   padding: 2.5rem 3rem;
-  color: #FFFBEB;
+  color: #fffbeb;
+}
+
+.milkdown {
+  position: relative;
+  min-height: 100%;
+}
+
+.milkdown .crepe-editor {
+  max-width: none !important;
+  width: 100%;
+  min-height: 100%;
+  padding: 2.5rem 3rem 12rem 3rem !important;
+  color: #fffbeb;
+}
+
+.milkdown .ProseMirror {
+  min-height: 100%;
+  outline: none;
+}
+
+.milkdown [role='menu'],
+.milkdown [role='listbox'],
+.milkdown [role='dialog'],
+.milkdown [role='tooltip'],
+.milkdown .crepe-toolbar,
+.milkdown .crepe-block-handle {
+  z-index: 9999 !important;
+  position: fixed !important;
 }

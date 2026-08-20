@@ -61,10 +61,7 @@ pub async fn logout(
     };
 
     let res = client
-        .post(format!(
-            "{}auth/logout",
-            crate::constants::SERVER_ADDRESS
-        ))
+        .post(format!("{}auth/logout", crate::constants::SERVER_ADDRESS))
         .bearer_auth(&access_token.0)
         .json(&request)
         .send()
@@ -102,21 +99,18 @@ pub async fn logout(
         "online session invalidated successfully"
     );
 
-    let entry = keyring::Entry::new(
-        "llava_desktop",
-        &format!("refresh_token_id:{}", user_id),
-    )
-    .map_err(|e| {
-        tracing::error!(
-            task = "online logout",
-            status = "error",
-            %user_id,
-            error = ?e,
-            "failed to create keyring entry"
-        );
+    let entry = keyring::Entry::new("llava_desktop", &format!("refresh_token_id:{}", user_id))
+        .map_err(|e| {
+            tracing::error!(
+                task = "online logout",
+                status = "error",
+                %user_id,
+                error = ?e,
+                "failed to create keyring entry"
+            );
 
-        crate::errors::Error::NotLoggedIn
-    })?;
+            crate::errors::Error::NotLoggedIn
+        })?;
 
     entry
         .delete_credential()
@@ -140,5 +134,22 @@ pub async fn logout(
         "online logout completed successfully"
     );
 
+    Ok(())
+}
+
+pub fn set_account_to_offline_in_db(
+    user_id: String,
+    users_db: &rusqlite::Connection,
+) -> Result<(), crate::errors::Error> {
+    users_db
+        .execute(
+            "UPDATE users_data
+         SET is_online_linked = false,
+             online_account_email = NULL,
+             online_account_id = NULL
+         WHERE user_id = :id",
+            rusqlite::named_params! { ":id": user_id },
+        )
+        .context("failed to unlink online account in db")?;
     Ok(())
 }

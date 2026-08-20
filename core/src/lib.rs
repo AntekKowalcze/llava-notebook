@@ -2,13 +2,13 @@
 
 mod config;
 mod constants;
+mod crypto;
 mod errors;
 mod migrations;
 mod models;
 mod services;
-mod utils;
-mod crypto;
 mod tags;
+mod utils;
 
 pub mod local_auth {
     pub use crate::services::local_auth::database_creation::connect_or_create_local_login_db;
@@ -28,24 +28,26 @@ pub mod storage {
     pub use crate::services::storage::db_creation::{SyncState, get_connection};
     pub use crate::services::storage::delete::delete_note;
     pub use crate::services::storage::init_note::add_note_to_database;
-    pub use crate::services::storage::update::update_md;
     pub use crate::services::storage::init_note::create_local_note;
-    pub use crate::services::storage::note_operations::{verify_note_owner, get_note, get_note_content, check_if_note_is_encrypted, toggle_note_encryption, toggle_note_sync};
-    pub use crate::services::storage::note_operations::update_title;
-    pub use crate::services::storage::note_operations::get_title;
     pub use crate::services::storage::note_operations::get_note_struct;
-
-    
+    pub use crate::services::storage::note_operations::get_title;
+    pub use crate::services::storage::note_operations::remove_note;
+    pub use crate::services::storage::note_operations::update_title;
+    pub use crate::services::storage::note_operations::{
+        check_if_note_is_encrypted, get_note, get_note_content, toggle_note_encryption,
+        toggle_note_sync, verify_note_owner,
+    };
+    pub use crate::services::storage::update::update_md;
 }
 pub mod tags_handling {
-    pub use crate::tags::add_tag_to_note;
-    pub use crate::tags::add_tag_to_database;
-    pub use crate::tags::remove_tag;
-    pub use crate::tags::remove_tag_from_note;
     pub use crate::tags::UiTag;
+    pub use crate::tags::add_tag_to_database;
+    pub use crate::tags::add_tag_to_note;
     pub use crate::tags::find_tag_id;
     pub use crate::tags::get_all_tags;
     pub use crate::tags::get_all_tags_for_note;
+    pub use crate::tags::remove_tag;
+    pub use crate::tags::remove_tag_from_note;
 }
 
 pub mod settings {
@@ -59,22 +61,23 @@ pub mod settings {
 
 pub mod stats {
     pub use crate::services::user_stats::dashboard_stats::{DashboardData, get_dashboard_stats};
-    pub use crate::services::user_stats::sliding_panel::{PanelData,get_sliding_panel_stats};
+    pub use crate::services::user_stats::sliding_panel::{PanelData, get_sliding_panel_stats};
 }
 
 pub mod online_auth {
     pub use crate::services::online_auth::login::check_if_logged_in_online;
     pub use crate::services::online_auth::login::login;
     pub use crate::services::online_auth::logout::logout;
+    pub use crate::services::online_auth::logout::set_account_to_offline_in_db;
     pub use crate::services::online_auth::register::change_email_in_database;
     pub use crate::services::online_auth::register::register;
 }
 
 pub mod crypto_operations {
     pub use crate::crypto::decrypt_note;
+    pub use crate::crypto::decrypt_title;
     pub use crate::crypto::encrypt_data;
     pub use crate::crypto::encrypt_title;
-    pub use crate::crypto::decrypt_title;
 }
 
 pub use config::get_device_id;
@@ -88,3 +91,7 @@ pub use utils::{
     get_time, get_user_uuid, get_username_from_uuid, is_online_linked,
 };
 
+pub mod note_stats {
+    pub use crate::services::storage::all_notes::NoteCard;
+    pub use crate::services::storage::all_notes::get_all_notes_data;
+}

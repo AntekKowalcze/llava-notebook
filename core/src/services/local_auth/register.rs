@@ -445,7 +445,7 @@ pub fn after_validation(
     Ok(paths)
 }
 
-    pub fn change_password(
+pub fn change_password(
     users_db: &Connection,
     username: String,
     password: String,
@@ -458,9 +458,9 @@ pub fn after_validation(
     password_validation(&password, &password_repeated)?;
 
     let mut found = 0;
-  let mut stmt = users_db
-    .prepare("SELECT code_hash, used_at FROM recovery_keys WHERE user_id = :id")
-    .context("failed to prepare statement")?;
+    let mut stmt = users_db
+        .prepare("SELECT code_hash, used_at FROM recovery_keys WHERE user_id = :id")
+        .context("failed to prepare statement")?;
     let mut handle = stmt
         .query(named_params! {
             ":id":user_uuid.to_string()
@@ -493,21 +493,21 @@ pub fn after_validation(
             params.clone(),
         );
         while let Some(row) = handle.next().context("failed to get next row")? {
-    let hash: String = row.get(0).context("failed to get hash")?;
-    let used_at: Option<i64> = row.get(1).context("failed to get used_at")?;
-    let phc: PasswordHash<'_> =
-        argon2::PasswordHash::new(&hash).context("failed to parse hash from db to phc")?;
+            let hash: String = row.get(0).context("failed to get hash")?;
+            let used_at: Option<i64> = row.get(1).context("failed to get used_at")?;
+            let phc: PasswordHash<'_> =
+                argon2::PasswordHash::new(&hash).context("failed to parse hash from db to phc")?;
 
-    if argon2.verify_password(&decoded, &phc).is_ok() {
-        let used_at = used_at.ok_or(crate::errors::Error::CodeNotFound)?;
-        if crate::utils::get_time() - used_at > RECOVERY_CHANGE_WINDOW_MS {
-            return Err(crate::errors::Error::CodeNotFound);
-        }
-        found += 1;
-    }
+            if argon2.verify_password(&decoded, &phc).is_ok() {
+                let used_at = used_at.ok_or(crate::errors::Error::CodeNotFound)?;
+                if crate::utils::get_time() - used_at > RECOVERY_CHANGE_WINDOW_MS {
+                    return Err(crate::errors::Error::CodeNotFound);
+                }
+                found += 1;
+            }
 
-    code.zeroize();
-    if found > 0 {
+            code.zeroize();
+            if found > 0 {
                 let (wrapped_key, nonce, kdf_salt) = users_db.query_row("SELECT wrapped_notes_key, wrapped_notes_key_nonce, recovery_kdf_salt FROM recovery_keys WHERE code_hash = :hash", named_params! {
             ":hash": hash
         }, |row|{

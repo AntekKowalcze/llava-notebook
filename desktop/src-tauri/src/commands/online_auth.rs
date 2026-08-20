@@ -151,7 +151,19 @@ pub async fn online_logout(state: tauri::State<'_, AppState>) -> Result<(), llav
             .clone()
     };
     let client = state.server_client.clone();
-    llava_core::online_auth::logout(user_id, client, &device_id, &access_token).await?;
+
+    llava_core::online_auth::logout(user_id.clone(), client, &device_id, &access_token).await?;
+
+    let users_db_guard = state
+        .users_db
+        .lock()
+        .map_err(|_| anyhow!("failed to lock users_db"))?;
+
+    let users_db = users_db_guard
+        .as_ref()
+        .ok_or(llava_core::Error::LockError)?;
+
+    llava_core::online_auth::set_account_to_offline_in_db(user_id, users_db)?;
 
     *state
         .online_user_id
@@ -410,4 +422,3 @@ pub async fn try_refresh_if_logged_in(
     });
     Ok(())
 }
-

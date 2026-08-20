@@ -6,9 +6,5 @@ pub struct Tag {
     pub owner_id: uuid::Uuid,
     pub name: String,
     pub color: String,
-    pub created_at: i64
+    pub created_at: i64,
 }
-
-
-
-

@@ -1,9 +1,8 @@
 use anyhow::Context;
-use rusqlite::named_params;
 use rusqlite::OptionalExtension;
-use uuid::Uuid;
+use rusqlite::named_params;
 use serde::Serialize;
-
+use uuid::Uuid;
 
 pub fn add_tag_to_database(
     notes_db: &rusqlite::Connection,
@@ -44,7 +43,6 @@ pub fn add_tag_to_database(
     Ok(tag_id.to_string())
 }
 
-
 pub fn add_tag_to_note(
     notes_db: &rusqlite::Connection,
     note_id: String,
@@ -73,7 +71,6 @@ pub fn add_tag_to_note(
 
     Ok(())
 }
-
 
 pub fn remove_tag_from_note(
     notes_db: &rusqlite::Connection,
@@ -186,7 +183,6 @@ pub struct UiTag {
     pub color: String,
 }
 
-
 pub fn get_all_tags(
     notes_db: &rusqlite::Connection,
     owner_id: &str,
@@ -219,7 +215,6 @@ pub fn get_all_tags(
 
     Ok(tags)
 }
-
 
 pub fn find_tag_id(
     notes_db: &rusqlite::Connection,

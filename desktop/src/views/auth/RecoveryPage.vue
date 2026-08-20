@@ -16,7 +16,7 @@ const route = useRoute();
 const router = useRouter();
 let code = ref<string>('');
 let username = ref<string>('');
-const loading = ref<boolean>(false)
+const loading = ref<boolean>(false);
 const authStore = useAuthStore();
 const originRaw = (route.query.origin as string | undefined) ?? 'login';
 // normalize: allow values like "settings", "/settings", "login" or "/login"
@@ -31,7 +31,7 @@ const originTo =
         : `/${originKey}`;
 async function checkCode() {
   try {
-    loading.value= true
+    loading.value = true;
     let [userId, one_code] = await invoke<[string, boolean]>('log_with_code', {
       username: username.value,
       code: code.value,
@@ -45,12 +45,12 @@ async function checkCode() {
       loggedInUserId: userId,
       pendingCode: code.value,
     });
-    console.log(authStore.pendingCode)
+    console.log(authStore.pendingCode);
     toast.success('Code correct, logged in successfully');
     router.replace({ path: '/changePassword' });
-    loading.value = false
+    loading.value = false;
   } catch (err: any) {
-    loading.value = false
+    loading.value = false;
     console.log(err);
     const errorKey =
       typeof err === 'string'
@@ -60,7 +60,12 @@ async function checkCode() {
           : typeof err?.message === 'string'
             ? err.message
             : null;
-    if (errorKey === 'WrongPassword' || errorKey === 'CodeNotFound' || err?.WrongPassword || err?.CodeNotFound) {
+    if (
+      errorKey === 'WrongPassword' ||
+      errorKey === 'CodeNotFound' ||
+      err?.WrongPassword ||
+      err?.CodeNotFound
+    ) {
       toast.warning('Code does not exist');
     } else if (errorKey === 'UserNotExists' || err?.UserNotExists) {
       toast.warning('User does not exist');
@@ -89,18 +94,36 @@ async function checkCode() {
 </script>
 
 <template>
-  <FormCard header-text="Enter recovery key" sub-text="enter the recovery code you received when logging in">
+  <FormCard
+    header-text="Enter recovery key"
+    sub-text="enter the recovery code you received when logging in"
+  >
     <template v-if="!loading">
-    <TextInput name="username" placeholder="enter username" :type="InputTypes.Text" v-model="username"></TextInput>
-    <TextInput name="code" placeholder="enter recovery code" :type="InputTypes.Text" class="mb-24 mt-20" v-model="code">
-    </TextInput>
+      <TextInput
+        name="username"
+        placeholder="enter username"
+        :type="InputTypes.Text"
+        v-model="username"
+      ></TextInput>
+      <TextInput
+        name="code"
+        placeholder="enter recovery code"
+        :type="InputTypes.Text"
+        class="mb-24 mt-20"
+        v-model="code"
+      ></TextInput>
 
-    <SubmitButton content="submit" @click="checkCode"></SubmitButton>
+      <SubmitButton
+        content="submit"
+        @click="checkCode"
+      ></SubmitButton>
     </template>
     <LoadingCircle v-else></LoadingCircle>
-    <RouterLink :to="originTo" class="mb-0 mt-8 text-note-ivory/80 hover:underline">
+    <RouterLink
+      :to="originTo"
+      class="mb-0 mt-8 text-note-ivory/80 hover:underline"
+    >
       Go back
     </RouterLink>
   </FormCard>
-  
 </template>

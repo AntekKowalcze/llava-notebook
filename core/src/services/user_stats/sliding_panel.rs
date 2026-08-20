@@ -32,7 +32,7 @@ use serde::Serialize;
 pub struct RecentlyEdited {
     pub title: String,
     pub date: String,
-    pub note_id: String
+    pub note_id: String,
 }
 
 #[derive(Serialize, Debug)]
@@ -60,7 +60,7 @@ pub struct PanelData {
 pub fn get_sliding_panel_stats(
     user_id: &uuid::Uuid,
     notes_db: &Connection,
-    notes_key: &Key
+    notes_key: &Key,
 ) -> Result<PanelData, crate::errors::Error> {
     tracing::debug!(
         task = "getting sliding panel stats",
@@ -148,15 +148,19 @@ pub fn get_sliding_panel_stats(
 
     let mut recently_edited = Vec::new();
 
-    while let Some(row) = rows.next().inspect_err(|err| {
-        tracing::error!(
-            task = "getting sliding panel stats",
-            status = "error",
-            %user_id,
-            error = ?err,
-            "failed to get next recently edited note row"
-        );
-    }).context("failed to get row")? {
+    while let Some(row) = rows
+        .next()
+        .inspect_err(|err| {
+            tracing::error!(
+                task = "getting sliding panel stats",
+                status = "error",
+                %user_id,
+                error = ?err,
+                "failed to get next recently edited note row"
+            );
+        })
+        .context("failed to get row")?
+    {
         let title: String = row
             .get(0)
             .inspect_err(|err| {
@@ -169,7 +173,9 @@ pub fn get_sliding_panel_stats(
                 );
             })
             .context("failed to get title")?;
-        let is_encrypted: bool =row.get(2).inspect_err(|err| {
+        let is_encrypted: bool = row
+            .get(2)
+            .inspect_err(|err| {
                 tracing::error!(
                     task = "getting sliding panel stats",
                     status = "error",
@@ -179,7 +185,9 @@ pub fn get_sliding_panel_stats(
                 );
             })
             .context("failed to get title")?;
-        let note_id: String = row.get(3).inspect_err(|err| {
+        let note_id: String = row
+            .get(3)
+            .inspect_err(|err| {
                 tracing::error!(
                     task = "getting sliding panel stats",
                     status = "error",
@@ -205,12 +213,20 @@ pub fn get_sliding_panel_stats(
 
         let edited_ago = crate::utils::get_time() - last_edited;
         let date = format_time_ago(edited_ago);
-            if is_encrypted {
-               let decrypted_title = crate::crypto::decrypt_title(&note_id, notes_key, notes_db)?;
-                recently_edited.push(RecentlyEdited { title: decrypted_title, date, note_id });
-            }else{
-                 recently_edited.push(RecentlyEdited { title, date, note_id });
-            }  
+        if is_encrypted {
+            let decrypted_title = crate::crypto::decrypt_title(&note_id, notes_key, notes_db)?;
+            recently_edited.push(RecentlyEdited {
+                title: decrypted_title,
+                date,
+                note_id,
+            });
+        } else {
+            recently_edited.push(RecentlyEdited {
+                title,
+                date,
+                note_id,
+            });
+        }
     }
 
     tracing::debug!(
@@ -244,47 +260,31 @@ fn format_time_ago(milliseconds: i64) -> String {
                 "{} minute{} ago",
                 minutes,
                 if minutes == 1 { "" } else { "s" }
-            )
+            );
         }
 
         3_600_000..=86_399_999 => {
             let hours = milliseconds / 3_600_000;
 
-          return  format!(
-                "{} hour{} ago",
-                hours,
-                if hours == 1 { "" } else { "s" }
-            )
+            return format!("{} hour{} ago", hours, if hours == 1 { "" } else { "s" });
         }
 
         86_400_000..=2_591_999_999 => {
             let days = milliseconds / 86_400_000;
 
-           return format!(
-                "{} day{} ago",
-                days,
-                if days == 1 { "" } else { "s" }
-            )
+            return format!("{} day{} ago", days, if days == 1 { "" } else { "s" });
         }
 
         2_592_000_000..=31_535_999_999 => {
             let weeks = milliseconds / 604_800_000;
 
-           return format!(
-                "{} week{} ago",
-                weeks,
-                if weeks == 1 { "" } else { "s" }
-            )
+            return format!("{} week{} ago", weeks, if weeks == 1 { "" } else { "s" });
         }
 
         _ => {
             let months = milliseconds / 2_592_000_000;
 
-           return format!(
-                "{} month{} ago",
-                months,
-                if months == 1 { "" } else { "s" }
-            )
+            return format!("{} month{} ago", months, if months == 1 { "" } else { "s" });
         }
     }
 }

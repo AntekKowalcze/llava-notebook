@@ -11,7 +11,7 @@ import {
   Cloud,
   RefreshCwOff,
   CloudCheck,
-  Save
+  Save,
 } from 'lucide-vue-next';
 import { useMetaStore } from '../../stores/metaStore';
 import { useRoute } from 'vue-router';
@@ -131,7 +131,7 @@ function formatTimeAgo(timestamp: number, currentTime: number): string {
 
       <span>
         {{ currentNoteStore.words }}
-        {{ currentNoteStore.words == 1 ? "word" : "words" }}
+        {{ currentNoteStore.words == 1 ? 'word' : 'words' }}
       </span>
 
       <div class="h-3 w-px bg-white/10" />
@@ -148,8 +148,7 @@ function formatTimeAgo(timestamp: number, currentTime: number): string {
         <Save
           :size="16"
           :stroke-width="2"
-          
-          class="transition-transform duration-300 text-note-ivory/75"
+          class="text-note-ivory/75 transition-transform duration-300"
           :class="isSaving ? 'scale-110' : 'scale-100'"
         />
 
@@ -250,9 +249,7 @@ function formatTimeAgo(timestamp: number, currentTime: number): string {
 
       <div class="h-3 w-px bg-white/10" />
 
-      <span class="text-note-pumice/30">
-        v{{ version }}
-      </span>
+      <span class="text-note-pumice/30">v{{ version }}</span>
     </div>
   </div>
 </template>

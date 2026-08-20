@@ -127,9 +127,7 @@ pub fn run_users_migration(users_db: &rusqlite::Connection) -> Result<(), crate:
 
     Ok(())
 }
-pub fn run_notes_migration(
-    notes_db: &rusqlite::Connection,
-) -> Result<(), crate::errors::Error> {
+pub fn run_notes_migration(notes_db: &rusqlite::Connection) -> Result<(), crate::errors::Error> {
     let version: i64 = notes_db
         .query_row("PRAGMA user_version;", [], |r| r.get(0))
         .context("failed to read notes db version")?;
@@ -212,11 +210,9 @@ pub fn run_notes_migration(
             .context("failed to commit notes migration transaction")?;
 
         let violation_count: i64 = notes_db
-            .query_row(
-                "SELECT COUNT(*) FROM pragma_foreign_key_check",
-                [],
-                |r| r.get(0),
-            )
+            .query_row("SELECT COUNT(*) FROM pragma_foreign_key_check", [], |r| {
+                r.get(0)
+            })
             .context("failed to run foreign_key_check after notes rebuild")?;
         if violation_count > 0 {
             return Err(crate::errors::Error::InternalError(

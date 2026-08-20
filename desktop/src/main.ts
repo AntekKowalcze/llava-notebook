@@ -12,16 +12,16 @@ import { useUserConfigStore } from './stores/userConfig';
 import { useOnlineAuthStore } from './stores/onlineAuth';
 import { useAuthStore } from './stores/auth';
 import { useMetaStore } from './stores/metaStore.ts';
-import './css/milkdown.css'
+import './css/milkdown.css';
 const app = createApp(App);
 app.use(PrimeVue);
 app.use(createPinia());
 app.use(router);
 const userConfigStore = useUserConfigStore();
-void await userConfigStore.init();
-useOnlineAuthStore()
-useAuthStore()
-useMetaStore()
+void (await userConfigStore.init());
+useOnlineAuthStore();
+useAuthStore();
+useMetaStore();
 app.use(Toast as any, {
   transition: 'Vue-Toastification__bounce',
   maxToasts: 20,

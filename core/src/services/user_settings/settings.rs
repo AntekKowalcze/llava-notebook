@@ -313,7 +313,8 @@ pub fn get_config_for_state(
                     tracing::debug!(
                         task = "get config state",
                         settings_count,
-                        expected_settings = crate::services::user_settings::settings_constants::NUMBER_OF_SETTINGS,
+                        expected_settings =
+                            crate::services::user_settings::settings_constants::NUMBER_OF_SETTINGS,
                         "configuration structure validated by setting count"
                     );
 
@@ -706,11 +707,7 @@ fn deserialize_write_config_preserves_settings_order() {
     let parsed: WriteConfig =
         serde_json::from_str(raw).expect("WriteConfig should deserialize from JSON");
 
-    let keys: Vec<String> = parsed.sections[0]
-        .settings
-        .keys()
-        .cloned()
-        .collect();
+    let keys: Vec<String> = parsed.sections[0].settings.keys().cloned().collect();
 
     assert_eq!(
         keys,

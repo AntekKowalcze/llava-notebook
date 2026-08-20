@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-const props = defineProps<{
-  currentValue: string;
-  id: string;
-}>();
+const props = withDefaults(
+  defineProps<{
+    currentValue: string;
+    id: string;
+    disabled?: boolean;
+  }>(),
+  {
+    disabled: false,
+  }
+);
 const emit = defineEmits<{
   (e: 'setting-changed', id: string, value: string): void;
 }>();
@@ -20,6 +26,7 @@ function changed() {
 <template>
   <div class="relative inline-block h-5 w-11">
     <input
+      :disabled="props.disabled"
       :checked="checked"
       :id="props.id"
       type="checkbox"
@@ -33,5 +40,4 @@ function changed() {
   </div>
 </template>
 
-<style lang="css" scoped></style>
 <!--! IMPORTANT view-model do note work here, use setting-changed -->

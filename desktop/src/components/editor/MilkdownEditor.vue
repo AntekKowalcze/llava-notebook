@@ -1,62 +1,49 @@
 <template>
-  <div class="h-full min-h-0 overflow-y-auto ">
-       <Milkdown />
+  <div class="h-full min-h-full">
+    <Milkdown />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed ,ref} from 'vue';
-import { Milkdown, useEditor } from '@milkdown/vue'
-import { Crepe } from '@milkdown/crepe'
+import { Milkdown, useEditor } from '@milkdown/vue';
+import { Crepe } from '@milkdown/crepe';
+import { listener, listenerCtx } from '@milkdown/kit/plugin/listener';
+import { editorViewCtx } from '@milkdown/kit/core';
+import { useCurrentNoteStore } from '../../stores/currentNoteStore';
 
-import { Editor, rootCtx } from '@milkdown/kit/core'
-import { commonmark } from '@milkdown/kit/preset/commonmark'
-import { listener, listenerCtx } from '@milkdown/kit/plugin/listener'
-import { defineComponent } from 'vue'
-const props = defineProps<{defaultValue: string}>()
-const emit = defineEmits<{(e: 'change', content: string):void}>()
-const { get } = useEditor((root) => {
+const props = defineProps<{ defaultValue: string }>();
+const emit = defineEmits<{ (e: 'change', content: string): void }>();
+
+const currentNoteStore = useCurrentNoteStore();
+
+function countWords(text: string): number {
+  const cleaned = text.trim();
+  if (!cleaned) return 0;
+  return cleaned.split(/\s+/).length;
+}
+
+useEditor((root) => {
   const crepe = new Crepe({
     root,
     defaultValue: props.defaultValue,
-  })
-  crepe.editor.config((ctx) => {
-    ctx.get(listenerCtx).markdownUpdated((ctx, markdown) => {
-      emit('change', markdown)
-    })
-  })
+  });
 
-  return crepe
-})
+  crepe.editor.use(listener).config((ctx) => {
+    const listenerPlugin = ctx.get(listenerCtx);
 
+    listenerPlugin.markdownUpdated((_, markdown) => {
+      emit('change', markdown);
+    });
 
- // const { get } = useEditor((root) =>
-  //     Editor.make()
-  //       .config((ctx) => {
-  //         ctx.set(rootCtx, root)
-  //         // Add markdown listener for auto-save
-  //         ctx.get(listenerCtx).markdownUpdated((ctx, markdown) => {
-  //           if(!isDirty){
-  //             setSafeSaveTimeout()
-  //             isDirty = true
-  //           }
-  //           if(debounceTimeout){
-  //             clearTimeout(debounceTimeout)
-  //           }
-  //           if(!debounceTimeout){
-  //             setDebounceTimeout();
-  //           }
-           
+    listenerPlugin.updated((ctx) => {
+      const view = ctx.get(editorViewCtx);
+      if (view) {
+        const plainText = view.state.doc.textContent;
+        currentNoteStore.words = countWords(plainText);
+      }
+    });
+  });
 
-  //             // If 2 second from last update save, if 60 seconds from last save, save 
-           
-
-
-
-
-  //         })
-  //       })
-  //       .use(commonmark)
-  //       .use(listener)
-  //   )
+  return crepe;
+});
 </script>

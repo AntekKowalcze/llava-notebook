@@ -146,7 +146,7 @@ onUnmounted(() => clearInterval(interval));
 <template>
   <div class="flex flex-1 flex-col">
     <ArrowBigLeftDash
-      class="active:scale-90 absolute left-[2%] top-[93%] text-note-paprika/80 transition-transform duration-200 hover:scale-95"
+      class="absolute left-[2%] top-[93%] text-note-paprika/80 transition-transform duration-200 hover:scale-95 active:scale-90"
       @click="redirect"
     ></ArrowBigLeftDash>
     <!-- greeting -->
@@ -212,7 +212,9 @@ onUnmounted(() => clearInterval(interval));
             <p class="text-xs uppercase tracking-widest text-note-pumice/60">Last 365 days</p>
           </div>
           <!-- month names  -->
-          <div class="flex h-4 w-[69vw] select-none flex-row justify-start gap-[3.5rem] pl-8 text-note-pumice/60">
+          <div
+            class="flex h-4 w-[69vw] select-none flex-row justify-start gap-[3.5rem] pl-8 text-note-pumice/60"
+          >
             <span
               v-for="(label, idx) in monthLabels"
               :key="idx"
@@ -280,7 +282,7 @@ onUnmounted(() => clearInterval(interval));
           class="flex flex-col gap-2"
         >
           <div
-            v-for="([title, noteId, ts] ) in lastThreeEdited"
+            v-for="[title, noteId, ts] in lastThreeEdited"
             :key="noteId + ts"
             class="flex items-center justify-between rounded-xl border border-note-pumice/15 bg-note-graphite px-3 py-2"
           >
@@ -347,4 +349,3 @@ onUnmounted(() => clearInterval(interval));
 </template>
 
 <style scoped></style>
-

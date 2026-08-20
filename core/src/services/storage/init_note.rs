@@ -35,7 +35,7 @@ use crate::crypto::NoteCryptoMetadata;
 
 use anyhow::Context;
 
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 
 use chacha20poly1305::aead::{Aead, OsRng};
 use chacha20poly1305::{AeadCore, ChaCha20Poly1305, KeyInit};
@@ -90,71 +90,70 @@ pub async fn create_local_note(
 
             let now = crate::utils::get_time();
 
-           let crypto_meta = if encryption {
-    let cipher = ChaCha20Poly1305::new(&notes_key);
+            let crypto_meta = if encryption {
+                let cipher = ChaCha20Poly1305::new(&notes_key);
 
-    let title_nonce = ChaCha20Poly1305::generate_nonce(&mut OsRng);
+                let title_nonce = ChaCha20Poly1305::generate_nonce(&mut OsRng);
 
-    let encrypted_title = cipher
-        .encrypt(&title_nonce, title.as_bytes())
-        .context("failed to encrypt title")
-        .map_err(|err| {
-            tracing::error!(
-                task = "note creation",
-                status = "error",
-                %id,
-                error = ?err,
-                "failed to encrypt note title"
-            );
-            err
-        })?;
+                let encrypted_title = cipher
+                    .encrypt(&title_nonce, title.as_bytes())
+                    .context("failed to encrypt title")
+                    .map_err(|err| {
+                        tracing::error!(
+                            task = "note creation",
+                            status = "error",
+                            %id,
+                            error = ?err,
+                            "failed to encrypt note title"
+                        );
+                        err
+                    })?;
 
-    title = BASE64.encode(&encrypted_title);
+                title = BASE64.encode(&encrypted_title);
 
-    let content_nonce = ChaCha20Poly1305::generate_nonce(&mut OsRng);
+                let content_nonce = ChaCha20Poly1305::generate_nonce(&mut OsRng);
 
-    let encrypted_content = cipher
-        .encrypt(&content_nonce, &[][..])
-        .context("failed to encrypt empty note content")
-        .map_err(|err| {
-            tracing::error!(
-                task = "note creation",
-                status = "error",
-                %id,
-                error = ?err,
-                "failed to encrypt empty note content"
-            );
-            err
-        })?;
+                let encrypted_content = cipher
+                    .encrypt(&content_nonce, &[][..])
+                    .context("failed to encrypt empty note content")
+                    .map_err(|err| {
+                        tracing::error!(
+                            task = "note creation",
+                            status = "error",
+                            %id,
+                            error = ?err,
+                            "failed to encrypt empty note content"
+                        );
+                        err
+                    })?;
 
-    std::fs::write(&note_path, BASE64.encode(&encrypted_content))
-        .map_err(|err| {
-            tracing::error!(
-                task = "note creation",
-                status = "error",
-                %id,
-                error = ?err,
-                "failed to write encrypted note content"
-            );
+                std::fs::write(&note_path, BASE64.encode(&encrypted_content)).map_err(|err| {
+                    tracing::error!(
+                        task = "note creation",
+                        status = "error",
+                        %id,
+                        error = ?err,
+                        "failed to write encrypted note content"
+                    );
 
-            crate::errors::Error::FileOperationError(err.to_string())
-        })?;
+                    crate::errors::Error::FileOperationError(err.to_string())
+                })?;
 
-    let title_nonce = BASE64.encode(title_nonce.as_slice());
-    let content_nonce = BASE64.encode(content_nonce.as_slice());
+                let title_nonce = BASE64.encode(title_nonce.as_slice());
+                let content_nonce = BASE64.encode(content_nonce.as_slice());
 
-    NoteCryptoMetadata {
-        title_nonce,
-        summary_nonce: String::new(),
-        content_nonce,
-    }
-} else {
-    NoteCryptoMetadata {
-        title_nonce: String::new(),
-        summary_nonce: String::new(),
-        content_nonce: String::new(),
-    }
-};
+                NoteCryptoMetadata {
+                    title_nonce,
+                    summary_nonce: String::new(),
+                    content_nonce,
+                }
+            } else {
+                NoteCryptoMetadata {
+                    title_nonce: String::new(),
+                    summary_nonce: String::new(),
+                    content_nonce: String::new(),
+                }
+            };
 
             let string_crypto_meta = serde_json::to_string(&crypto_meta)
                 .context("failed to serialize crypto metadata")
@@ -220,9 +219,7 @@ pub async fn create_local_note(
                 "failed to create note file"
             );
 
-            Err(crate::errors::Error::FileOperationError(
-                err.to_string(),
-            ))
+            Err(crate::errors::Error::FileOperationError(err.to_string()))
         }
     }
 }
@@ -272,8 +269,7 @@ pub fn add_note_to_database(
         )
         .context("failed to insert note")?;
 
-        tx.commit()
-            .context("failed to commit note transaction")?;
+        tx.commit().context("failed to commit note transaction")?;
 
         Ok::<(), anyhow::Error>(())
     })();
@@ -287,10 +283,7 @@ pub fn add_note_to_database(
                 "note inserted successfully"
             );
 
-            crate::services::storage::note_utils::update_note_activity(
-                note.local_id,
-                notes_db,
-            )?;
+            crate::services::storage::note_utils::update_note_activity(note.local_id, notes_db)?;
 
             Ok(())
         }

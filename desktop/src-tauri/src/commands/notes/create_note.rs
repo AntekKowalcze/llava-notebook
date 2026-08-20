@@ -7,7 +7,6 @@ pub async fn create_note(
     synchronizing: bool,
     state: tauri::State<'_, AppState>,
 ) -> Result<Note, llava_core::Error> {
-
     if title.trim().is_empty() {
         return Err(llava_core::Error::NoteNameError);
     }
@@ -18,9 +17,7 @@ pub async fn create_note(
             .lock()
             .map_err(|_| llava_core::Error::LockError)?;
 
-        *guard
-            .as_ref()
-            .ok_or(llava_core::Error::LockError)?
+        *guard.as_ref().ok_or(llava_core::Error::LockError)?
     };
 
     let notes_path = {
@@ -36,24 +33,21 @@ pub async fn create_note(
             .clone()
     };
     let notes_key = {
-         let guard = state
+        let guard = state
             .notes_key
             .lock()
             .map_err(|_| llava_core::Error::LockError)?;
 
-        guard
-            .as_ref()
-            .ok_or(llava_core::Error::LockError)?
-            .clone()
+        guard.as_ref().ok_or(llava_core::Error::LockError)?.clone()
     };
 
-    let note = llava_core::storage::create_local_note(
-        title,
+    let mut note = llava_core::storage::create_local_note(
+        title.clone(),
         encryption,
         synchronizing,
         &user_id,
         &notes_path,
-        notes_key
+        notes_key,
     )
     .await?;
 
@@ -62,11 +56,10 @@ pub async fn create_note(
         .lock()
         .map_err(|_| llava_core::Error::LockError)?;
 
-    let db = db_guard
-        .as_mut()
-        .ok_or(llava_core::Error::LockError)?;
+    let db = db_guard.as_mut().ok_or(llava_core::Error::LockError)?;
 
     llava_core::storage::add_note_to_database(db, &note)?;
+    note.title = title;
 
     Ok(note)
 }

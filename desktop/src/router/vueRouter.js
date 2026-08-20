@@ -40,33 +40,38 @@ const routes = [
     },
     meta: { skipAuth: true },
   },
-{
-  path: '/main',
-  name: 'main',
-  component: () => import('../views/MainView.vue'),
-  children: [
-    {
-      path: '',
-      name: 'create',
-      component: () => import('../views/NoteCreationView.vue')
-    },
-    {
-      path: 'editor/:noteId',
-      name: 'editor',
-      component: () => import('../views/editor/editorView.vue'),
-    },
-    {
-      path: 'dashboard',
-      name: 'dashboard',
-      component: () => import('../views/DashboardView.vue'),
-    },
-    {
-      path: 'settings',
-      name: 'settings',
-      component: () => import('../views/SettingsView.vue'),
-    },
-  ],
-},
+  {
+    path: '/main',
+    name: 'main',
+    component: () => import('../views/MainView.vue'),
+    children: [
+      {
+        path: '',
+        name: 'create',
+        component: () => import('../views/NoteCreationView.vue'),
+      },
+      {
+        path: 'editor/:noteId',
+        name: 'editor',
+        component: () => import('../views/editor/editorView.vue'),
+      },
+      {
+        path: 'dashboard',
+        name: 'dashboard',
+        component: () => import('../views/DashboardView.vue'),
+      },
+      {
+        path: 'settings',
+        name: 'settings',
+        component: () => import('../views/SettingsView.vue'),
+      },
+      {
+        path: 'allNotes',
+        name: 'allNotes',
+        component: () => import('../views/AllNotesView.vue'),
+      },
+    ],
+  },
   {
     path: '/chooseRegisterForm',
     name: 'choose',

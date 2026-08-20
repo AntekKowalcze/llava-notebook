@@ -52,7 +52,7 @@ async function submitRegister() {
       toast.error('Settings not loaded. Try again.');
       return;
     }
-    console.log(userConfig.settingList + " to jest lista")
+    console.log(userConfig.settingList + ' to jest lista');
     userConfig.updateSettingValue('local.mode', 'off');
     await invoke<void>('register_user_online', {
       email: email.value,
@@ -69,17 +69,16 @@ async function submitRegister() {
     toast.success('successfully regisered and connected to online account');
     await router.replace('/main/');
   } catch (err: any) {
-    
     userConfig.updateSettingValue('local.mode', 'on');
     console.log(err);
     const errorKey =
       typeof err === 'string'
         ? err
         : typeof err?.error === 'string'
-        ? err.error
-        : typeof err?.message === 'string'
-        ? err.message
-        : null;
+          ? err.error
+          : typeof err?.message === 'string'
+            ? err.message
+            : null;
 
     if (errorKey === 'NoInternetConnection' || err?.NoInternetConnection) {
       toast.error('No internet connection');
@@ -145,24 +144,20 @@ async function submitRegister() {
         :content="'Submit'"
         @click="submitRegister"
       ></SubmitButton>
-      
+
       <RouterLink
         to="/login/online"
         class="mb-0 mt-8 text-note-ivory/80 hover:underline"
       >
         Do you have online account already? Login.
       </RouterLink>
-        
+
       <RouterLink
         to="/main/"
         class="mb-0 mt-4 text-note-ivory/80 hover:underline"
       >
         Cancel
       </RouterLink>
-      
-
-
-      
     </template>
     <LoadingCircle v-else></LoadingCircle>
   </FormCard>

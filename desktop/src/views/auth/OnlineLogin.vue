@@ -11,18 +11,18 @@ import { useOnlineAuthStore } from '../../stores/onlineAuth';
 import { useAuthStore } from '../../stores/auth';
 import { useUserConfigStore } from '../../stores/userConfig';
 const toast = useToast();
-const authStore = useAuthStore()
-const onlineAuthStore = useOnlineAuthStore()
+const authStore = useAuthStore();
+const onlineAuthStore = useOnlineAuthStore();
 const router = useRouter();
-const password = ref<string>("");
-const email = ref<string>("");
+const password = ref<string>('');
+const email = ref<string>('');
 const userConfig = useUserConfigStore();
 const loading = ref(false);
 const lockoutUntil = ref<number | null>(null);
 let lockoutTimer: ReturnType<typeof setTimeout> | null = null;
-  const emailPattern = new RegExp(
+const emailPattern = new RegExp(
   "^[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$",
-  "i"
+  'i'
 );
 const correctEmail = computed(() => {
   return emailPattern.test(email.value);
@@ -67,38 +67,38 @@ async function submitLogin() {
 
   loading.value = true;
   try {
-    console.log("in try clause")
+    console.log('in try clause');
     await userConfig.init();
     if (!userConfig.settingList) {
       toast.error('Settings not loaded. Try again.');
       return;
     }
-      console.log("after getting config ")
+    console.log('after getting config ');
 
     userConfig.updateSettingValue('local.mode', 'off');
-        console.log("setting updated")
+    console.log('setting updated');
 
     let online_user_id = await invoke<string>('login_online', {
       email: email.value,
       password: password.value,
       currentSettings: userConfig.settingList,
     });
-        console.log("connected")
+    console.log('connected');
 
     toast.success('Connected accounts successfully');
-    
+
     onlineAuthStore.$patch({
       loggedIn: true,
-      loggedInId: online_user_id
+      loggedInId: online_user_id,
     });
     authStore.$patch({
-      linked: true
-    })
+      linked: true,
+    });
 
-    await onlineAuthStore.fetchEmail()
+    await onlineAuthStore.fetchEmail();
     router.replace('/main/');
   } catch (err: any) {
-    console.log(err)
+    console.log(err);
     userConfig.updateSettingValue('local.mode', 'on');
     const timeout = extractTimeout(err);
     if (timeout !== null) {
@@ -138,7 +138,7 @@ function showTimeout(lengthMs: number) {
   const secs = totalSeconds % 60;
 
   toast.error(`🔒Account locked for ${minutes}m ${String(secs).padStart(2, '0')}s`, {
-    timeout: lengthMs
+    timeout: lengthMs,
   });
 }
 
@@ -170,19 +170,17 @@ onBeforeUnmount(() => {
       :content="'Submit'"
       @click="submitLogin"
     ></SubmitButton>
- <RouterLink
+    <RouterLink
       to="/register/online"
-      class="mt-12 text-note-ivory/80 hover:underline" 
-
+      class="mt-12 text-note-ivory/80 hover:underline"
     >
       Do you want to create online account?
     </RouterLink>
     <RouterLink
-      :to="'/main/settings'" 
+      :to="'/main/settings'"
       class="mt-4 text-note-ivory/80 hover:underline"
     >
       Return
     </RouterLink>
-   
   </FormCard>
 </template>

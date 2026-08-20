@@ -69,24 +69,23 @@ export const useUserConfigStore = defineStore('userConfig', () => {
   }
   function getValueBySettingId(sections: Section[], id: string): string {
     for (const section of sections) {
-        for (const setting of section.sectionSettings) {
-            if (setting.id === id) {
-                return setting.currentValue;
-            }
+      for (const setting of section.sectionSettings) {
+        if (setting.id === id) {
+          return setting.currentValue;
         }
+      }
 
-        if (section.subsections) {
-            const value = getValueBySettingId(section.subsections, id);
+      if (section.subsections) {
+        const value = getValueBySettingId(section.subsections, id);
 
-            if (value !== "ID NOT EXISTS") {
-                return value;
-            }
+        if (value !== 'ID NOT EXISTS') {
+          return value;
         }
+      }
     }
 
-    return "ID NOT EXISTS";
-}
+    return 'ID NOT EXISTS';
+  }
 
   return { config, settingList, isDefault, updateSettingValue, init, getValueBySettingId };
 });
-

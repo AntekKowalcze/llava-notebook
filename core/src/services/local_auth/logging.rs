@@ -855,7 +855,7 @@ pub async fn check_online_login(
 ) -> Result<AccessToken, crate::errors::Error> {
     if !utils::is_device_connected_to_server().await {
         return Err(crate::errors::Error::NoInternetConnection);
-    } 
+    }
     let entry: keyring::Entry =
         keyring::Entry::new("llava_desktop", &format!("refresh_token_id:{}", online_id))
             .map_err(|_| crate::errors::Error::NotLoggedIn)?;
@@ -867,7 +867,8 @@ pub async fn check_online_login(
         .post(format!("{}auth/refresh", SERVER_ADDRESS))
         .json(&req)
         .send()
-        .await.map_err(|_| crate::Error::ServerNotAvailable)?;
+        .await
+        .map_err(|_| crate::Error::ServerNotAvailable)?;
     if !response.status().is_success() {
         let status_code = response.status().as_u16();
         let body_text = response.text().await.unwrap_or_else(|_| String::new());

@@ -35,15 +35,13 @@
 //!   sensitive cryptographic material
 
 use anyhow::Context;
-use chacha20poly1305::{aead::OsRng};
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
+use chacha20poly1305::aead::OsRng;
 use chacha20poly1305::aead::{self, Aead};
-use rusqlite::{Connection, named_params};
 use chacha20poly1305::{AeadCore, KeyInit, Nonce};
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
-use serde::{Deserialize, Serialize};
 use chacha20poly1305::{ChaCha20Poly1305, Key};
-
-use crate::models::note;
+use rusqlite::{Connection, named_params};
+use serde::{Deserialize, Serialize};
 
 pub fn decrypt_note(
     notes_key: &Key,
@@ -129,7 +127,6 @@ pub fn decrypt_note(
     Ok(decrypted_content)
 }
 
-
 pub fn encrypt_data(
     notes_key: &Key,
     content: String,
@@ -144,8 +141,7 @@ pub fn encrypt_data(
 
     let cipher = ChaCha20Poly1305::new(notes_key);
 
-    let nonce =
-        ChaCha20Poly1305::generate_nonce(&mut aead::OsRng);
+    let nonce = ChaCha20Poly1305::generate_nonce(&mut aead::OsRng);
 
     let encrypted_data = cipher
         .encrypt(&nonce, content.as_bytes())
@@ -180,7 +176,6 @@ pub fn encrypt_data(
     Ok(encrypted_string)
 }
 
-
 fn get_current_crypto_metadata(
     note_id: &str,
     notes_db: &Connection,
@@ -211,19 +206,18 @@ fn get_current_crypto_metadata(
             e
         })?;
 
-    let crypto_meta: NoteCryptoMetadata =
-        serde_json::from_str(&crypto_meta_json)
-            .context("failed to parse crypto_meta")
-            .map_err(|e| {
-                tracing::error!(
-                    task = "get crypto metadata",
-                    status = "error",
-                    %note_id,
-                    error = ?e,
-                    "failed to parse crypto metadata"
-                );
-                e
-            })?;
+    let crypto_meta: NoteCryptoMetadata = serde_json::from_str(&crypto_meta_json)
+        .context("failed to parse crypto_meta")
+        .map_err(|e| {
+            tracing::error!(
+                task = "get crypto metadata",
+                status = "error",
+                %note_id,
+                error = ?e,
+                "failed to parse crypto metadata"
+            );
+            e
+        })?;
 
     tracing::debug!(
         task = "get crypto metadata",
@@ -235,14 +229,12 @@ fn get_current_crypto_metadata(
     Ok(crypto_meta)
 }
 
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NoteCryptoMetadata {
     pub title_nonce: String,
     pub summary_nonce: String,
     pub content_nonce: String,
 }
-
 
 pub fn encrypt_title(
     notes_key: &Key,
@@ -286,9 +278,12 @@ pub fn encrypt_title(
     Ok(BASE64.encode(encrypted_data))
 }
 
-
-pub fn decrypt_title(note_id:&str, notes_key: &Key, notes_db: &Connection) -> Result<String, crate::errors::Error>{ 
-   tracing::debug!(
+pub fn decrypt_title(
+    note_id: &str,
+    notes_key: &Key,
+    notes_db: &Connection,
+) -> Result<String, crate::errors::Error> {
+    tracing::debug!(
         task = "decrypt title",
         %note_id,
         "starting title decryption"
@@ -311,14 +306,16 @@ pub fn decrypt_title(note_id:&str, notes_key: &Key, notes_db: &Connection) -> Re
             );
             e
         })?;
-    let title = notes_db.query_row("SELECT title FROM notes WHERE local_id = :note_id", named_params! {":note_id": note_id}, |row| 
-{
-    let title:String = row.get(0)?;
-    Ok(title)
-}
-
-).context("Failed to get title from database")?;
-
+    let title = notes_db
+        .query_row(
+            "SELECT title FROM notes WHERE local_id = :note_id",
+            named_params! {":note_id": note_id},
+            |row| {
+                let title: String = row.get(0)?;
+                Ok(title)
+            },
+        )
+        .context("Failed to get title from database")?;
 
     let content = BASE64
         .decode(title)
@@ -372,11 +369,7 @@ pub fn decrypt_title(note_id:&str, notes_key: &Key, notes_db: &Connection) -> Re
     );
 
     Ok(decrypted_content)
-
-
-
 }
-
 
 pub fn update_title_metadata(
     notes_db: &Connection,
@@ -391,14 +384,9 @@ pub fn update_title_metadata(
 
     let mut crypto_meta = get_current_crypto_metadata(note_id, notes_db)?;
 
-    crypto_meta.title_nonce =
-        BASE64.encode(nonce.as_slice());
+    crypto_meta.title_nonce = BASE64.encode(nonce.as_slice());
 
-    save_crypto_metadata(
-        notes_db,
-        &crypto_meta,
-        note_id,
-    )?;
+    save_crypto_metadata(notes_db, &crypto_meta, note_id)?;
 
     tracing::debug!(
         task = "update title metadata",
@@ -409,7 +397,6 @@ pub fn update_title_metadata(
 
     Ok(())
 }
-
 
 fn save_crypto_metadata(
     notes_db: &Connection,
@@ -422,19 +409,18 @@ fn save_crypto_metadata(
         "saving crypto metadata"
     );
 
-    let string_crypto_meta =
-        serde_json::to_string(crypto_meta)
-            .context("failed to serialize crypto_meta")
-            .map_err(|e| {
-                tracing::error!(
-                    task = "save crypto metadata",
-                    status = "error",
-                    %note_id,
-                    error = ?e,
-                    "failed to serialize crypto metadata"
-                );
-                e
-            })?;
+    let string_crypto_meta = serde_json::to_string(crypto_meta)
+        .context("failed to serialize crypto_meta")
+        .map_err(|e| {
+            tracing::error!(
+                task = "save crypto metadata",
+                status = "error",
+                %note_id,
+                error = ?e,
+                "failed to serialize crypto metadata"
+            );
+            e
+        })?;
 
     notes_db
         .execute(

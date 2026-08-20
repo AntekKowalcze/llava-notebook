@@ -1,23 +1,23 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
-import {
-  X,
-  Plus,
-  Tag,
-  Check,
-  Trash2
-} from 'lucide-vue-next';
-
+import { X, Plus, Tag, Check, Trash2 } from 'lucide-vue-next';
+import { emit as emitTauri } from '@tauri-apps/api/event';
 interface UiTag {
   tag_id: string;
   name: string;
   color: string;
 }
 
-const props = defineProps<{
-  noteId: string;
-}>();
+const props = withDefaults(
+  defineProps<{
+    noteId: string;
+    showBackdrop?: boolean;
+  }>(),
+  {
+    showBackdrop: true,
+  }
+);
 
 const emit = defineEmits<{
   close: [];
@@ -45,12 +45,9 @@ async function loadTags() {
   try {
     tags.value = await invoke<UiTag[]>('get_all_tags');
 
-    noteTags.value = await invoke<UiTag[]>(
-      'get_all_tags_for_note',
-      {
-        noteId: props.noteId
-      }
-    );
+    noteTags.value = await invoke<UiTag[]>('get_all_tags_for_note', {
+      noteId: props.noteId,
+    });
   } catch (err) {
     console.error('Failed to load tags:', err);
     error.value = 'Failed to load tags';
@@ -60,9 +57,7 @@ async function loadTags() {
 }
 
 function hasTag(tag: UiTag) {
-  return noteTags.value.some(
-    (item) => item.tag_id === tag.tag_id
-  );
+  return noteTags.value.some((item) => item.tag_id === tag.tag_id);
 }
 
 async function toggleTag(tag: UiTag) {
@@ -72,23 +67,22 @@ async function toggleTag(tag: UiTag) {
     if (hasTag(tag)) {
       await invoke('remove_tag_from_note', {
         noteId: props.noteId,
-        tagName: tag.name
+        tagName: tag.name,
       });
 
-      noteTags.value = noteTags.value.filter(
-        (item) => item.tag_id !== tag.tag_id
-      );
+      noteTags.value = noteTags.value.filter((item) => item.tag_id !== tag.tag_id);
     } else {
       await invoke('add_tag_to_note', {
         noteId: props.noteId,
         tagName: tag.name,
-        tagColor: tag.color
+        tagColor: tag.color,
       });
 
       noteTags.value.push(tag);
     }
 
     emit('changed');
+    await emitTauri('tags_changed');
   } catch (err) {
     console.error('Failed to update tag:', err);
     error.value = 'Failed to update tag';
@@ -108,7 +102,7 @@ async function createTag() {
     await invoke('add_tag_to_note', {
       noteId: props.noteId,
       tagName: name,
-      tagColor: newTagColor.value
+      tagColor: newTagColor.value,
     });
 
     newTag.value = '';
@@ -117,6 +111,7 @@ async function createTag() {
     await loadTags();
 
     emit('changed');
+    await emitTauri('tags_changed');
   } catch (err) {
     console.error('Failed to create tag:', err);
     error.value = 'Failed to create tag';
@@ -129,29 +124,29 @@ async function removeTag(tag: UiTag) {
 
   try {
     await invoke('remove_tag', {
-      tagId: tag.tag_id
+      tagId: tag.tag_id,
     });
 
-    tags.value = tags.value.filter(
-      (item) => item.tag_id !== tag.tag_id
-    );
+    tags.value = tags.value.filter((item) => item.tag_id !== tag.tag_id);
 
-    noteTags.value = noteTags.value.filter(
-      (item) => item.tag_id !== tag.tag_id
-    );
+    noteTags.value = noteTags.value.filter((item) => item.tag_id !== tag.tag_id);
 
     emit('changed');
+    await emitTauri('tags_changed');
   } catch (err) {
-    console.error('Failed to remove tag:', err);
-    error.value = 'Failed to remove tag';
+    console.log(err);
+    error.value = 'Failed to remove a tag';
   }
 }
 </script>
 
 <template>
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm"
-    @click.self="emit('close')"
+    class="fixed inset-0 z-50 flex items-center justify-center"
+    :class="{
+      'bg-black/55 backdrop-blur-sm': props.showBackdrop,
+    }"
+    @click.self="props.showBackdrop && emit('close')"
   >
     <div
       class="relative w-[420px] overflow-hidden rounded-xl border border-white/10 bg-note-graphite/95 shadow-2xl shadow-black/60 backdrop-blur-xl"
@@ -166,9 +161,7 @@ async function removeTag(tag: UiTag) {
       />
 
       <!-- header -->
-      <div
-        class="relative flex items-center justify-between border-b border-white/10 px-5 py-4"
-      >
+      <div class="relative flex items-center justify-between border-b border-white/10 px-5 py-4">
         <div class="flex items-center gap-3">
           <div
             class="flex h-8 w-8 items-center justify-center rounded-lg border border-note-glow/20 bg-note-glow/10 text-note-glow"
@@ -177,13 +170,9 @@ async function removeTag(tag: UiTag) {
           </div>
 
           <div>
-            <h2 class="text-sm font-medium text-note-ivory">
-              Edit tags
-            </h2>
+            <h2 class="text-sm font-medium text-note-ivory">Edit tags</h2>
 
-            <p class="mt-0.5 text-[11px] text-note-pumice/50">
-              Organize this note with tags
-            </p>
+            <p class="mt-0.5 text-[11px] text-note-pumice/50">Organize this note with tags</p>
           </div>
         </div>
 
@@ -202,9 +191,7 @@ async function removeTag(tag: UiTag) {
           v-if="noteTags.length"
           class="mb-4"
         >
-          <div
-            class="mb-2 text-[10px] font-medium uppercase tracking-wider text-note-pumice/40"
-          >
+          <div class="mb-2 text-[10px] font-medium uppercase tracking-wider text-note-pumice/40">
             Selected
           </div>
 
@@ -216,7 +203,7 @@ async function removeTag(tag: UiTag) {
               :style="{
                 color: tag.color,
                 borderColor: `${tag.color}35`,
-                backgroundColor: `${tag.color}12`
+                backgroundColor: `${tag.color}12`,
               }"
             >
               <span>#{{ tag.name }}</span>
@@ -234,9 +221,7 @@ async function removeTag(tag: UiTag) {
 
         <!-- all tags -->
         <div>
-          <div
-            class="mb-2 text-[10px] font-medium uppercase tracking-wider text-note-pumice/40"
-          >
+          <div class="mb-2 text-[10px] font-medium uppercase tracking-wider text-note-pumice/40">
             Tags
           </div>
 
@@ -262,11 +247,7 @@ async function removeTag(tag: UiTag) {
               v-for="tag in tags"
               :key="tag.tag_id"
               class="group flex items-center gap-2 rounded-lg px-2.5 py-2 transition"
-              :class="
-                hasTag(tag)
-                  ? 'bg-white/5'
-                  : 'hover:bg-white/5'
-              "
+              :class="hasTag(tag) ? 'bg-white/5' : 'hover:bg-white/5'"
             >
               <button
                 class="flex min-w-0 flex-1 items-center gap-2 text-left"
@@ -279,11 +260,11 @@ async function removeTag(tag: UiTag) {
                       ? {
                           borderColor: `${tag.color}60`,
                           backgroundColor: `${tag.color}20`,
-                          color: tag.color
+                          color: tag.color,
                         }
                       : {
                           borderColor: 'rgba(255,255,255,0.1)',
-                          backgroundColor: 'rgba(255,255,255,0.03)'
+                          backgroundColor: 'rgba(255,255,255,0.03)',
                         }
                   "
                 >
@@ -313,9 +294,7 @@ async function removeTag(tag: UiTag) {
 
         <!-- create -->
         <div class="mt-4 border-t border-white/5 pt-4">
-          <div
-            class="mb-2 text-[10px] font-medium uppercase tracking-wider text-note-pumice/40"
-          >
+          <div class="mb-2 text-[10px] font-medium uppercase tracking-wider text-note-pumice/40">
             Create tag
           </div>
 
@@ -341,7 +320,7 @@ async function removeTag(tag: UiTag) {
             <label
               class="relative flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/20 transition hover:border-white/20"
               :style="{
-                boxShadow: `0 0 14px ${newTagColor}20`
+                boxShadow: `0 0 14px ${newTagColor}20`,
               }"
             >
               <input
@@ -369,9 +348,7 @@ async function removeTag(tag: UiTag) {
 
           <!-- color preview -->
           <div class="mt-2 flex items-center gap-2">
-            <span class="text-[10px] text-note-pumice/30">
-              Color
-            </span>
+            <span class="text-[10px] text-note-pumice/30">Color</span>
 
             <span
               class="text-[10px]"
@@ -400,12 +377,8 @@ async function removeTag(tag: UiTag) {
       </div>
 
       <!-- footer -->
-      <div
-        class="flex items-center justify-between border-t border-white/10 bg-black/10 px-5 py-3"
-      >
-        <span class="text-[10px] text-note-pumice/30">
-          {{ noteTags.length }} selected
-        </span>
+      <div class="flex items-center justify-between border-t border-white/10 bg-black/10 px-5 py-3">
+        <span class="text-[10px] text-note-pumice/30">{{ noteTags.length }} selected</span>
 
         <button
           class="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-note-pumice transition hover:bg-white/10 hover:text-note-ivory"

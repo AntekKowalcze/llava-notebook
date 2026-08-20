@@ -13,9 +13,6 @@
 use serde::Serialize;
 use thiserror::Error;
 
-
-
-
 #[derive(Debug, Error, Serialize, Clone)]
 pub enum Error {
     #[error("Password didn't pass validation")]
@@ -95,7 +92,7 @@ pub enum Error {
 
     #[error("Invalid tag name")]
     InvalidTagName,
-    
+
     #[error("Tag already exists")]
     TagAlreadyExists,
 
@@ -107,8 +104,6 @@ pub enum Error {
 
     #[error("Internal error: {0}")]
     InternalError(String),
-
-
 }
 
 impl From<std::io::Error> for Error {

@@ -24,7 +24,6 @@ const onlineAuthStore = useOnlineAuthStore();
 const router = useRouter();
 const userConfigStore = useUserConfigStore();
 const { settingList, isDefault } = storeToRefs(userConfigStore);
-
 const cardSettingsIdList: string[] = [
   'local.mode',
   'local.encryption',
@@ -195,10 +194,11 @@ async function handleUpdate(id: string) {
         });
         userConfigStore.settingList = null;
         onlineAuthStore.$patch({
-          loggedIn:false,
+          loggedIn: false,
           loggedInEmail: null,
-          loggedInId: null
-        })
+          loggedInId: null,
+        });
+
         toast.success('logged out successfully');
 
         router.replace('/');
@@ -278,8 +278,9 @@ async function handleUpdate(id: string) {
         onlineAuthStore.$patch({
           loggedIn: false,
           loggedInEmail: null,
-          loggedInId: null
-        })
+          loggedInId: null,
+        });
+        authStore.linked = false;
         toast.success('Disconnected online account from local account successfully');
       } catch (err: any) {
         console.log(err);
@@ -296,15 +297,15 @@ async function handleUpdate(id: string) {
       break;
     }
     case 'online.register': {
-      router.replace({name: "registerOnline"})
+      router.replace({ name: 'registerOnline' });
       try {
-      } catch (err) { }
+      } catch (err) {}
       break;
     }
     case 'online.login': {
-        router.replace({ name: "loginOnline", query: { origin: 'settings' } })
+      router.replace({ name: 'loginOnline', query: { origin: 'settings' } });
       try {
-      } catch (err) { }
+      } catch (err) {}
       break;
     }
   }
@@ -417,27 +418,42 @@ function handleUsernameCancel() {
 </script>
 
 <template>
-<div class="relative flex h-full min-h-0 flex-col overflow-hidden px-[10%]">
-<ArrowBigLeftDash
+  <div class="relative flex h-full min-h-0 flex-col overflow-hidden px-[10%]">
+    <ArrowBigLeftDash
       class="absolute left-[2%] top-[93%] text-note-paprika/80 transition-transform duration-200 hover:scale-95"
-      @click="redirect" />
+      @click="redirect"
+    />
 
-    <LogPreview v-if="showLogs" class="absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]"
-      :log-content="logContents" @close-logs="closeLogs()"></LogPreview>
+    <LogPreview
+      v-if="showLogs"
+      class="absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]"
+      :log-content="logContents"
+      @close-logs="closeLogs()"
+    ></LogPreview>
 
-    <PasswordInput :loading="codesLoading" v-if="showPasswordInput"
-      class="absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]" @submit-password="handlePassword"
-      @cancel-password="handlePasswordCancel"></PasswordInput>
+    <PasswordInput
+      :loading="codesLoading"
+      v-if="showPasswordInput"
+      class="absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]"
+      @submit-password="handlePassword"
+      @cancel-password="handlePasswordCancel"
+    ></PasswordInput>
 
-    <ChangeUsername :loading="usernameLoading" v-if="showUsernameInput"
-      class="absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]" @submit-username="handleUsername"
-      @cancel-username="handleUsernameCancel"></ChangeUsername>
+    <ChangeUsername
+      :loading="usernameLoading"
+      v-if="showUsernameInput"
+      class="absolute left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]"
+      @submit-username="handleUsername"
+      @cancel-username="handleUsernameCancel"
+    ></ChangeUsername>
 
     <header class="shrink-0 pb-4 pt-8">
       <div class="flex items-start justify-between gap-8">
         <div class="flex h-[27vh] min-h-60 flex-col justify-between">
           <div class="flex flex-col">
-            <h1 class="text-4xl font-semibold tracking-tight text-note-ivory lg:text-5xl xl:text-6xl">
+            <h1
+              class="text-4xl font-semibold tracking-tight text-note-ivory lg:text-5xl xl:text-6xl"
+            >
               Settings of
               <span class="text-note-paprika">{{ username }}</span>
             </h1>
@@ -445,20 +461,28 @@ function handleUsernameCancel() {
           </div>
 
           <span
-            class="flex h-10 w-80 items-center rounded-md border-2 border-note-pumice/50 bg-black/40 p-2 transition duration-1000 ease-out focus-within:border-note-paprika/80 focus-within:bg-black/60">
+            class="flex h-10 w-80 items-center rounded-md border-2 border-note-pumice/50 bg-black/40 p-2 transition duration-1000 ease-out focus-within:border-note-paprika/80 focus-within:bg-black/60"
+          >
             <input
               class="w-[90%] select-none bg-note-graphite text-note-ivory outline-none transition duration-1000 ease-out placeholder:text-note-pumice/70 focus:border-transparent focus:bg-black/50 focus:shadow-none focus:outline-none focus:ring-0"
-              type="text" placeholder="Search..." @input="search" @blur="handleBlur" v-model="searchText"
-              @focus="hide" />
+              type="text"
+              placeholder="Search..."
+              @input="search"
+              @blur="handleBlur"
+              v-model="searchText"
+              @focus="hide"
+            />
             <Search class="ml-2 shrink-0 text-note-paprika" />
           </span>
         </div>
 
         <div
-          class="flex h-[27vh] min-h-60 w-[28%] min-w-56 shrink-0 flex-col rounded-xl border border-note-pumice/20 bg-note-graphite/80 px-4 py-4">
+          class="flex h-[27vh] min-h-60 w-[28%] min-w-56 shrink-0 flex-col rounded-xl border border-note-pumice/20 bg-note-graphite/80 px-4 py-4"
+        >
           <div class="mb-4 flex items-center gap-2">
             <div
-              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-note-paprika/20 text-note-glow">
+              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-note-paprika/20 text-note-glow"
+            >
               <InfoIcon class="h-4 w-4" />
             </div>
             <div class="flex min-w-0 flex-col">
@@ -470,13 +494,20 @@ function handleUsernameCancel() {
           </div>
 
           <div
-            class="flex flex-1 flex-col justify-between overflow-hidden rounded-lg border border-note-pumice/10 bg-black/40 px-3 py-2">
-            <button v-for="setting in cardSettings" :key="setting.id" type="button"
-              class="flex w-full items-center rounded-md px-2 py-1.5 text-xs text-note-pumice/80 transition-colors hover:bg-black/50 hover:text-note-ivory">
+            class="flex flex-1 flex-col justify-between overflow-hidden rounded-lg border border-note-pumice/10 bg-black/40 px-3 py-2"
+          >
+            <button
+              v-for="setting in cardSettings"
+              :key="setting.id"
+              type="button"
+              class="flex w-full items-center rounded-md px-2 py-1.5 text-xs text-note-pumice/80 transition-colors hover:bg-black/50 hover:text-note-ivory"
+            >
               <span class="flex flex-1 justify-start">{{ setting.label }}</span>
               <span class="flex flex-1 justify-center">{{ setting.currentValue }}</span>
-              <span @click="goToSetting(setting.id)"
-                class="flex flex-1 justify-end text-[11px] uppercase tracking-wide text-note-paprika">
+              <span
+                @click="goToSetting(setting.id)"
+                class="flex flex-1 justify-end text-[11px] uppercase tracking-wide text-note-paprika"
+              >
                 go to setting
               </span>
             </button>
@@ -485,28 +516,42 @@ function handleUsernameCancel() {
       </div>
     </header>
 
-    <ScreenDeviderHorizontal class="shrink-0 mt-6" />
+    <ScreenDeviderHorizontal class="mt-6 shrink-0" />
 
     <div class="mb-2 mt-4 flex shrink-0">
-      <Funnel class="text-note-pumice/90 transition duration-500 ease-out hover:text-note-paprika"
-        @click="showFilters" />
+      <Funnel
+        class="text-note-pumice/90 transition duration-500 ease-out hover:text-note-paprika"
+        @click="showFilters"
+      />
       <template v-if="showFilter">
-        <div v-for="filter in filters" :key="filter" class="ml-4 flex h-fit w-44 border-note-ivory">
-          <CheckboxInput :checked="getElementVisibility(settingList?.sections, filter) ?? true" :id="filter"
+        <div
+          v-for="filter in filters"
+          :key="filter"
+          class="ml-4 flex h-fit w-44 border-note-ivory"
+        >
+          <CheckboxInput
+            :checked="getElementVisibility(settingList?.sections, filter) ?? true"
+            :id="filter"
             @visibility-changed="
               (id, value) => {
                 handleVisibilityChange(id, value);
               }
-            "></CheckboxInput>
+            "
+          ></CheckboxInput>
         </div>
       </template>
     </div>
 
-  <main class="mb-4 mt-4 flex min-h-0 flex-1 flex-col gap-4">
-  <div
-    class="scrollbar-none min-h-0 flex-1 overflow-y-auto rounded-xl border border-note-pumice/40 bg-black/40 p-4"
-  > <SectionComp v-if="settingList" v-for="section in settingList.sections" :section="section"
-          @setting-changed="handleChange"></SectionComp>
+    <main class="mb-4 mt-4 flex min-h-0 flex-1 flex-col gap-4">
+      <div
+        class="scrollbar-none min-h-0 flex-1 overflow-y-auto rounded-xl border border-note-pumice/40 bg-black/40 p-4"
+      >
+        <SectionComp
+          v-if="settingList"
+          v-for="section in settingList.sections"
+          :section="section"
+          @setting-changed="handleChange"
+        ></SectionComp>
       </div>
     </main>
   </div>

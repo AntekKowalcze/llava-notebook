@@ -13,7 +13,7 @@ import { useToast } from 'vue-toastification';
 import TinyError from '../../components/auth/forms/TinyError.vue';
 import LoadingCircle from '../../components/main/LoadingCircle.vue';
 const authStore = useAuthStore();
-const loading = ref<boolean>(false)
+const loading = ref<boolean>(false);
 const username = authStore.loggedInUsername;
 const router = useRouter();
 const password = ref<string>('');
@@ -28,7 +28,7 @@ const canSubmit = computed(() => {
 });
 async function changePassword() {
   try {
-    loading.value = true
+    loading.value = true;
     await invoke<void>('change_password', {
       username,
       password: password.value,
@@ -36,11 +36,11 @@ async function changePassword() {
       code: authStore.pendingCode,
     });
     authStore.$patch({ pendingCode: null });
-    loading.value = false
+    loading.value = false;
     toast.success('Password changed sucessfully');
     router.replace({ name: 'create' });
   } catch (err) {
-    loading.value = false
+    loading.value = false;
     toast.error('error while chaning password');
   }
 }
@@ -51,30 +51,30 @@ async function changePassword() {
     header-text="Change password"
     sub-text=""
   >
-  <template v-if="!loading">
-    <TextInput
-      v-model:isValid="isPasswordValid"
-      :placeholder="'password'"
-      :type="InputTypes.Password"
-      :name="'password'"
-      v-model="password"
-      show-validation
-    ></TextInput>
-    <TextInput
-      :placeholder="'repeat password'"
-      :type="InputTypes.Password"
-      :name="'repeatPassword'"
-      v-model="repeatPassword"
-    ></TextInput>
-    <TinyError
-      v-if="repeatPassword && !passwordsMatch"
-      error-content="Passwords do not match!"
-    ></TinyError>
-    <SubmitButton
-      :disabled="!canSubmit"
-      :content="'Submit'"
-      @click="changePassword"
-    ></SubmitButton>
+    <template v-if="!loading">
+      <TextInput
+        v-model:isValid="isPasswordValid"
+        :placeholder="'password'"
+        :type="InputTypes.Password"
+        :name="'password'"
+        v-model="password"
+        show-validation
+      ></TextInput>
+      <TextInput
+        :placeholder="'repeat password'"
+        :type="InputTypes.Password"
+        :name="'repeatPassword'"
+        v-model="repeatPassword"
+      ></TextInput>
+      <TinyError
+        v-if="repeatPassword && !passwordsMatch"
+        error-content="Passwords do not match!"
+      ></TinyError>
+      <SubmitButton
+        :disabled="!canSubmit"
+        :content="'Submit'"
+        @click="changePassword"
+      ></SubmitButton>
     </template>
     <LoadingCircle v-else></LoadingCircle>
     <RouterLink

@@ -19,7 +19,7 @@ pub fn change_state_after_login(
         .notes_db
         .lock()
         .map_err(|_| anyhow!("Couldnt edit notes db in state"))? = Some(notes_conn);
-  
+
     *state
         .paths
         .lock()

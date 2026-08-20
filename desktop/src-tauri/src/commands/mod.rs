@@ -1,10 +1,11 @@
+pub mod all_notes_view;
 mod command_helpers;
 pub mod dashboard;
 pub mod handlers;
 pub mod local_auth;
+pub mod notes;
 pub mod online_auth;
 pub mod settings;
-pub mod utils;
-pub mod notes;
 pub mod sliding_panel;
 pub mod tags;
+pub mod utils;

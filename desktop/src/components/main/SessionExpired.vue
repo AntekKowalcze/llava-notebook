@@ -22,11 +22,11 @@ const email = ref('');
 const password = ref('');
 const loading = ref<boolean>(false);
 const emailPattern =
-  /[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?/ ;
+  /[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?/;
 
-const isDisabled = computed(()=> {
+const isDisabled = computed(() => {
   return !emailPattern.test(email.value);
-})
+});
 //await window.__TAURI__.event.emit('online_session_expired', null) then implement timeuot handling on login, and implememnt logging online, after loging with code, and add register to settings then implement no internet, no server connection handling and add error hadling to this
 function clearFields() {
   email.value = '';
@@ -74,7 +74,7 @@ async function submit() {
     onlineAuthStore.setSessionExpired(false);
     clearFields();
   } catch (err: unknown) {
-    console.log(err)
+    console.log(err);
     // TODO online login is not implemented in full spec because of key manipulatino
     const message = getErrorText(err).toLowerCase();
     if (message.includes('wrong password')) {
@@ -168,4 +168,3 @@ watch(
     </div>
   </div>
 </template>
-

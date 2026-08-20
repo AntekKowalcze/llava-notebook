@@ -26,11 +26,10 @@ export const useOnlineAuthStore = defineStore('onlineAuth', () => {
     await fetchEmail();
   });
 
-
   function setSessionExpired(value: boolean) {
     sessionExpired.value = value;
   }
-  
+
   return {
     loggedIn,
     loggedInEmail,

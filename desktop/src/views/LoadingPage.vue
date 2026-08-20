@@ -24,13 +24,13 @@ async function logout() {
       loggedInUsername: null,
       loggedInUserId: null,
     });
-        userConfigStore.settingList = null;
+    userConfigStore.settingList = null;
 
     onlineAuthStore.$patch({
       loggedIn: false,
       loggedInEmail: null,
-      loggedInId: null
-    })
+      loggedInId: null,
+    });
 
     toast.success('logged out successfully');
     router.replace('/');
@@ -70,6 +70,12 @@ async function logout() {
       }
     "
   ></SubmitButton>
-  <UserRoundCheck class="text-note-ivory" v-if="onlineAuthStore.loggedIn"></UserRoundCheck>
-  <UserRoundX class="text-note-ivory" v-else></UserRoundX>
+  <UserRoundCheck
+    class="text-note-ivory"
+    v-if="onlineAuthStore.loggedIn"
+  ></UserRoundCheck>
+  <UserRoundX
+    class="text-note-ivory"
+    v-else
+  ></UserRoundX>
 </template>
