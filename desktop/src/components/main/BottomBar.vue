@@ -175,7 +175,7 @@ function formatTimeAgo(timestamp: number, currentTime: number): string {
         v-if="connected"
       >
         <Cloud :size="12" />
-        <span>Online</span>
+        <span>Online mode</span>
       </div>
 
       <!-- offline -->
@@ -184,7 +184,7 @@ function formatTimeAgo(timestamp: number, currentTime: number): string {
         v-else
       >
         <CloudOff :size="12" />
-        <span>Offline</span>
+        <span>No connection</span>
       </div>
 
       <div class="h-3 w-px bg-white/10" />

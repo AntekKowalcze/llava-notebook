@@ -1,8 +1,8 @@
-pub mod all_notes_view;
 mod command_helpers;
 pub mod dashboard;
 pub mod handlers;
 pub mod local_auth;
+pub mod note_managing_views;
 pub mod notes;
 pub mod online_auth;
 pub mod settings;

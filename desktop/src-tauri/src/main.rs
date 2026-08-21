@@ -116,9 +116,12 @@ pub fn main() {
             commands::tags::tags::get_all_tags_for_note,
             commands::tags::tags::remove_tag,
             commands::notes::note_operations::change_note_title,
-            commands::all_notes_view::get_all_notes_data,
+            commands::note_managing_views::get_all_notes_data,
             commands::notes::note_operations::toggle_note_encryption,
             commands::notes::note_operations::remove_note,
+            commands::notes::note_operations::hard_delete_note,
+            commands::notes::note_operations::restore_note,
+            commands::note_managing_views::get_all_removed_notes_data,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

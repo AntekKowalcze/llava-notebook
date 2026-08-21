@@ -137,7 +137,7 @@ fn creating_tables(
     Ok(notes_db)
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq)]
 pub enum SyncState {
     LocalOnly,
     PendingUpload,
@@ -145,6 +145,7 @@ pub enum SyncState {
     Conflict,
     Error,
     PendingDeleted,
+    WaitingForTombstone,
 }
 
 impl rusqlite::ToSql for SyncState {
@@ -156,6 +157,7 @@ impl rusqlite::ToSql for SyncState {
             Self::Conflict => "Conflict",
             Self::Error => "Error",
             Self::PendingDeleted => "PendingDeleted",
+            Self::WaitingForTombstone => "WaitingForTombstone",
         };
         Ok(rusqlite::types::ToSqlOutput::from(s))
     }
@@ -170,6 +172,7 @@ impl rusqlite::types::FromSql for SyncState {
             "Conflict" => Ok(SyncState::Conflict),
             "Error" => Ok(SyncState::Error),
             "PendingDeleted" => Ok(SyncState::PendingDeleted),
+            "WaitingForTombstone" => Ok(SyncState::WaitingForTombstone),
             _ => Err(rusqlite::types::FromSqlError::InvalidType),
         }
     }

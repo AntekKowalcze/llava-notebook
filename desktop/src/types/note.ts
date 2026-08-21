@@ -22,4 +22,10 @@ export interface Note {
 }
 
 export type SyncState =
-  'Synced' | 'PendingUpload' | 'PendingDownload' | 'Conflict' | 'Error' | 'LocalOnly';
+  | 'Synced'
+  | 'PendingUpload'
+  | 'PendingDownload'
+  | 'Conflict'
+  | 'Error'
+  | 'LocalOnly'
+  | 'WaitingForTombstone';

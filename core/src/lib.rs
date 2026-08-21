@@ -31,7 +31,9 @@ pub mod storage {
     pub use crate::services::storage::init_note::create_local_note;
     pub use crate::services::storage::note_operations::get_note_struct;
     pub use crate::services::storage::note_operations::get_title;
+    pub use crate::services::storage::note_operations::hard_delete_note;
     pub use crate::services::storage::note_operations::remove_note;
+    pub use crate::services::storage::note_operations::restore_deleted_note;
     pub use crate::services::storage::note_operations::update_title;
     pub use crate::services::storage::note_operations::{
         check_if_note_is_encrypted, get_note, get_note_content, toggle_note_encryption,
@@ -92,6 +94,12 @@ pub use utils::{
 };
 
 pub mod note_stats {
-    pub use crate::services::storage::all_notes::NoteCard;
-    pub use crate::services::storage::all_notes::get_all_notes_data;
+    pub use crate::services::storage::note_managing::NoteCard;
+    pub use crate::services::storage::note_managing::RemovedNote;
+    pub use crate::services::storage::note_managing::get_all_notes_data;
+    pub use crate::services::storage::note_managing::get_all_removed_notes_data;
+}
+
+pub mod clean {
+    pub use crate::services::cleaner::hard_deletes_terminated_notes;
 }

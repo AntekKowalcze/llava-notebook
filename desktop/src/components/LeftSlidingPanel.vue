@@ -7,7 +7,8 @@ import { useLayoutStore } from '../stores/layoutStore';
 import { useRouter } from 'vue-router';
 import ScreenDeviderHorizontal from './dashboard/ScreenDeviderHorizontal.vue';
 import IconComponent from './main/IconComponent.vue';
-import { ArrowRight } from 'lucide-vue-next';
+import { ArrowRight, Trash2 } from 'lucide-vue-next';
+
 const layout = useLayoutStore();
 const router = useRouter();
 const userConfig = useUserConfigStore();
@@ -70,6 +71,9 @@ function redirectToNote(noteId: string) {
 
 function seeAllNotes() {
   router.push({ name: 'allNotes' });
+}
+function seeRemovedNotes() {
+  router.push({ name: 'removed' });
 }
 </script>
 
@@ -183,9 +187,19 @@ function seeAllNotes() {
     <div class="items center flex w-full justify-center text-note-ivory/90">
       <button
         class="group inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-note-ivory/75 transition-all duration-200 hover:bg-note-pumice/5 hover:text-note-ivory active:scale-95"
+        @click="seeRemovedNotes()"
+      >
+        <span class="text-xs">See removed notes</span>
+        <Trash2
+          :size="17"
+          class="transform text-note-garnet duration-200 group-hover:scale-105"
+        />
+      </button>
+      <button
+        class="group inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-note-ivory/75 transition-all duration-200 hover:bg-note-pumice/5 hover:text-note-ivory active:scale-95"
         @click="seeAllNotes()"
       >
-        <span>See all notes</span>
+        <span class="text-xs">See all notes</span>
 
         <ArrowRight
           :size="17"

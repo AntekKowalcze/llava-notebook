@@ -17,16 +17,15 @@ Switch between local and cloud mode easily
 Change password / reset password
 
 Export / import user data (backup or migration)
-
+<!-- TODO export import notes -->
+<!-- TODO backup -->
 Manage connected devices (if multi-device sync)
 //TODO delete account,  Remove local data,
 
 Create a note (Markdown or plaintext)
 
-Give a note a name (immutable identifier)
-
 Give a note a title (mutable display name)
-
+<!-- TODO change username -->
 Write note content
 
 Paste images into the note

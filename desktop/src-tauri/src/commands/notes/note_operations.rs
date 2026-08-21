@@ -328,3 +328,62 @@ pub fn remove_note(
 
     llava_core::storage::remove_note(notes_db, &note_id, &paths.delete_tmp_path)
 }
+
+#[tauri::command]
+pub fn hard_delete_note(
+    note_id: String,
+    state: tauri::State<'_, llava_core::AppState>,
+) -> Result<(), llava_core::Error> {
+    let notes_db_guard = state
+        .notes_db
+        .lock()
+        .map_err(|_| llava_core::Error::LockError)?;
+
+    let notes_db = notes_db_guard
+        .as_ref()
+        .ok_or(llava_core::Error::LockError)?;
+    let program_paths: ProgramFiles = {
+        let guard = state
+            .paths
+            .lock()
+            .map_err(|_| llava_core::Error::LockError)?;
+
+        guard.as_ref().ok_or(llava_core::Error::LockError)?.clone()
+    };
+
+    llava_core::storage::hard_delete_note(notes_db, &program_paths.delete_tmp_path, &note_id)?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn restore_note(
+    note_id: String,
+    state: tauri::State<'_, llava_core::AppState>,
+) -> Result<(), llava_core::Error> {
+    let notes_db_guard = state
+        .notes_db
+        .lock()
+        .map_err(|_| llava_core::Error::LockError)?;
+
+    let notes_db = notes_db_guard
+        .as_ref()
+        .ok_or(llava_core::Error::LockError)?;
+    let program_paths: ProgramFiles = {
+        let guard = state
+            .paths
+            .lock()
+            .map_err(|_| llava_core::Error::LockError)?;
+
+        guard.as_ref().ok_or(llava_core::Error::LockError)?.clone()
+    };
+
+    llava_core::storage::restore_deleted_note(
+        notes_db,
+        program_paths.delete_tmp_path,
+        &program_paths.notes_path,
+        &note_id,
+    )?;
+
+    Ok(())
+}

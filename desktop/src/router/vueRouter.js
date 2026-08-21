@@ -70,6 +70,11 @@ const routes = [
         name: 'allNotes',
         component: () => import('../views/AllNotesView.vue'),
       },
+      {
+        path: 'removedNotes',
+        name: 'removed',
+        component: () => import('../views/RemovedNotes.vue'),
+      },
     ],
   },
   {

@@ -225,7 +225,8 @@ function getSyncLabel(syncState: string): string {
 
     case 'PendingDeleted':
       return 'Deleting';
-
+    case 'WaitingForTombstone':
+      return 'Syncing deletation';
     default:
       return 'Unknown';
   }
@@ -259,6 +260,7 @@ function getSyncColor(syncState: string): string {
 
     case 'Conflict':
     case 'Error':
+    case 'WaitingForTombstone':
       return 'text-note-garnet';
 
     default:

@@ -1,10 +1,10 @@
 use crate::{storage::SyncState, tags::UiTag};
 use anyhow::Context;
 use chacha20poly1305::Key;
-use rusqlite::{Connection, params};
-use serde::Serialize;
+use rusqlite::{Connection, named_params, params};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{error, info};
+use tracing::error;
 
 #[derive(Debug, Serialize)]
 pub struct NoteCard {
@@ -280,4 +280,83 @@ pub fn get_all_notes_data(
     );
 
     Ok(result)
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RemovedNote {
+    pub local_id: String,
+    pub title: String,
+    pub removed_at: i64,
+}
+
+pub fn get_all_removed_notes_data(
+    notes_db: &Connection,
+    user_id: String,
+    notes_key: &Key,
+) -> Result<Vec<RemovedNote>, crate::errors::Error> {
+    let current_removal_border = crate::utils::get_time() - crate::constants::HARD_DELETE_TIME;
+
+    let mut stmt = notes_db
+        .prepare(
+            "SELECT local_id, title, deleted_at, encrypted
+             FROM notes
+             WHERE is_deleted = 1
+               AND deleted_at > :time AND sync_state != 'WaitingForTombstone'",
+        )
+        .context("Failed to prepare removed notes query")
+        .map_err(|e| crate::errors::Error::InternalError(e.to_string()))?;
+
+    let removed_rows = stmt
+        .query_map(
+            named_params! {
+                ":time": current_removal_border
+            },
+            |row| {
+                let id: String = row.get(0)?;
+                let encrypted: bool = row.get(3)?;
+
+                let title = if encrypted {
+                    crate::crypto::decrypt_title(&id, notes_key, notes_db).map_err(|e| {
+                        rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::other(
+                            e.to_string(),
+                        )))
+                    })?
+                } else {
+                    row.get(1)?
+                };
+
+                Ok(RemovedNote {
+                    local_id: id,
+                    title,
+                    removed_at: row.get(2)?,
+                })
+            },
+        )
+        .context("Failed to query removed notes")
+        .map_err(|e| {
+            error!(
+                task = "get all removed notes data",
+                status = "error",
+                %user_id,
+                error = ?e,
+                "failed to collect removed notes query results"
+            );
+
+            crate::errors::Error::InternalError(e.to_string())
+        })?
+        .collect::<Result<Vec<_>, _>>()
+        .context("Failed to collect removed notes")
+        .map_err(|e| {
+            error!(
+                task = "get all removed notes data",
+                status = "error",
+                %user_id,
+                error = ?e,
+                "failed to collect removed notes"
+            );
+
+            crate::errors::Error::InternalError(e.to_string())
+        })?;
+
+    Ok(removed_rows)
 }

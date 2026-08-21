@@ -53,7 +53,7 @@ console.log(sync, encryption);
 const title = ref<string>('');
 
 onMounted(async () => {
-  void userSettings.init();
+  await userSettings.init();
 });
 
 function settingChanged(id: string, value: string) {
@@ -100,7 +100,7 @@ async function createNote(): Promise<void> {
 
   const useEncryption = encryption.value === 'on';
   console.log('TO JEST TO', useEncryption + encryption.value);
-  const useSynchronization = sync.value === 'on';
+  const useSynchronization = canSync.value && sync.value === 'on';
 
   try {
     const createdNote = await invoke<Note>('create_note', {

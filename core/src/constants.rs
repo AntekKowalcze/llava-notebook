@@ -28,7 +28,7 @@ pub const ACTIVE_USER_JSON_PATH: &str = "llava/active_user.json";
 pub const DEVICE_ID_FILE: &str = "llava/device_id.json";
 pub const DEVICE_ID_JSON_KEY: &str = "device_id";
 pub const ACTIVE_USER_JSON_KEY: &str = "user_uuid";
-
+pub const HARD_DELETE_TIME: i64 = 1000 * 60 * 60 * 24 * 30;
 //sqlite
 pub const NOTES_DB: &str = "note.sqlite";
 pub const LOCAL_USERS_DB: &str = "llava/users/local_login_db.sqlite";
@@ -39,7 +39,7 @@ pub const LOGS_PATH: &str = "llava/logs/app.log";
 pub const RECOVERY_CHANGE_WINDOW_MS: i64 = 180_000;
 //SQL
 
-pub const NOTES_DB_VERSION: i64 = 1;
+pub const NOTES_DB_VERSION: i64 = 2;
 pub const USERS_DB_VERSION: i64 = 3;
 pub const LOCAL_USER_DB_INSERT_SQL_SCHEMA: &str = r#"INSERT INTO users_data (
                 user_id,

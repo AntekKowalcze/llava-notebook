@@ -11,6 +11,7 @@ pub fn change_state_after_login(
     user_config: IndexMap<String, String>,
     mut notes_key: chacha20poly1305::Key,
 ) -> Result<(), llava_core::Error> {
+    cleanup_expired_notes(&paths.delete_tmp_path, &notes_conn);
     *state
         .current_user
         .lock()
@@ -38,4 +39,9 @@ pub fn change_state_after_login(
         .map_err(|_| anyhow!("Couldnt edit kek_bytes in state"))? = Some(notes_key);
     notes_key.zeroize();
     Ok(())
+}
+pub fn cleanup_expired_notes(tmp_deleted_path: &std::path::Path, notes_db: &rusqlite::Connection) {
+    if let Err(err) = llava_core::clean::hard_deletes_terminated_notes(notes_db, tmp_deleted_path) {
+        tracing::error!("Failed to cleanup expired notes: {err}");
+    }
 }

@@ -63,5 +63,4 @@ pub async fn create_note(
 
     Ok(note)
 }
-// TODO add view, where all notes are visible
 // TODO THEN create sync manager
