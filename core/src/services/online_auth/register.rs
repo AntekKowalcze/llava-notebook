@@ -83,7 +83,7 @@ pub async fn register(
     let password_salt = password_salt
         .as_str()
         .split('$')
-        .last()
+        .next_back()
         .unwrap()
         .to_string();
 

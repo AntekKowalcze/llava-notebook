@@ -7,8 +7,11 @@ const props = defineProps<{
 }>();
 
 const opacity = computed(() => {
-  if (props.numberOfContributions === 0) return 0;
-  return 0.15 + (Math.log(props.numberOfContributions + 1) / Math.log(11)) * 0.85;
+  const contributions = props.numberOfContributions;
+
+  if (contributions === 0) return 0;
+
+  return 0.15 + (Math.log(Math.min(contributions, 50) + 1) / Math.log(51)) * 0.85;
 });
 
 const titleString = computed(() => `${props.numberOfContributions} edition(s) • ${props.date}`);

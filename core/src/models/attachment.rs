@@ -21,4 +21,3 @@ pub struct Attachment {
     pub created_at: i64,
     pub updated_at: i64,
 }
-// TODO run attachment deletation on note removal

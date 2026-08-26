@@ -118,18 +118,13 @@ pub async fn login_command(
             .lock()
             .map_err(|_| anyhow!("failed to lock users_db"))?;
 
-        let mut users_db = conn_guard.as_mut().ok_or(llava_core::Error::LockError)?;
+        let users_db = conn_guard.as_mut().ok_or(llava_core::Error::LockError)?;
         let paths = paths_guard.as_ref().ok_or(llava_core::Error::LockError)?;
         let timeout = crate::commands::handlers::local_auth::check_timeout(&username, users_db)?; //returns diff between current timestamp and end of lock timestamp
         if timeout > 0 {
             return Err(llava_core::Error::AccountLocked(0));
         }
-        crate::commands::handlers::local_auth::login(
-            username.clone(),
-            password,
-            paths,
-            &mut users_db,
-        )?
+        crate::commands::handlers::local_auth::login(username.clone(), password, paths, users_db)?
     };
 
     let id = {
@@ -312,9 +307,9 @@ pub async fn check_login_on_start(
 
     if let SessionState::LoggedIn { user_id, notes_key } = &mut is_logged_in {
         let mut owned_key: chacha20poly1305::Key =
-            chacha20poly1305::Key::clone_from_slice(&notes_key);
+            chacha20poly1305::Key::clone_from_slice(notes_key);
         let parsed_user_uuid =
-            uuid::Uuid::parse_str(&user_id).context("Failed to parse user_id to string")?;
+            uuid::Uuid::parse_str(user_id).context("Failed to parse user_id to string")?;
 
         let (updated_paths, notes_db, username, user_config, is_linked) = {
             let users_db_guard = state
@@ -330,7 +325,7 @@ pub async fn check_login_on_start(
             let notes_db = llava_core::storage::get_connection(&updated_paths)?;
             let username = llava_core::get_username_from_uuid(users_db, user_id.clone())?;
             let user_config = llava_core::settings::get_config_for_state(&updated_paths)?;
-            let is_linked = llava_core::is_online_linked(&parsed_user_uuid, &users_db)?;
+            let is_linked = llava_core::is_online_linked(&parsed_user_uuid, users_db)?;
             (updated_paths, notes_db, username, user_config, is_linked)
         };
 

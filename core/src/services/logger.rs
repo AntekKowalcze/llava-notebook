@@ -48,13 +48,13 @@ where
 pub fn configure_logger(
     path_to_log_file: &PathBuf,
 ) -> Result<tracing_appender::non_blocking::WorkerGuard, crate::errors::Error> {
-    rename_log_file(&path_to_log_file)?;
+    rename_log_file(path_to_log_file)?;
     let filter = tracing_subscriber::filter::EnvFilter::new("off,llava_core=trace");
     let log_file = OpenOptions::new()
         .create(true)
         .write(true)
         .truncate(true)
-        .open(&path_to_log_file)?;
+        .open(path_to_log_file)?;
     let (non_blocking, guard) = tracing_appender::non_blocking(log_file);
     let subscriber = Registry::default().with(
         fmt::layer()
@@ -77,7 +77,7 @@ fn rename_log_file(logger_file_path: &PathBuf) -> Result<(), crate::errors::Erro
         .parent()
         .context("There always should be parrent path for log file")?;
 
-    create_dir_all(&parent_path)?;
+    create_dir_all(parent_path)?;
     if logger_file_path.exists() {
         let time_for_name = crate::utils::get_time();
 

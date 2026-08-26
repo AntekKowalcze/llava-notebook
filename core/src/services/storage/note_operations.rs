@@ -756,7 +756,6 @@ pub fn hard_delete_note(
             "note is not deleted".to_string(),
         ));
     }
-    // TODO make filename in attachments as uuid so there are no problems with privacy
     /*
      * For synchronized notes, keep the database row as an outbox entry
      * for the tombstone.
@@ -907,7 +906,7 @@ pub fn check_if_note_is_synced(
         .query_row(
             "SELECT sync_state FROM notes WHERE local_id = :id",
             named_params! {":id": note_id},
-            |row| Ok(row.get(0)?),
+            |row| row.get(0),
         )
         .context("Failed to get is synced")?;
     let synced = match sync_status {

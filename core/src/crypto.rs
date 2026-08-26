@@ -33,7 +33,6 @@
 //! - `anyhow` — Adding context to cryptographic, encoding, serialisation, and database errors
 //! - `tracing` — Logging encryption, decryption, and metadata operations without logging
 //!   sensitive cryptographic material
-
 use anyhow::Context;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use chacha20poly1305::aead::OsRng;
@@ -338,7 +337,7 @@ pub fn decrypt_title(
 
     let decrypted = cipher
         .decrypt(nonce, content.as_ref())
-        .context("failed to decrypt note content")
+        .context("failed to decrypt note title")
         .map_err(|e| {
             tracing::error!(
                 task = "decrypt title",
@@ -473,6 +472,7 @@ pub fn encrypt_attachment(
     let crypto_meta = AttachmentCryptoMetadata {
         attachment_nonce: BASE64.encode(nonce),
     };
+    let encrypted_checksum = blake3::hash(&encrypted_file);
 
     let crypto_meta_json = serde_json::to_string(&crypto_meta)
         .context("failed to serialize attachment crypto metadata")?;
@@ -484,15 +484,20 @@ pub fn encrypt_attachment(
             SET
                 crypto_meta = ?1,
                 encrypted = 1,
-                updated_at = ?2
-            WHERE attachment_id = ?3
+                updated_at = ?2,
+                checksum_encrypted = ?3
+            WHERE attachment_id = ?4
             "#,
-            rusqlite::params![crypto_meta_json, crate::utils::get_time(), attachment_id],
+            rusqlite::params![
+                crypto_meta_json,
+                crate::utils::get_time(),
+                encrypted_checksum.to_string(),
+                attachment_id
+            ],
         )
         .context("failed to update attachment crypto metadata")?;
 
     Ok(encrypted_file)
-    // TODO recalculate blake3 after encryption
 }
 
 pub fn decrypt_attachment(
@@ -544,6 +549,14 @@ pub fn decrypt_attachment(
     let decrypted_file = cipher
         .decrypt(nonce, encrypted_file.as_ref())
         .context("failed to decrypt attachment")?;
+    let decrypted_checksum = blake3::hash(&decrypted_file);
+
+    notes_db
+        .execute(
+            "UPDATE attachments SET checksum_encrypted = ?1 WHERE attachment_id = ?2",
+            rusqlite::params![decrypted_checksum.to_string(), attachment_id],
+        )
+        .context("failed to update checksum in db")?;
 
     Ok(decrypted_file)
 }

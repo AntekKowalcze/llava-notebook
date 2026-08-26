@@ -1,6 +1,11 @@
 use anyhow::Context;
 use rusqlite::{Connection, named_params};
 use std::path::Path;
+
+use crate::{
+    attachments::{delete_attachment, get_attachments_for_note},
+    models::attachment,
+};
 pub fn hard_deletes_terminated_notes(
     notes_db: &Connection,
     tmp_deleted_path: &Path,

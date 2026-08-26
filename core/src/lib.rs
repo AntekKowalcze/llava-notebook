@@ -105,9 +105,9 @@ pub mod note_stats {
 pub mod clean {
     pub use crate::services::cleaner::hard_deletes_terminated_notes;
 }
-// TODO on quit note, parse content, get attachments that really are in note, and clean rest,
 pub mod attachments {
     pub use crate::models::attachment::Attachment;
+    pub use crate::services::attachment::check_attachment_existance;
     pub use crate::services::attachment::check_if_attachment_is_encrypted;
     pub use crate::services::attachment::create_attachment;
     pub use crate::services::attachment::delete_attachment;

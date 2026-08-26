@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use llava_core::{tags_handling::find_tag_id, AppState};
 #[tauri::command]
 pub async fn add_tag_to_note(
@@ -92,7 +91,7 @@ pub async fn get_all_tags(
         .ok_or(llava_core::Error::LockError)?
         .to_string();
 
-    Ok(llava_core::tags_handling::get_all_tags(notes_db, &user_id)?)
+    llava_core::tags_handling::get_all_tags(notes_db, &user_id)
 }
 
 #[tauri::command]
@@ -109,9 +108,7 @@ pub async fn get_all_tags_for_note(
         .as_ref()
         .ok_or(llava_core::Error::LockError)?;
 
-    Ok(llava_core::tags_handling::get_all_tags_for_note(
-        notes_db, &note_id,
-    )?)
+    llava_core::tags_handling::get_all_tags_for_note(notes_db, &note_id)
 }
 
 #[tauri::command]

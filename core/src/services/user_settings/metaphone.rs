@@ -38,7 +38,7 @@ pub fn create_metaphone_map() -> HashMap<String, Vec<String>> {
         let metaphone_key = metaphone(&normalized_key);
         if !metaphone_key.is_empty() {
             temp.entry(metaphone_key)
-                .or_insert_with(HashSet::new)
+                .or_default()
                 .insert(key.to_string());
         }
 
@@ -47,9 +47,7 @@ pub fn create_metaphone_map() -> HashMap<String, Vec<String>> {
             let normalized_word: String = word.chars().filter(|c| c.is_alphanumeric()).collect();
             let m_key = metaphone(&normalized_word);
             if !m_key.is_empty() {
-                temp.entry(m_key)
-                    .or_insert_with(HashSet::new)
-                    .insert(key.to_string());
+                temp.entry(m_key).or_default().insert(key.to_string());
             }
         }
     }
@@ -123,12 +121,10 @@ fn metaphone(entry: &str) -> String {
                         continue;
                     }
                 }
-                if index + 1 < chars_arr.len() {
-                    if chars_arr[index + 1] == 'h' {
-                        output.push('x');
-                        index += 2;
-                        continue;
-                    }
+                if index + 1 < chars_arr.len() && chars_arr[index + 1] == 'h' {
+                    output.push('x');
+                    index += 2;
+                    continue;
                 }
 
                 output.push('s');
@@ -151,24 +147,20 @@ fn metaphone(entry: &str) -> String {
                     }
                 }
 
-                if index + 1 < chars_arr.len() {
-                    if chars_arr[index + 1] == 'h' {
-                        output.push('0');
-                        index += 2;
-                        continue;
-                    }
+                if index + 1 < chars_arr.len() && chars_arr[index + 1] == 'h' {
+                    output.push('0');
+                    index += 2;
+                    continue;
                 }
                 output.push('t');
                 index += 1;
             }
 
             'p' => {
-                if index + 1 < chars_arr.len() {
-                    if chars_arr[index + 1] == 'h' {
-                        output.push('f');
-                        index += 2;
-                        continue;
-                    }
+                if index + 1 < chars_arr.len() && chars_arr[index + 1] == 'h' {
+                    output.push('f');
+                    index += 2;
+                    continue;
                 }
 
                 output.push('p');
@@ -182,12 +174,13 @@ fn metaphone(entry: &str) -> String {
                 continue;
             }
             'c' => {
-                if index + 2 < chars_arr.len() {
-                    if chars_arr[index + 1] == 'i' && chars_arr[index + 2] == 'a' {
-                        output.push('x');
-                        index += 3;
-                        continue;
-                    }
+                if index + 2 < chars_arr.len()
+                    && chars_arr[index + 1] == 'i'
+                    && chars_arr[index + 2] == 'a'
+                {
+                    output.push('x');
+                    index += 3;
+                    continue;
                 }
                 if index < chars_arr.len() - 1 {
                     match chars_arr[index + 1] {

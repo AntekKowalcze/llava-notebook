@@ -51,7 +51,7 @@ pub fn register_user_offline(
     crate::errors::Error,
 > {
     let username = username.trim().to_string();
-    validate_username(&username, &users_db)?;
+    validate_username(&username, users_db)?;
     let password = password.as_str().trim();
     let password_repeated = password_repeated.as_str().trim();
     password_validation(password, password_repeated)?;
@@ -60,8 +60,8 @@ pub fn register_user_offline(
         generate_enctypted_keys(password, notes_key)?;
     let new_user = crate::services::local_auth::auth_data_models::local_user::LocalUser {
         user_id: uuid::Uuid::new_v4(),
-        username: username,
-        password_hash: password_hash, //SALT ALREADY IN PHC STRING
+        username,
+        password_hash, //SALT ALREADY IN PHC STRING
         notes_key: encrypted_notes_key,
         nonce_notes_key: nonce_for_key_wrap,
         kek_salt: salt,
@@ -72,7 +72,7 @@ pub fn register_user_offline(
         is_online_linked: false,
         online_account_email: None,
         online_account_id: None,
-        device_id: crate::config::get_device_id(&users_db, &paths.device_id_path)?,
+        device_id: crate::config::get_device_id(users_db, &paths.device_id_path)?,
         created_at: crate::utils::get_time(),
         last_login: crate::utils::get_time(),
         password_errors: 0,
@@ -109,7 +109,7 @@ pub fn register_user_offline(
     tx.commit().context(
         "Couldnt insert user into database, transaction failed while registering a user",
     )?;
-    crate::config::change_active_user(&new_user.user_id, &paths)?;
+    crate::config::change_active_user(&new_user.user_id, paths)?;
     log_helper(
         "registering",
         "success",
@@ -121,7 +121,7 @@ pub fn register_user_offline(
 
     let paths = after_validation(&new_user.user_id, paths)?;
     crate::services::local_auth::logging::session_operations(
-        &users_db,
+        users_db,
         new_user.user_id,
         &notes_key,
     )?;
@@ -199,7 +199,7 @@ pub fn recovery_code_handling(
     users_db: &rusqlite::Connection,
     password: &str,
 ) -> Result<Vec<String>, crate::errors::Error> {
-    let user_uuid = crate::utils::get_user_uuid(users_db, &username)?;
+    let user_uuid = crate::utils::get_user_uuid(users_db, username)?;
     let mut user_visible_codes: Vec<String> = Vec::new();
     let (notes_key, nonce, kek_salt, params_string) = users_db
         .query_row(
@@ -390,7 +390,7 @@ fn validate_username(username: &str, users_db: &Connection) -> Result<(), crate:
     if exists {
         tracing::error!(task="username validation", status="error", %username, "username didnt pass validation");
 
-        return Err(crate::errors::Error::UsernameExistsError);
+        Err(crate::errors::Error::UsernameExistsError)
     } else {
         log_helper(
             "username validation",
@@ -399,7 +399,7 @@ fn validate_username(username: &str, users_db: &Connection) -> Result<(), crate:
             "username validated successfully",
         );
 
-        return Ok(());
+        Ok(())
     }
 }
 
@@ -407,7 +407,7 @@ pub fn after_validation(
     user_uuid: &uuid::Uuid,
     paths: &crate::config::ProgramFiles,
 ) -> Result<ProgramFiles, crate::errors::Error> {
-    change_active_user(&user_uuid, paths).inspect_err(|e| {
+    change_active_user(user_uuid, paths).inspect_err(|e| {
         tracing::error!(
             task = "after validation",
             status = "error",
@@ -455,7 +455,7 @@ pub fn change_password(
     let user_uuid = crate::utils::get_user_uuid(users_db, &username)?;
     let password = password.as_str().trim();
     let password_repeated = password_repeated.as_str().trim();
-    password_validation(&password, &password_repeated)?;
+    password_validation(password, password_repeated)?;
 
     let mut found = 0;
     let mut stmt = users_db
@@ -598,7 +598,7 @@ pub fn change_password(
             }
         }
     }
-    return Err(crate::errors::Error::CodeNotFound);
+    Err(crate::errors::Error::CodeNotFound)
 }
 
 #[test]

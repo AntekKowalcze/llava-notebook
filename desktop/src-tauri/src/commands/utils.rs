@@ -1,4 +1,3 @@
-use std::println;
 use std::time::Duration;
 
 use anyhow::anyhow;
@@ -81,14 +80,14 @@ pub fn check_connection_before_request(
             .internet_connection
             .lock()
             .map_err(|_| llava_core::Error::LockError)?;
-        guard.clone()
+        *guard
     };
     let is_connected_to_server = {
         let guard = state
             .server_connection
             .lock()
             .map_err(|_| llava_core::Error::LockError)?;
-        guard.clone()
+        *guard
     };
     if !is_online {
         return Err(llava_core::Error::NoInternetConnection);

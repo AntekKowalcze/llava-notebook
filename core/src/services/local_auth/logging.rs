@@ -40,8 +40,8 @@
 
 use crate::constants::SERVER_ADDRESS;
 use crate::services::online_auth::login::RefreshRequest;
+use crate::services::online_auth::models::online_account::ArgonParams;
 use crate::services::online_auth::models::online_account::{AccessToken, RefreshResponse};
-use crate::services::online_auth::models::online_account::{ArgonParams, RefreshToken};
 use crate::{ProgramFiles, errors, utils};
 use anyhow::Context;
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
@@ -87,7 +87,7 @@ pub fn autorization(
         .context("Coldnt create a password hash from password given by user in login")?;
 
     let password_verified = Argon2::default()
-        .verify_password(&password.as_bytes(), &password_hash)
+        .verify_password(password.as_bytes(), &password_hash)
         .is_ok();
     Ok(password_verified)
 }
@@ -107,7 +107,7 @@ pub fn local_log_in(
     crate::errors::Error,
 > {
     check_if_user_exists(&username, users_db)?;
-    let password_verified = autorization(&username, &password, &users_db)?;
+    let password_verified = autorization(&username, &password, users_db)?;
     if password_verified {
         crate::utils::log_helper(
             "logging",
@@ -276,7 +276,7 @@ pub fn log_with_code(
                 },
                 |row| {
                     let params: String = row.get(0)?;
-                    return Ok(params);
+                    Ok(params)
                 },
             )
             .context("failed to get params")?;
@@ -376,7 +376,7 @@ pub fn log_with_code(
 
                 let paths =
                     crate::services::local_auth::register::after_validation(&user_id, paths)?;
-                session_operations(&users_db, user_id, &notes_key)?;
+                session_operations(users_db, user_id, &notes_key)?;
                 let notes_db = crate::services::storage::db_creation::get_connection(&paths)?;
 
                 crate::utils::log_helper(
@@ -429,10 +429,10 @@ fn check_if_user_exists(
             Some(crate::utils::Format::Display(&username)),
             "user exists, can log in",
         );
-        return Ok(());
+        Ok(())
     } else {
         tracing::error!(task="checking if user exists in db", status="error", %username, "user do not exists in database, cant log in");
-        return Err(crate::errors::Error::UserNotExists);
+        Err(crate::errors::Error::UserNotExists)
     }
 }
 
@@ -542,7 +542,7 @@ pub fn check_error_count(
     if (statement + 1) % 5 == 0 {
         let multiplier = (statement + 1) / 5;
         end_of_timeout = 30 * multiplier * 1000;
-        end_of_timeout = crate::utils::get_time() + end_of_timeout;
+        end_of_timeout += crate::utils::get_time();
         tx.execute(
             "UPDATE users_data SET ending_block_timestamp = :end WHERE user_id = :id",
             rusqlite::named_params! {
@@ -883,7 +883,7 @@ pub async fn check_online_login(
                 if body_text.is_empty() {
                     "Internal server error, you will be not logged in".to_string()
                 } else {
-                    String::from(format!("Internal server error: {}", body_text))
+                    format!("Internal server error: {}", body_text)
                 },
             )));
         } else if status_code == 401 {
@@ -903,7 +903,7 @@ pub async fn check_online_login(
     entry
         .set_password(&tokens.refresh_token.0)
         .context("failed to save refresh token in keyring")?;
-    return Ok(tokens.access_token);
+    Ok(tokens.access_token)
 }
 
 //workds only after register test

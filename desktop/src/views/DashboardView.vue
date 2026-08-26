@@ -139,7 +139,9 @@ monthLabels.push(...rotatedElements);
 function redirect() {
   router.replace('/main/');
 }
-
+function goToNote(noteId: string) {
+  router.replace(`/main/editor/${noteId}`);
+}
 onUnmounted(() => clearInterval(interval));
 </script>
 
@@ -285,6 +287,7 @@ onUnmounted(() => clearInterval(interval));
             v-for="[title, noteId, ts] in lastThreeEdited"
             :key="noteId + ts"
             class="flex items-center justify-between rounded-xl border border-note-pumice/15 bg-note-graphite px-3 py-2"
+            @click="goToNote(noteId)"
           >
             <div class="flex flex-col">
               <span class="text-sm font-medium text-note-ivory">{{ title }}</span>

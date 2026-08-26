@@ -53,7 +53,7 @@ const routes = [
       {
         path: 'editor/:noteId',
         name: 'editor',
-        component: () => import('../views/editor/editorView.vue'),
+        component: () => import('../views/editor/EditorView.vue'),
       },
       {
         path: 'dashboard',

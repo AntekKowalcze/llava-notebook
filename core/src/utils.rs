@@ -3,10 +3,8 @@
 use std::time::Duration;
 
 use anyhow::Context;
-use reqwest::Client;
 use rusqlite::{Connection, OptionalExtension, named_params};
 
-use crate::constants::SERVER_ADDRESS;
 #[allow(dead_code)]
 pub fn getting_user_input(buffer: &mut String) {
     println!("Podaj treść");
@@ -107,7 +105,7 @@ pub fn get_email_from_online_id(
             |row| row.get(0),
         )
         .context("failed to get online user_id")?;
-    return Ok(email);
+    Ok(email)
 }
 pub fn is_online_linked(
     user_id: &uuid::Uuid,
@@ -120,7 +118,7 @@ pub fn is_online_linked(
             |row| row.get(0),
         )
         .context("failed to get is_online_linked")?;
-    return Ok(linked == 1);
+    Ok(linked == 1)
 }
 
 pub fn change_account_link_status(

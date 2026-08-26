@@ -32,7 +32,7 @@ pub fn get_connection(
     paths: &crate::config::ProgramFiles,
 ) -> Result<Connection, crate::errors::Error> {
     let notes_db = creating_tables(paths)
-        .inspect_err(|err| crate::services::logger::log_error("error while creating tables", &err))
+        .inspect_err(|err| crate::services::logger::log_error("error while creating tables", err))
         .context("couldnt create tables in getting connection foruser connection to db")?;
     log_helper(
         "connecting to notes database and creating it",

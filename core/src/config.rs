@@ -223,7 +223,7 @@ pub fn get_device_id(
     }
     if device_id_path.exists() {
         let has_error: Result<uuid::Uuid, crate::errors::Error> = {
-            let file_content = std::fs::read_to_string(&device_id_path)?;
+            let file_content = std::fs::read_to_string(device_id_path)?;
             let parsed_file: serde_json::Value = serde_json::from_str(&file_content)
                 .context("couldnt parse device id file content with serde")?;
 
@@ -254,11 +254,11 @@ pub fn get_device_id(
                     let file_content = serde_json::to_string_pretty(&json_data)
                         .context("couldnt serialize device id json")?;
 
-                    std::fs::write(&device_id_path, file_content)
+                    std::fs::write(device_id_path, file_content)
                         .context("couldnt write device id content")?;
                     Ok(dev_uuid)
                 } else {
-                    return Err(crate::errors::Error::FatalError);
+                    Err(crate::errors::Error::FatalError)
                 }
             }
         }
@@ -269,7 +269,7 @@ pub fn get_device_id(
         });
         let file_content = serde_json::to_string_pretty(&file_content)
             .context("couldnt parse device uuid to json ")?;
-        std::fs::write(&device_id_path, file_content).context("couldnt write device id content")?;
+        std::fs::write(device_id_path, file_content).context("couldnt write device id content")?;
         Ok(device_id)
     }
 }
@@ -287,7 +287,7 @@ pub fn change_active_user(
 }
 
 pub fn read_current_user(path: &PathBuf) -> Result<uuid::Uuid, crate::errors::Error> {
-    let file_content = std::fs::read_to_string(&path)?;
+    let file_content = std::fs::read_to_string(path)?;
     let contents_json: serde_json::Value =
         serde_json::from_str(&file_content).context("failed to parse active_user.json file")?;
     let user_uuid = uuid::Uuid::parse_str(

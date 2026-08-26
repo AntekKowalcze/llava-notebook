@@ -12,8 +12,7 @@
 //! ## Key design decisions
 //! The attachment id is read from the request URI's **host** component, not its path.
 //! `attachment://<uuid>` places the identifier right after `//`, which the URI spec
-//! parses as authority/host, not path. Reading `.path()` instead silently returns an
-//! empty string — this was the original bug that made every attachment request 404.
+//! parses as authority/host, not path.
 //!
 //! Registered via `register_asynchronous_uri_scheme_protocol` rather than the sync
 //! variant, since resolving a request means locking shared state, running a SQLite
@@ -21,10 +20,6 @@
 //! is dispatched onto `std::thread::spawn`; swap for `tauri::async_runtime::spawn` if
 //! `read_attachment` ever becomes a true `async fn`.
 //!
-//! On Windows, Tauri remaps custom schemes to `https://attachment.localhost/<uuid>`
-//! internally, putting the id back in the **path**, not the host. This module is
-//! Linux/macOS-only as written — see the `TODO` in [`handle_request`] before shipping
-//! cross-platform.
 //!
 //! ## Dependencies
 //! - `tauri` — `Builder::register_asynchronous_uri_scheme_protocol`, `UriSchemeContext`, `AppHandle`
@@ -47,14 +42,18 @@ pub fn register(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wr
     builder.register_asynchronous_uri_scheme_protocol("attachment", handle_request)
 }
 
+#[cfg(not(windows))]
 fn handle_request(
     ctx: tauri::UriSchemeContext<'_, tauri::Wry>,
     request: http::Request<Vec<u8>>,
     responder: tauri::UriSchemeResponder,
 ) {
-    // TODO: cross-platform support — on Windows this scheme is remapped to
-    // `https://attachment.localhost/<uuid>`, so the id lands in `.path()`, not `.host()`.
+    #[cfg(windows)]
+    let attachment_id = request.uri().path().trim_start_matches('/').to_string();
+
+    #[cfg(not(windows))]
     let attachment_id = request.uri().host().unwrap_or_default().to_string();
+
     let app_handle = ctx.app_handle().clone();
 
     std::thread::spawn(move || {

@@ -13,10 +13,9 @@ pub async fn create_attachment(
             .lock()
             .map_err(|_| llava_core::Error::LockError)?;
 
-        notes_key_guard
+        *notes_key_guard
             .as_ref()
             .ok_or(llava_core::Error::NoKeyToDecryptANote)?
-            .clone()
     };
 
     let program_paths: ProgramFiles = {
@@ -40,10 +39,7 @@ pub async fn create_attachment(
             .current_note
             .lock()
             .map_err(|_| llava_core::Error::LockError)?;
-        cn_guard
-            .as_ref()
-            .ok_or(llava_core::Error::LockError)?
-            .clone()
+        *cn_guard.as_ref().ok_or(llava_core::Error::LockError)?
     };
     let is_encrypted =
         llava_core::storage::check_if_note_is_encrypted(&current_note_id.to_string(), notes_db)?;

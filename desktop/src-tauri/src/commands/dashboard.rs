@@ -28,13 +28,10 @@ pub async fn get_dashboard_data(
             .lock()
             .map_err(|_| llava_core::Error::LockError)?;
 
-        notes_key_guard
+        *notes_key_guard
             .as_ref()
             .ok_or(llava_core::Error::NoKeyToDecryptANote)?
-            .clone()
     };
 
-    return Ok(llava_core::stats::get_dashboard_stats(
-        user_uuid, &notes_db, &users_db, &notes_key,
-    )?);
+    llava_core::stats::get_dashboard_stats(user_uuid, notes_db, users_db, &notes_key)
 }

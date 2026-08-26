@@ -15,7 +15,6 @@ use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use rusqlite::{named_params, params};
 use std::{fs, path::Path};
 use uuid::Uuid;
-// TODO change attachment filename to encrypted (same as title in note)
 pub fn create_attachment(
     notes_key: &Key,
     assets_path: &PathBuf,
@@ -73,7 +72,7 @@ pub fn create_attachment(
         None => attachment_id.to_string(),
     };
 
-    let local_path = assets_path.join(stored_filename);
+    let local_path = assets_path.join(&stored_filename);
 
     fs::create_dir_all(assets_path).context("failed to create assets directory")?;
 
@@ -122,7 +121,7 @@ pub fn create_attachment(
             named_params! {
                 ":id": attachment_id.to_string(),
                 ":note_id": note_local_id.to_string(),
-                ":filename": file_name,
+                ":filename": stored_filename,
                 ":mime_type": mime_type,
                 ":size_bytes": size_bytes,
                 ":local_path": local_path.to_string_lossy().to_string(),
@@ -208,39 +207,49 @@ pub fn delete_attachment(
     notes_db: &rusqlite::Connection,
     attachment_id: String,
 ) -> Result<(), crate::errors::Error> {
-    let local_path: String = notes_db
+    let (local_path, sync_state): (String, SyncState) = notes_db
         .query_row(
             r#"
-            SELECT local_path
+            SELECT local_path, sync_state
             FROM attachments
             WHERE attachment_id = ?1
             "#,
             params![attachment_id],
-            |row| row.get(0),
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )
-        .context("failed to get attachment path")?;
+        .context("failed to get attachment")?;
 
-    let path = PathBuf::from(&local_path);
+    fs::remove_file(&local_path).context("failed to delete attachment file")?;
 
-    fs::remove_file(&path).context("failed to delete attachment file")?;
+    match sync_state {
+        SyncState::LocalOnly => {
+            notes_db
+                .execute(
+                    r#"
+                    DELETE FROM attachments
+                    WHERE attachment_id = ?1
+                    "#,
+                    params![attachment_id],
+                )
+                .context("failed to delete attachment from database")?;
+        }
 
-    let deleted = notes_db
-        .execute(
-            r#"
-            DELETE FROM attachments
-            WHERE attachment_id = ?1
-            "#,
-            params![attachment_id],
-        )
-        .context("failed to delete attachment from database")?;
-
-    if deleted == 0 {
-        return Err(anyhow::anyhow!("attachment not found").into());
+        _ => {
+            notes_db
+                .execute(
+                    r#"
+                    UPDATE attachments
+                    SET sync_state = 'WaitingForTombstone'
+                    WHERE attachment_id = ?1
+                    "#,
+                    params![attachment_id],
+                )
+                .context("failed to mark attachment for deletion")?;
+        }
     }
 
     Ok(())
 }
-
 pub fn check_if_attachment_is_encrypted(
     attachment_id: &str,
     notes_db: &rusqlite::Connection,
@@ -370,4 +379,14 @@ pub fn update_attachment_file(
 ) -> Result<(), crate::errors::Error> {
     std::fs::write(path, content)?;
     Ok(())
+}
+
+pub fn check_attachment_existance(notes_db: &rusqlite::Connection, attachment_id: &str) -> bool {
+    notes_db
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM attachments WHERE attachment_id = ?1)",
+            params![attachment_id],
+            |row| row.get::<_, bool>(0),
+        )
+        .unwrap_or(false)
 }

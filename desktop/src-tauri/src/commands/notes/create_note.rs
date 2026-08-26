@@ -38,7 +38,7 @@ pub async fn create_note(
             .lock()
             .map_err(|_| llava_core::Error::LockError)?;
 
-        guard.as_ref().ok_or(llava_core::Error::LockError)?.clone()
+        *guard.as_ref().ok_or(llava_core::Error::LockError)?
     };
 
     let mut note = llava_core::storage::create_local_note(

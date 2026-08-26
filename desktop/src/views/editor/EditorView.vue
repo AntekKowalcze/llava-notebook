@@ -161,8 +161,12 @@ onUnmounted(() => {
     unlistenClose();
     unlistenClose = null;
   }
-
   window.removeEventListener('keydown', handleKeyDown);
+  void invoke('clean_attachments', {
+    content: noteContent.value,
+  }).catch((err) => {
+    console.error('Failed to clean attachments:', err);
+  });
 });
 
 onBeforeRouteUpdate(async (to) => {

@@ -161,6 +161,7 @@ pub fn main() {
             commands::notes::note_operations::restore_note,
             commands::note_managing_views::get_all_removed_notes_data,
             commands::attachments::create_attachment::create_attachment,
+            commands::attachments::clean_attachments::clean_attachments,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

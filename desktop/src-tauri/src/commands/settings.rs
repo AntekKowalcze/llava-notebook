@@ -19,7 +19,7 @@ pub async fn get_config_data(
         paths_guard.as_ref().ok_or(llava_core::Error::LockError)?;
 
     let (user_config, created_default): (llava_core::settings::UserConfig, bool) =
-        llava_core::settings::get_config(&paths)?;
+        llava_core::settings::get_config(paths)?;
     Ok((user_config, created_default))
 }
 
@@ -36,7 +36,7 @@ pub async fn get_config_state(
     let paths: &llava_core::ProgramFiles =
         paths_guard.as_ref().ok_or(llava_core::Error::LockError)?;
 
-    let state_config = llava_core::settings::get_config_for_state(&paths)?;
+    let state_config = llava_core::settings::get_config_for_state(paths)?;
     *state
         .user_config
         .lock()
@@ -91,7 +91,7 @@ pub async fn load_backup_config(
 
     llava_core::settings::load_config_backup(&paths.config_backup_path, &paths.config_path)?;
     let (user_config, _created_default): (llava_core::settings::UserConfig, bool) =
-        llava_core::settings::get_config(&paths)?;
+        llava_core::settings::get_config(paths)?;
     let hash_config = llava_core::settings::save_config(
         &user_config,
         paths.config_path.clone(),
@@ -116,7 +116,7 @@ pub async fn get_logfile_content(
         .lock()
         .map_err(|_| anyhow!("failed to lock paths"))?;
     let paths = paths_guard.as_ref().ok_or(llava_core::Error::LockError)?;
-    Ok(llava_core::settings::logfile_contents(&paths.logs_path)?)
+    llava_core::settings::logfile_contents(&paths.logs_path)
 }
 
 #[tauri::command]
@@ -135,9 +135,8 @@ pub async fn get_recovery_codes(
         .map_err(|_| anyhow!("failed to lock username"))?;
     let username = username_lock.as_ref().ok_or(llava_core::Error::LockError)?;
 
-    if llava_core::local_auth::autorization(&username, &password, &users_db)? {
-        let codes =
-            llava_core::local_auth::recovery_code_handling(&username, &users_db, &password)?;
+    if llava_core::local_auth::autorization(username, &password, users_db)? {
+        let codes = llava_core::local_auth::recovery_code_handling(username, users_db, &password)?;
 
         password.zeroize();
         Ok(codes)
@@ -164,7 +163,7 @@ pub async fn change_username(
         .map_err(|_| anyhow!("failed to lock users_db"))?;
     let users_db = users_db_lock.as_ref().ok_or(llava_core::Error::LockError)?;
 
-    llava_core::settings::change_username(&user_id, &new_username, &users_db)?;
+    llava_core::settings::change_username(user_id, &new_username, users_db)?;
 
     *state
         .username

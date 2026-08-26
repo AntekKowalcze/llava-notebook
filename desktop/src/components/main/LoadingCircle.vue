@@ -3,7 +3,7 @@
 <template>
   <div style="transform-origin: center; display: inline-block">
     <div
-      class="m-auto h-32 w-32 animate-spin rounded-full border-[7px] border-b-[18px] border-t-[18px] border-note-paprika shadow-[0_0_60px_rgba(249,115,22,0.8)] [animation-duration:1.5s]"
+      class="m-auto h-32 w-32 animate-spin rounded-full border-[7px] border-b-[18px] border-t-[18px] border-note-paprika shadow-[0_0_60px_rgba(249,115,22,0.8)] [animation-duration:3s]"
     ></div>
   </div>
 </template>

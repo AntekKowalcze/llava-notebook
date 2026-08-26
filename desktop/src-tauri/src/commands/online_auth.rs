@@ -36,7 +36,7 @@ pub async fn register_user_online(
             .device_id
             .lock()
             .map_err(|_| llava_core::Error::LockError)?;
-        guard.as_ref().ok_or(llava_core::Error::LockError)?.clone()
+        *guard.as_ref().ok_or(llava_core::Error::LockError)?
     }; // guard dropped here
 
     let notes_key: chacha20poly1305::Key = {
@@ -44,7 +44,7 @@ pub async fn register_user_online(
             .notes_key
             .lock()
             .map_err(|_| llava_core::Error::LockError)?;
-        guard.as_ref().ok_or(llava_core::Error::LockError)?.clone()
+        *guard.as_ref().ok_or(llava_core::Error::LockError)?
     }; // guard dropped here
 
     let client = &state.server_client;
@@ -56,7 +56,7 @@ pub async fn register_user_online(
         email.clone(),
         password,
         password_repeated,
-        device_id.clone(),
+        device_id,
         &notes_key,
     )
     .await?;
@@ -76,7 +76,7 @@ pub async fn register_user_online(
 
     llava_core::online_auth::change_email_in_database(
         &email,
-        &users_db,
+        users_db,
         &online_user_id,
         user_id.to_string(),
     )?;
@@ -145,10 +145,7 @@ pub async fn online_logout(state: tauri::State<'_, AppState>) -> Result<(), llav
             .device_id
             .lock()
             .map_err(|_| llava_core::Error::LockError)?;
-        guard
-            .as_ref()
-            .ok_or(llava_core::Error::NotLoggedIn)?
-            .clone()
+        *guard.as_ref().ok_or(llava_core::Error::NotLoggedIn)?
     };
     let client = state.server_client.clone();
 
@@ -188,7 +185,7 @@ pub async fn get_email_from_id(
         .lock()
         .map_err(|_| llava_core::Error::LockError)?;
     let users_db = conn_guard.as_ref().ok_or(llava_core::Error::LockError)?;
-    Ok(llava_core::get_email_from_online_id(&online_id, users_db)?)
+    llava_core::get_email_from_online_id(&online_id, users_db)
 }
 
 #[tauri::command]
@@ -218,7 +215,7 @@ pub async fn login_online(
             .device_id
             .lock()
             .map_err(|_| llava_core::Error::LockError)?;
-        guard.as_ref().ok_or(llava_core::Error::LockError)?.clone()
+        *guard.as_ref().ok_or(llava_core::Error::LockError)?
     };
 
     let (access_token, online_user_id, notes_key) =
@@ -233,7 +230,7 @@ pub async fn login_online(
             .notes_key
             .lock()
             .map_err(|_| llava_core::Error::LockError)?;
-        guard.as_ref().ok_or(llava_core::Error::LockError)?.clone()
+        *guard.as_ref().ok_or(llava_core::Error::LockError)?
     };
     *state
         .online_user_id
@@ -252,6 +249,7 @@ pub async fn login_online(
             .notes_key
             .lock()
             .map_err(|_| llava_core::Error::LockError)? = Some(arr);
+        // i think here we should reencrypt all notes with new key
         todo!()
     }
     let users_data_guard = state
@@ -318,7 +316,7 @@ fn after_login(
         guard.as_ref().ok_or(llava_core::Error::LockError)?.clone()
     };
     let hash_config = llava_core::settings::save_config(
-        &current_settings,
+        current_settings,
         paths.config_path.clone(),
         paths.config_backup_path.clone(),
     )?;
@@ -340,10 +338,9 @@ pub async fn try_login_if_connected_with_server(
             .current_user
             .lock()
             .map_err(|_| llava_core::Error::LockError)?;
-        user_uuid_guard
+        *user_uuid_guard
             .as_ref()
             .ok_or(llava_core::Error::LockError)?
-            .clone()
     };
 
     let id = {
@@ -371,14 +368,14 @@ pub async fn try_refresh_if_logged_in(
             .server_connection
             .lock()
             .map_err(|_| llava_core::Error::LockError)?;
-        guard.clone()
+        *guard
     };
     let is_online = {
         let guard = state
             .internet_connection
             .lock()
             .map_err(|_| llava_core::Error::LockError)?;
-        guard.clone()
+        *guard
     };
 
     if !is_online || !is_connected_to_server {

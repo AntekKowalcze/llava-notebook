@@ -1,6 +1,5 @@
 use anyhow::Context;
 use llava_core::{storage::SyncState, Note, ProgramFiles};
-use std::sync::Mutex;
 use std::{path::PathBuf, str::FromStr};
 #[tauri::command]
 pub async fn get_note_content(
@@ -50,10 +49,9 @@ pub async fn get_note_content(
                 .lock()
                 .map_err(|_| llava_core::Error::LockError)?;
 
-            notes_key_guard
+            *notes_key_guard
                 .as_ref()
                 .ok_or(llava_core::Error::NoKeyToDecryptANote)?
-                .clone()
         };
 
         let content = {
@@ -135,10 +133,9 @@ pub async fn save_note(
                 .lock()
                 .map_err(|_| llava_core::Error::LockError)?;
 
-            notes_key_guard
+            *notes_key_guard
                 .as_ref()
                 .ok_or(llava_core::Error::NoKeyToDecryptANote)?
-                .clone()
         };
 
         let encrypted_content = {
@@ -177,10 +174,9 @@ pub async fn save_note(
                     .lock()
                     .map_err(|_| llava_core::Error::NoKeyToDecryptANote)?;
 
-                notes_key_guard
+                *notes_key_guard
                     .as_ref()
                     .ok_or(llava_core::Error::NoKeyToDecryptANote)?
-                    .clone()
             };
             let all_attachments_ids: Vec<(String, PathBuf)> =
                 llava_core::attachments::get_attachments_for_note(notes_db, &note_id)?;
@@ -268,15 +264,12 @@ pub async fn get_note_object(
             .lock()
             .map_err(|_| llava_core::Error::NoKeyToDecryptANote)?;
 
-        notes_key_guard
+        *notes_key_guard
             .as_ref()
             .ok_or(llava_core::Error::NoKeyToDecryptANote)?
-            .clone()
     };
 
-    Ok(llava_core::storage::get_note_struct(
-        &notes_key, note_id, notes_db,
-    )?)
+    llava_core::storage::get_note_struct(&notes_key, note_id, notes_db)
 }
 
 #[tauri::command]
@@ -302,10 +295,9 @@ pub async fn change_note_title(
                 .lock()
                 .map_err(|_| llava_core::Error::LockError)?;
 
-            notes_key_guard
+            *notes_key_guard
                 .as_ref()
                 .ok_or(llava_core::Error::NoKeyToDecryptANote)?
-                .clone()
         };
         let encrypted_title =
             llava_core::crypto_operations::encrypt_title(&notes_key, &note_id, notes_db, title)?;
@@ -332,9 +324,7 @@ pub async fn toggle_note_encryption(
         .as_ref()
         .ok_or(llava_core::Error::LockError)?;
 
-    Ok(llava_core::storage::toggle_note_encryption(
-        note_id, notes_db, value,
-    )?)
+    llava_core::storage::toggle_note_encryption(note_id, notes_db, value)
 }
 
 #[tauri::command]
