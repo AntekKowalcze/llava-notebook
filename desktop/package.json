@@ -19,6 +19,8 @@
     "@fontsource/outfit": "^5.2.8",
     "@headlessui/vue": "^1.7.23",
     "@milkdown/crepe": "^7.22.0",
+    "@milkdown/kit": "^7.22.1",
+    "@milkdown/plugin-emoji": "^7.22.1",
     "@milkdown/theme-nord": "^7.22.0",
     "@milkdown/vue": "^7.22.0",
     "@tauri-apps/api": "^2",

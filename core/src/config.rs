@@ -85,6 +85,7 @@ pub struct AppState {
 
     pub internet_connection: Mutex<bool>,
     pub server_connection: Mutex<bool>,
+    pub current_note: Mutex<Option<uuid::Uuid>>,
 }
 
 impl AppState {
@@ -103,6 +104,7 @@ impl AppState {
             server_client: Client::new(),
             internet_connection: Mutex::new(false),
             server_connection: Mutex::new(false),
+            current_note: Mutex::new(None),
         })
     }
 }

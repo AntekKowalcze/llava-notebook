@@ -19,7 +19,6 @@ import TagEdition from '../../components/editor/tagEdition.vue';
 import NoteHeader from '../../components/editor/NoteHeader.vue';
 import QuitModal from '../../components/editor/QuitModal.vue';
 const currentNoteStore = useCurrentNoteStore();
-
 let isDirty = false;
 let isClosing = false;
 let unlistenClose: (() => void) | null = null;
@@ -283,6 +282,7 @@ function getErrorText(err: unknown): string {
 
 async function saveNote(id: string = noteId.value): Promise<boolean> {
   try {
+    console.log(noteContent.value);
     await invoke('save_note', {
       noteId: id,
       content: noteContent.value,
@@ -379,12 +379,6 @@ function setWordCount(text = noteContent.value) {
     v-else
     class="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden"
   >
-    <NoteHeader
-      v-if="currentNoteStore.currentNote"
-      :note-id="currentNoteStore.currentNote.local_id"
-      :note-name="currentNoteStore.currentNote.title"
-    />
-
     <ArrowBigLeftDash
       class="absolute left-[2%] top-[93%] z-[100] cursor-pointer text-note-paprika/80 transition-transform duration-200 hover:scale-95 active:scale-90"
       @click="redirect"
@@ -394,7 +388,6 @@ function setWordCount(text = noteContent.value) {
       <PlusButton @change_encryption_method="changeEncMethod" />
     </div>
 
-    <!-- Kontener edytora z poprawnym scrollem -->
     <div class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <div class="relative h-full min-h-0 min-w-0 flex-1 overflow-y-auto">
         <MilkdownProvider>
@@ -406,5 +399,10 @@ function setWordCount(text = noteContent.value) {
         </MilkdownProvider>
       </div>
     </div>
+    <NoteHeader
+      v-if="currentNoteStore.currentNote"
+      :note-id="currentNoteStore.currentNote.local_id"
+      :note-name="currentNoteStore.currentNote.title"
+    />
   </div>
 </template>

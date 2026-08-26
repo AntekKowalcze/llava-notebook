@@ -39,7 +39,7 @@ pub const LOGS_PATH: &str = "llava/logs/app.log";
 pub const RECOVERY_CHANGE_WINDOW_MS: i64 = 180_000;
 //SQL
 
-pub const NOTES_DB_VERSION: i64 = 2;
+pub const NOTES_DB_VERSION: i64 = 1;
 pub const USERS_DB_VERSION: i64 = 3;
 pub const LOCAL_USER_DB_INSERT_SQL_SCHEMA: &str = r#"INSERT INTO users_data (
                 user_id,
@@ -129,7 +129,7 @@ pub const NOTE_DB_SCHEMA: &str = r#"
         encrypted INTEGER NOT NULL DEFAULT 1,
         crypto_meta TEXT,
     
-        CHECK(sync_state IN ('LocalOnly', 'PendingUpload', 'Synced', 'Conflict', 'Error', 'PendingDeleted'))
+        CHECK(sync_state IN ('LocalOnly', 'PendingUpload', 'Synced', 'Conflict', 'Error', 'PendingDeleted', 'WaitingForTombstone'))
     );
 
     CREATE INDEX IF NOT EXISTS idx_notes_owner_updated ON notes(owner_id, updated_at DESC);
@@ -157,7 +157,7 @@ pub const NOTE_DB_SCHEMA: &str = r#"
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
         
-        CHECK(sync_state IN ('LocalOnly', 'PendingUpload', 'Synced', 'Error'))
+        CHECK(sync_state IN ('LocalOnly', 'PendingUpload', 'Synced', 'Error', 'WaitingForTombstone'))
     );
 
     CREATE INDEX IF NOT EXISTS idx_attachments_note ON attachments(note_local_id);

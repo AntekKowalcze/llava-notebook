@@ -43,6 +43,8 @@ use chacha20poly1305::{ChaCha20Poly1305, Key};
 use rusqlite::{Connection, named_params};
 use serde::{Deserialize, Serialize};
 
+use crate::services::attachment::AttachmentCryptoMetadata;
+
 pub fn decrypt_note(
     notes_key: &Key,
     content: String,
@@ -452,4 +454,96 @@ fn save_crypto_metadata(
     );
 
     Ok(())
+}
+
+pub fn encrypt_attachment(
+    notes_key: &Key,
+    notes_db: &rusqlite::Connection,
+    file_content: &[u8],
+    attachment_id: String,
+) -> Result<Vec<u8>, crate::errors::Error> {
+    let nonce = ChaCha20Poly1305::generate_nonce(&mut OsRng);
+
+    let cipher = ChaCha20Poly1305::new(notes_key);
+
+    let encrypted_file = cipher
+        .encrypt(&nonce, file_content)
+        .context("failed to encrypt attachment")?;
+
+    let crypto_meta = AttachmentCryptoMetadata {
+        attachment_nonce: BASE64.encode(nonce),
+    };
+
+    let crypto_meta_json = serde_json::to_string(&crypto_meta)
+        .context("failed to serialize attachment crypto metadata")?;
+
+    notes_db
+        .execute(
+            r#"
+            UPDATE attachments
+            SET
+                crypto_meta = ?1,
+                encrypted = 1,
+                updated_at = ?2
+            WHERE attachment_id = ?3
+            "#,
+            rusqlite::params![crypto_meta_json, crate::utils::get_time(), attachment_id],
+        )
+        .context("failed to update attachment crypto metadata")?;
+
+    Ok(encrypted_file)
+    // TODO recalculate blake3 after encryption
+}
+
+pub fn decrypt_attachment(
+    notes_key: &Key,
+    notes_db: &rusqlite::Connection,
+    attachment_id: String,
+) -> Result<Vec<u8>, crate::errors::Error> {
+    let (local_path, crypto_meta_json, encrypted): (String, String, bool) = notes_db
+        .query_row(
+            r#"
+            SELECT
+                local_path,
+                crypto_meta,
+                encrypted
+            FROM attachments
+            WHERE attachment_id = ?1
+            "#,
+            rusqlite::params![attachment_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .context("failed to get attachment metadata")?;
+
+    if !encrypted {
+        return Err(anyhow::anyhow!("attachment is not encrypted").into());
+    }
+
+    let crypto_meta: AttachmentCryptoMetadata = serde_json::from_str(&crypto_meta_json)
+        .context("failed to parse attachment crypto metadata")?;
+
+    let nonce_bytes = BASE64
+        .decode(&crypto_meta.attachment_nonce)
+        .context("failed to decode attachment nonce")?;
+
+    if nonce_bytes.len() != 12 {
+        return Err(anyhow::anyhow!(
+            "invalid attachment nonce length: expected 12 bytes, got {}",
+            nonce_bytes.len()
+        )
+        .into());
+    }
+
+    let nonce = Nonce::from_slice(&nonce_bytes);
+
+    let encrypted_file =
+        std::fs::read(&local_path).context("failed to read encrypted attachment")?;
+
+    let cipher = ChaCha20Poly1305::new(notes_key);
+
+    let decrypted_file = cipher
+        .decrypt(nonce, encrypted_file.as_ref())
+        .context("failed to decrypt attachment")?;
+
+    Ok(decrypted_file)
 }

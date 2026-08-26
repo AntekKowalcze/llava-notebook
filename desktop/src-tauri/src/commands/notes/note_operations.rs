@@ -1,4 +1,7 @@
+use anyhow::Context;
 use llava_core::{storage::SyncState, Note, ProgramFiles};
+use std::sync::Mutex;
+use std::{path::PathBuf, str::FromStr};
 #[tauri::command]
 pub async fn get_note_content(
     note_id: String,
@@ -33,7 +36,11 @@ pub async fn get_note_content(
 
         llava_core::storage::get_note(&note_id, notes_db)?
     };
-
+    *state
+        .current_note
+        .lock()
+        .map_err(|_| llava_core::Error::LockError)? =
+        Some(uuid::Uuid::from_str(&note_id).context("failed to parse uuid")?);
     let note_content = llava_core::storage::get_note_content(&note.content_path)?;
 
     if note.encrypted {
@@ -175,11 +182,22 @@ pub async fn save_note(
                     .ok_or(llava_core::Error::NoKeyToDecryptANote)?
                     .clone()
             };
+            let all_attachments_ids: Vec<(String, PathBuf)> =
+                llava_core::attachments::get_attachments_for_note(notes_db, &note_id)?;
 
             if !next_value {
                 let title =
                     llava_core::crypto_operations::decrypt_title(&note_id, &notes_key, notes_db)?;
                 llava_core::storage::update_title(notes_db, &note_id, title)?;
+                for (id, path) in all_attachments_ids {
+                    let attachment = llava_core::crypto_operations::decrypt_attachment(
+                        &notes_key, notes_db, id,
+                    )?;
+                    llava_core::attachments::update_attachment_file(&path, attachment)?;
+                }
+                llava_core::attachments::toggle_attachments_encryption_for_note(
+                    notes_db, false, &note_id,
+                )?;
             } else {
                 let unencrypted_title = llava_core::storage::get_title(&note_id, notes_db)?;
                 let title = llava_core::crypto_operations::encrypt_title(
@@ -188,7 +206,22 @@ pub async fn save_note(
                     notes_db,
                     unencrypted_title,
                 )?;
-                llava_core::storage::update_title(notes_db, &note_id, title)?
+                llava_core::storage::update_title(notes_db, &note_id, title)?;
+
+                for (id, path) in all_attachments_ids {
+                    let attachment =
+                        llava_core::attachments::read_attachment(&notes_key, notes_db, id.clone())?;
+                    let encrypted_attachment = llava_core::crypto_operations::encrypt_attachment(
+                        &notes_key,
+                        notes_db,
+                        &attachment,
+                        id,
+                    )?;
+                    llava_core::attachments::update_attachment_file(&path, encrypted_attachment)?;
+                }
+                llava_core::attachments::toggle_attachments_encryption_for_note(
+                    notes_db, true, &note_id,
+                )?;
             }
             llava_core::storage::toggle_note_encryption(note_id, notes_db, next_value)?;
         }

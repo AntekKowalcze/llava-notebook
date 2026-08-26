@@ -30,8 +30,8 @@ Master Key (32 random bytes, generated once at online account creation)
 
 ### Note Encryption
 
-- Notes encrypted with **Local Key** (no online account) or **Master Key** (online linked)
-- Each note has its own `nonce` (12 bytes, random, stored with ciphertext)
+- Each note has- Notes encrypted with **Local Key** (no online account) or **Master Key** (online linked)
+ its own `nonce` (12 bytes, random, stored with ciphertext)
 - `key_type` field on each note tells the app which key to use for decryption
 
 ### Image/Attachment Encryption

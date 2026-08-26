@@ -36,8 +36,8 @@ pub mod storage {
     pub use crate::services::storage::note_operations::restore_deleted_note;
     pub use crate::services::storage::note_operations::update_title;
     pub use crate::services::storage::note_operations::{
-        check_if_note_is_encrypted, get_note, get_note_content, toggle_note_encryption,
-        toggle_note_sync, verify_note_owner,
+        check_if_note_is_encrypted, check_if_note_is_synced, get_note, get_note_content,
+        toggle_note_encryption, toggle_note_sync, verify_note_owner,
     };
     pub use crate::services::storage::update::update_md;
 }
@@ -76,8 +76,10 @@ pub mod online_auth {
 }
 
 pub mod crypto_operations {
+    pub use crate::crypto::decrypt_attachment;
     pub use crate::crypto::decrypt_note;
     pub use crate::crypto::decrypt_title;
+    pub use crate::crypto::encrypt_attachment;
     pub use crate::crypto::encrypt_data;
     pub use crate::crypto::encrypt_title;
 }
@@ -102,4 +104,16 @@ pub mod note_stats {
 
 pub mod clean {
     pub use crate::services::cleaner::hard_deletes_terminated_notes;
+}
+// TODO on quit note, parse content, get attachments that really are in note, and clean rest,
+pub mod attachments {
+    pub use crate::models::attachment::Attachment;
+    pub use crate::services::attachment::check_if_attachment_is_encrypted;
+    pub use crate::services::attachment::create_attachment;
+    pub use crate::services::attachment::delete_attachment;
+    pub use crate::services::attachment::get_attachments_for_note;
+    pub use crate::services::attachment::read_attachment;
+    pub use crate::services::attachment::toggle_attachments_encryption_for_note;
+    pub use crate::services::attachment::toggle_attachments_sync_for_note;
+    pub use crate::services::attachment::update_attachment_file;
 }

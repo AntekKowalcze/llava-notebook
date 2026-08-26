@@ -150,7 +150,14 @@ function seeRemovedNotes() {
       </div>
 
       <div class="space-y-1">
+        <p
+          v-if="panelData.recentlyEdited.length === 0"
+          class="text-md text-white/80"
+        >
+          No notes yet.
+        </p>
         <button
+          v-else
           v-for="note in panelData.recentlyEdited"
           :key="note.title"
           @click="redirectToNote(note.noteId)"

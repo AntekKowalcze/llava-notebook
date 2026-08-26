@@ -2,9 +2,7 @@
 use std::path::PathBuf;
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Attachment {
-    #[serde(with = "uuid::serde::simple")]
     pub attachment_id: uuid::Uuid,
-    #[serde(with = "uuid::serde::simple")]
     pub note_local_id: uuid::Uuid,
 
     pub filename: String,
@@ -16,10 +14,11 @@ pub struct Attachment {
 
     pub checksum_encrypted: String,
     pub encrypted: bool,
-    pub crypto_meta: Option<serde_json::Value>,
+    pub crypto_meta: String,
 
     pub sync_state: crate::services::storage::db_creation::SyncState,
 
     pub created_at: i64,
     pub updated_at: i64,
 }
+// TODO run attachment deletation on note removal

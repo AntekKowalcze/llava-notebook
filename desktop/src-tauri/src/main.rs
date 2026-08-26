@@ -1,3 +1,34 @@
+//! # Application entry point
+//! **Purpose**: Bootstraps the Tauri application: resolves filesystem paths, opens the
+//! local login database, resolves/generates the device id, builds the single
+//! `tauri::Builder` chain (plugins, custom protocols, managed state, commands), and
+//! hands control to Tauri's event loop via `.run()`.
+//!
+//! ## Exported items
+//! * [`main`] — Binary entry point. Not called directly anywhere else; invoked by the
+//!   generated Tauri runtime shim (`#[cfg_attr(mobile, tauri::mobile_entry_point)]`
+//!   makes this the entry point on mobile targets too).
+//!
+//! ## Key design decisions
+//! This file must contain **exactly one** `tauri::Builder` chain, ending in **exactly
+//! one** `.run(...)` call. `.run()` blocks until the app exits and consumes the
+//! builder by value, so a second chain or a leftover scaffold block after it is
+//! either a compile error (moved value) or dead code that silently never executes.
+//! This bit us once already with the `attachment://` protocol registration living in
+//! an unreferenced scaffold `main.rs` — see `commands::attachments::protocol` for the
+//! writeup. If you're pasting in example code from docs, put it in a scratch file
+//! outside `src-tauri/src`, not here.
+//!
+//! `AppState` fields are populated incrementally: `users_db` and `device_id` are set
+//! here at startup since they don't depend on a logged-in user; `notes_db` and
+//! `notes_key` are populated later, on login (see the auth commands), since they
+//! require the user's credentials to derive the decryption key.
+//!
+//! ## Dependencies
+//! - `tauri` — `Builder`, `Manager`, `Emitter`, application lifecycle
+//! - `llava_core` — `ProgramFiles`, `AppState`, local login DB, device id, logger, settings
+//! - `commands` — all `#[tauri::command]` handlers plus the `attachment://` protocol registration
+
 //Prevents additional console window on Windows in release
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -6,6 +37,8 @@ use llava_core::ProgramFiles;
 use tauri::Emitter;
 use tauri::Manager;
 mod commands;
+mod protocols;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn main() {
     let program_paths: ProgramFiles =
@@ -36,9 +69,11 @@ pub fn main() {
     let device_id = llava_core::get_device_id(&user_db, &program_paths.device_id_path)
         .expect("big error while reading device id");
     println!("{}", device_id);
+
     let mut builder = tauri::Builder::default();
     builder = builder.plugin(tauri_plugin_opener::init());
     builder = builder.plugin(tauri_plugin_clipboard_manager::init());
+    builder = protocols::protocol::register(builder);
 
     // #[cfg(debug_assertions)]
     // {
@@ -60,6 +95,9 @@ pub fn main() {
     state.paths = std::sync::Mutex::from(Some(program_paths));
 
     builder
+        // Runs once, after plugins/state are wired but before the window is shown.
+        // Loads the persisted user config (if any), pushes it to the frontend via the
+        // `config-updated` event, and starts the background connection-status monitor.
         .setup(|app: &mut tauri::App| {
             app.manage(state);
             let app_state = app.state::<llava_core::AppState>();
@@ -122,6 +160,7 @@ pub fn main() {
             commands::notes::note_operations::hard_delete_note,
             commands::notes::note_operations::restore_note,
             commands::note_managing_views::get_all_removed_notes_data,
+            commands::attachments::create_attachment::create_attachment,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

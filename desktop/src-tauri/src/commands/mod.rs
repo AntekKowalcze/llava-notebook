@@ -1,3 +1,4 @@
+pub mod attachments;
 mod command_helpers;
 pub mod dashboard;
 pub mod handlers;

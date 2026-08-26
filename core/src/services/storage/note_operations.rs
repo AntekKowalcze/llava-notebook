@@ -367,6 +367,7 @@ pub fn toggle_note_sync(
                     },
                 )
                 .context("failed to toggle sync state")?;
+            notes_db.execute("UPDATE attachments SET sync_state = 'LocalOnly' WHERE note_local_id = :note_id AND sync_state != 'WaitingForTombstone'", named_params! {":note_id": note_id}).context("failed to toggle sync state for attachments")?;
         }
 
         SyncState::PendingUpload => {
@@ -378,6 +379,7 @@ pub fn toggle_note_sync(
                     },
                 )
                 .context("failed to toggle sync state")?;
+            notes_db.execute("UPDATE attachments SET sync_state = 'PendingUpload' WHERE note_local_id = :note_id AND sync_state != 'WaitingForTombstone'", named_params! {":note_id": note_id}).context("failed to toggle sync state for attachments")?;
         }
 
         _ => return Err(crate::errors::Error::FatalError),
@@ -754,7 +756,7 @@ pub fn hard_delete_note(
             "note is not deleted".to_string(),
         ));
     }
-
+    // TODO make filename in attachments as uuid so there are no problems with privacy
     /*
      * For synchronized notes, keep the database row as an outbox entry
      * for the tombstone.
@@ -763,6 +765,15 @@ pub fn hard_delete_note(
      * WaitingForTombstone is not committed.
      */
     if sync_state == SyncState::PendingDeleted {
+        let attachments: Vec<(String, PathBuf)> =
+            crate::services::attachment::get_attachments_for_note(notes_db, note_id)?;
+        for (_, path) in attachments {
+            match fs::remove_file(&path) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => return Err(e.into()),
+            }
+        }
         let tx = notes_db
             .unchecked_transaction()
             .context("failed to start hard delete transaction")?;
@@ -789,6 +800,12 @@ pub fn hard_delete_note(
 
             crate::errors::Error::InternalError(e.to_string())
         })?;
+
+        tx.execute(
+            "UPDATE attachments SET sync_state = 'WaitingForTombstone' WHERE note_local_id = :id",
+            named_params! {":id": note_id},
+        )
+        .context("Failed to put attachments to tombstone")?;
 
         // The file is no longer needed locally.
         fs::remove_file(&delete_path)
@@ -882,4 +899,20 @@ pub fn hard_delete_note(
     Ok(())
 }
 
-// TODO attatchments manipulation
+pub fn check_if_note_is_synced(
+    note_id: &str,
+    notes_db: &Connection,
+) -> Result<bool, crate::errors::Error> {
+    let sync_status: SyncState = notes_db
+        .query_row(
+            "SELECT sync_state FROM notes WHERE local_id = :id",
+            named_params! {":id": note_id},
+            |row| Ok(row.get(0)?),
+        )
+        .context("Failed to get is synced")?;
+    let synced = match sync_status {
+        SyncState::LocalOnly => false,
+        _ => true,
+    };
+    Ok(synced)
+}
