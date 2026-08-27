@@ -58,7 +58,7 @@ export const useMetaStore = defineStore('metaStore', () => {
     (newValue) => {
       if (newValue === null) return;
       const toast = useToast();
-      if (newValue) {
+      if (newValue && location.hash != "/login") {
         toast.success('Internet connected');
       } else {
         toast.error('Lost internet connection');

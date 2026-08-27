@@ -118,13 +118,13 @@ pub async fn login_command(
             .lock()
             .map_err(|_| anyhow!("failed to lock users_db"))?;
 
-        let users_db = conn_guard.as_mut().ok_or(llava_core::Error::LockError)?;
+        let mut users_db = conn_guard.as_mut().ok_or(llava_core::Error::LockError)?;
         let paths = paths_guard.as_ref().ok_or(llava_core::Error::LockError)?;
         let timeout = crate::commands::handlers::local_auth::check_timeout(&username, users_db)?; //returns diff between current timestamp and end of lock timestamp
         if timeout > 0 {
             return Err(llava_core::Error::AccountLocked(0));
         }
-        crate::commands::handlers::local_auth::login(username.clone(), password, paths, users_db)?
+        crate::commands::handlers::local_auth::login(username.clone(), password, paths, &mut users_db)?
     };
 
     let id = {

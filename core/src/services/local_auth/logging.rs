@@ -630,6 +630,7 @@ pub fn get_timeout(users_db: &Connection, uuid: &uuid::Uuid) -> Result<i64, crat
     Ok(timeout)
 }
 
+
 pub fn session_operations(
     users_db: &Connection,
     user_id: uuid::Uuid,
@@ -883,7 +884,8 @@ pub async fn check_online_login(
                 if body_text.is_empty() {
                     "Internal server error, you will be not logged in".to_string()
                 } else {
-                    format!("Internal server error: {}", body_text)
+                    let err_str = format!("Internal server error: {}", body_text);
+                    err_str
                 },
             )));
         } else if status_code == 401 {
@@ -904,6 +906,19 @@ pub async fn check_online_login(
         .set_password(&tokens.refresh_token.0)
         .context("failed to save refresh token in keyring")?;
     Ok(tokens.access_token)
+}
+
+
+pub fn invalidate_session_for_user(user_id: &str, users_db: &Connection) -> Result<(), crate::errors::Error> {
+    users_db.execute("DELETE FROM session_data WHERE user_id = ?1", rusqlite::params![user_id]).context("Failed to invalidate sesisons")?;
+Ok(())
+}
+
+pub fn invalidate_recovery_keys(users_db: &Connection ,user_id: &str) -> Result<(), crate::errors::Error> {
+
+    users_db.execute("DELETE FROM recovery_keys WHERE user_id = ?1", rusqlite::params![user_id]).context("failed to invalidate recovery keys")?;
+
+    Ok(())
 }
 
 //workds only after register test
@@ -929,3 +944,5 @@ fn login_test() {
     let home_path = std::env::temp_dir();
     local_log_in(username, password, &mut users_db, &paths).unwrap();
 }
+
+

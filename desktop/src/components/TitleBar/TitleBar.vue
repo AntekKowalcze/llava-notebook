@@ -7,7 +7,8 @@ import StatusBox from './StatusBox.vue';
 import { useMetaStore } from '../../stores/metaStore.ts';
 import { useAuthStore } from '../../stores/auth.ts';
 import { useOnlineAuthStore } from '../../stores/onlineAuth.ts';
-
+import { useToast } from 'vue-toastification';
+const toast = useToast();
 const layout = useLayoutStore();
 const metaStore = useMetaStore();
 const authStore = useAuthStore();
@@ -51,7 +52,11 @@ const toggleMaximize = async () => {
 };
 
 const closeWin = async () => {
+  if (!layout.reencrypting){
   await win.close();
+  }else {
+    toast.success("You can't leave application now")
+  }
 };
 </script>
 

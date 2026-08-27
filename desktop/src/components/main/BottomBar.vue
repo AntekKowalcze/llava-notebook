@@ -72,10 +72,6 @@ const isEditor = computed(() => route.name === 'editor');
 const encrypted = computed(() => userConfig.config['local.encryption']);
 const local = computed(() => userConfig.config['online.sync'] === 'off');
 
-const connected = computed<boolean | null>(
-  () => metaStore.isConnectedToServer && metaStore.isConnectedToInternet
-);
-
 const isLocal = computed(() => userConfig.config['local.mode'] === 'off');
 
 defineProps<{ version: string; synced: string }>();
@@ -169,24 +165,6 @@ function formatTimeAgo(timestamp: number, currentTime: number): string {
     </div>
 
     <div class="flex items-center gap-2">
-      <!-- online -->
-      <div
-        class="flex items-center gap-1.5 text-green-500"
-        v-if="connected"
-      >
-        <Cloud :size="12" />
-        <span>Online mode</span>
-      </div>
-
-      <!-- offline -->
-      <div
-        class="flex items-center gap-1.5 text-note-garnet"
-        v-else
-      >
-        <CloudOff :size="12" />
-        <span>No connection</span>
-      </div>
-
       <div class="h-3 w-px bg-white/10" />
 
       <!-- sync off -->
@@ -200,7 +178,7 @@ function formatTimeAgo(timestamp: number, currentTime: number): string {
 
       <!-- synced -->
       <div
-        class="flex items-center gap-1.5 text-note-glow"
+        class="flex items-center gap-1.5 text-green-500"
         v-if="!local"
       >
         <CloudCheck :size="12" />
@@ -235,7 +213,7 @@ function formatTimeAgo(timestamp: number, currentTime: number): string {
         v-if="!isLocal"
       >
         <HardDrive :size="11" />
-        <span>Disk</span>
+        <span>Local mode</span>
       </div>
 
       <!-- cloud -->
@@ -244,7 +222,7 @@ function formatTimeAgo(timestamp: number, currentTime: number): string {
         v-else
       >
         <Server :size="11" />
-        <span>Cloud</span>
+        <span>Online mode</span>
       </div>
 
       <div class="h-3 w-px bg-white/10" />

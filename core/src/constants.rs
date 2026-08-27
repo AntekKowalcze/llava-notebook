@@ -208,9 +208,6 @@ pub const LOCAL_LOGIN_DB_SCHEMA: &str = r#" CREATE TABLE IF NOT EXISTS users_dat
                         nonce_notes_key BLOB NOT NULL,
                         kek_salt TEXT,
                         kek_argon_params TEXT,
-                        master_key_enc BLOB,
-                        master_key_nonce BLOB,
-                        master_kek_salt TEXT,
                         is_online_linked INTEGER NOT NULL DEFAULT 0, 
                         online_account_email TEXT DEFAULT NULL, 
                         online_account_id TEXT DEFAULT NULL,
@@ -246,3 +243,5 @@ pub const LOCAL_LOGIN_DB_SCHEMA: &str = r#" CREATE TABLE IF NOT EXISTS users_dat
                         FOREIGN KEY(user_id) REFERENCES users_data(user_id) ON DELETE CASCADE);
                               
                         "#;
+// TODO after reencryption im not changing size in bytes
+// TODO delete unused columns in users_data

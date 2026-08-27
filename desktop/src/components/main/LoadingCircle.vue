@@ -1,14 +1,44 @@
 <script setup lang="ts"></script>
 
 <template>
-  <div style="transform-origin: center; display: inline-block">
-    <div
-      class="m-auto h-32 w-32 animate-spin rounded-full border-[7px] border-b-[18px] border-t-[18px] border-note-paprika shadow-[0_0_60px_rgba(249,115,22,0.8)] [animation-duration:3s]"
-    ></div>
+  <div class="spinner-wrapper">
+    <div class="spinner"></div>
   </div>
 </template>
 
 <style scoped>
+.spinner-wrapper {
+  display: inline-block;
+  transform-origin: center;
+}
+
+.spinner {
+  width: 8rem;
+  height: 8rem;
+  margin: auto;
+
+  border: 7px solid #f97316;
+  border-top-width: 18px;
+  border-bottom-width: 18px;
+  border-radius: 50%;
+
+  box-shadow: 0 0 60px rgba(249, 115, 22, 0.8);
+
+  animation:
+    my-spin 2s linear infinite,
+    borderColor 2s ease-in-out infinite;
+}
+
+@keyframes my-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @keyframes borderColor {
   0%,
   100% {
@@ -18,11 +48,5 @@
   50% {
     border-color: #d77f0c;
   }
-}
-
-div > div {
-  animation:
-    spin 1.7s linear infinite,
-    borderColor 2s ease-in-out infinite;
 }
 </style>

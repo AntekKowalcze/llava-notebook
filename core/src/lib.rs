@@ -16,10 +16,10 @@ pub mod local_auth {
     pub use crate::services::local_auth::logging::{
         autorization, change_last_login, check_error_count, check_if_user_logged_in,
         check_online_login, get_optional_online_id, get_timeout, local_log_in, local_logout,
-        log_with_code, zero_error_count,
+        log_with_code, zero_error_count, invalidate_session_for_user,session_operations, invalidate_recovery_keys
     };
     pub use crate::services::local_auth::register::{
-        change_password, recovery_code_handling, register_user_offline,
+        change_password, recovery_code_handling, register_user_offline,rewrap_key,generate_recovery_codes_with_new_key
     };
     pub use crate::services::local_auth::utils::check_if_first_start;
 }
@@ -82,6 +82,7 @@ pub mod crypto_operations {
     pub use crate::crypto::encrypt_attachment;
     pub use crate::crypto::encrypt_data;
     pub use crate::crypto::encrypt_title;
+    pub use crate::crypto::reencrypt_db;
 }
 
 pub use config::get_device_id;

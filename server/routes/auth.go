@@ -266,6 +266,7 @@ func (h *Handler) Login(c fiber.Ctx) error {
 		if _, err = jwtColl.InsertOne(ctx, refreshInsert); err != nil {
 			return middleware.Internal("couldn't save refresh token")
 		}
+
 		usersColl.UpdateOne(ctx, bson.M{"_id": user.ID}, bson.M{
 			"$set": bson.M{
 				"last_login":      time.Now().UnixMilli(),
