@@ -10,3 +10,5 @@ pub mod settings;
 pub mod sliding_panel;
 pub mod tags;
 pub mod utils;
+pub mod sync;
+pub mod ai;

@@ -68,9 +68,6 @@ pub fn register_user_offline(
         nonce_notes_key: nonce_for_key_wrap,
         kek_salt: salt,
         kek_argon_params: argon_params,
-        master_key_enc: None,
-        master_key_nonce: None,
-        master_kek_salt: None,
         is_online_linked: false,
         online_account_email: None,
         online_account_id: None,
@@ -93,9 +90,6 @@ pub fn register_user_offline(
         ":password_hash":new_user.password_hash,
         ":notes_key":new_user.notes_key,
         ":nonce_notes_key":new_user.nonce_notes_key,
-        ":master_key_enc": new_user.master_key_enc,
-        ":master_key_nonce": new_user.master_key_nonce,
-        ":master_kek_salt": new_user.master_kek_salt,
         ":kek_salt": new_user.kek_salt,
         ":kek_argon_params": new_user.kek_argon_params,
         ":is_online_linked": new_user.is_online_linked,
@@ -603,7 +597,6 @@ pub fn change_password(
     Err(crate::errors::Error::CodeNotFound)
 }
 
-
 pub fn rewrap_key(
     new_key: &Key,
     users_db: &Connection,
@@ -624,23 +617,18 @@ pub fn rewrap_key(
             },
         )
         .context("failed to get password hash and Argon2 parameters")?;
-    let params_s: ArgonParams = serde_json::from_str(&params)
-        .context("failed to parse Argon2 parameters")?;
+    let params_s: ArgonParams =
+        serde_json::from_str(&params).context("failed to parse Argon2 parameters")?;
 
-    let argon_params = argon2::Params::new(
-        params_s.m_cost,
-        params_s.t_cost,
-        params_s.p_cost,
-        None,
-    )
-    .context("failed to create Argon2 parameters")?;
+    let argon_params = argon2::Params::new(params_s.m_cost, params_s.t_cost, params_s.p_cost, None)
+        .context("failed to create Argon2 parameters")?;
 
     let argon2 = Argon2::new(
         argon2::Algorithm::Argon2id,
         argon2::Version::V0x13,
         argon_params,
     );
-  
+
     let salt: String = users_db
         .query_row(
             r#"
@@ -656,16 +644,10 @@ pub fn rewrap_key(
     let mut kek_bytes = [0u8; 32];
 
     argon2
-        .hash_password_into(
-            password.as_bytes(),
-            salt.as_bytes(),
-            &mut kek_bytes,
-        )
+        .hash_password_into(password.as_bytes(), salt.as_bytes(), &mut kek_bytes)
         .context("failed to derive local KEK")?;
 
-    let kek = ChaCha20Poly1305::new(
-        Key::from_slice(&kek_bytes),
-    );
+    let kek = ChaCha20Poly1305::new(Key::from_slice(&kek_bytes));
 
     let nonce = ChaCha20Poly1305::generate_nonce(&mut OsRng);
 
@@ -684,18 +666,12 @@ pub fn rewrap_key(
                 nonce_notes_key = ?2
             WHERE user_id = ?3
             "#,
-            params![
-                wrapped_notes_key,
-                nonce.as_slice(),
-                user_id,
-            ],
+            params![wrapped_notes_key, nonce.as_slice(), user_id,],
         )
         .context("failed to save re-wrapped notes key")?;
 
     Ok(())
 }
-
-
 
 pub fn generate_recovery_codes_with_new_key(
     new_key: &Key,
@@ -713,8 +689,7 @@ pub fn generate_recovery_codes_with_new_key(
         .context("failed to get Argon2 parameters")?;
 
     let argon_params: ArgonParams =
-        serde_json::from_str(&params_string)
-            .context("failed to parse Argon2 parameters")?;
+        serde_json::from_str(&params_string).context("failed to parse Argon2 parameters")?;
 
     let params = argon2::Params::new(
         argon_params.m_cost,
@@ -724,11 +699,7 @@ pub fn generate_recovery_codes_with_new_key(
     )
     .context("failed to create Argon2 parameters")?;
 
-    let argon2 = Argon2::new(
-        argon2::Algorithm::Argon2id,
-        argon2::Version::V0x13,
-        params,
-    );
+    let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
 
     for _ in 0..NUMBER_OF_KEYS {
         let (mut code_hash, user_readable, wrapped_key, nonce, kdf_salt) =
@@ -749,13 +720,7 @@ pub fn generate_recovery_codes_with_new_key(
                 )
                 VALUES (?1, ?2, NULL, ?3, ?4, ?5)
                 "#,
-                rusqlite::params![
-                    user_id,
-                    code_hash,
-                    wrapped_key,
-                    nonce,
-                    kdf_salt
-                ],
+                rusqlite::params![user_id, code_hash, wrapped_key, nonce, kdf_salt],
             )
             .context("failed to insert recovery key")?;
 
@@ -764,7 +729,6 @@ pub fn generate_recovery_codes_with_new_key(
 
     Ok(user_visible_codes)
 }
-
 
 #[test]
 fn test_password_validation() {

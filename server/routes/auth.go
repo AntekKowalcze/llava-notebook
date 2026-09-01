@@ -54,11 +54,9 @@ func (h *Handler) Register(c fiber.Ctx) error {
 		MasterKeyNonce:   localUser.MasterKeyNonce,
 		KekSalt:          localUser.KekSalt,
 		ArgonParams:      localUser.ArgonParams,
-
-		StorageUsed:    localUser.StorageUsed,
-		QuotaBytes:     localUser.QuotaBytes,
-		FailedAttempts: 0,
-		LockoutUntil:   nil,
+		QuotaUsed:        localUser.QuotaBytes,
+		FailedAttempts:   0,
+		LockoutUntil:     nil,
 
 		CreatedAt: time.Now().UnixMilli(),
 		LastLogin: time.Now().UnixMilli(),

@@ -1,0 +1,1112 @@
+@baseUrl = http://127.0.0.1:3000
+@token = eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YTk0OTM4MjI2MGNjNzQzODczY2NiZjUiLCJhdWQiOlsibGxhdmEtc2VydmVyIl0sImV4cCI6MTc4ODE2NjM5NiwiaWF0IjoxNzg4MTY1NDk2LCJkZXZpY2VfaWQiOiI1NTBlODQwMC1lMjliLTQxZDQtYTcxNi00NDY2NTU0NDAwMDAifQ.5c67_vgXVXF_6efinFcfN6J9ry3VrpfdEOjTE3SLF_pDfyn7JQZyrLOw34ZxiefnFGTzRLrYbRNelku_rUfVsw
+
+# Uruchamiaj po kolei, od gory do dolu - czesc requestow (upload -> update ->
+# sync-check -> hard delete) zaklada wykonanie poprzednich w tej samej sesji
+# REST Clienta (zmienne typu {{uploadNote.response.body.$.mongo_id}}).
+#
+# Ten plik pokrywa strukty z models.go: CheckSyncRequest, CheckNoteSyncStatus,
+# AttachmentSyncCheck, CheckSyncResponse, NoteUploadRequest - walidacje,
+# typy, wartosci brzegowe i logike biznesowa endpointow ktore je uzywaja.
+
+###############################################################################
+# SEKCJA 1: CheckNoteSyncStatus - walidacja pol i bledy parsowania
+###############################################################################
+
+### 1.1 Brak wymaganego pola local_id -> 400 (validate:"required")
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [ { "hard_deleted": false } ],
+  "full_sync": false
+}
+
+### Oczekiwane: 400 "Wrong check sync struct was sent"
+
+
+### 1.2 local_id jako PUSTY string -> 400
+# required w go-playground/validator odrzuca zero value typu, dla stringa to ""
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [ { "local_id": "", "hard_deleted": false } ],
+  "full_sync": false
+}
+
+### Oczekiwane: 400 "Wrong check sync struct was sent"
+
+
+### 1.3 cloud_id w niepoprawnym formacie (nie jest to 24-znakowy hex ObjectID)
+# -> blad juz na etapie unmarshalowania JSON (bson.ObjectID.UnmarshalJSON), nie walidacji
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [
+    { "local_id": "{{$guid}}", "cloud_id": "to-nie-jest-objectid", "hard_deleted": false, "cloud_version": 1 }
+  ],
+  "full_sync": false
+}
+
+### Oczekiwane: 400 "Couldnt read body data" (blad parsowania, PRZED walidacja)
+
+
+### 1.4 hard_deleted jako string zamiast bool -> blad typu JSON
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [ { "local_id": "{{$guid}}", "hard_deleted": "true" } ],
+  "full_sync": false
+}
+
+### Oczekiwane: 400 "Couldnt read body data" (json: cannot unmarshal string into bool)
+
+
+### 1.5 cloud_version jako string zamiast liczby -> blad typu JSON
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [
+    { "local_id": "{{$guid}}", "cloud_id": "507f1f77bcf86cd799439011", "hard_deleted": false, "cloud_version": "1" }
+  ],
+  "full_sync": false
+}
+
+### Oczekiwane: 400 "Couldnt read body data"
+
+
+### 1.6 to_check = null -> traktowane jak brak notatek (nil slice), nie blad
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": null,
+  "full_sync": false
+}
+
+### Oczekiwane: 200, wszystkie listy w odpowiedzi puste
+
+
+### 1.7 to_check calkowicie pominiete w body -> to samo co null (zero value)
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "full_sync": false
+}
+
+### Oczekiwane: 200, wszystkie listy w odpowiedzi puste
+
+
+### 1.8 full_sync pominiete -> domyslnie false (zero value bool), nie 400
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": []
+}
+
+### Oczekiwane: 200, brak pelnego skanu (bo full_sync=false)
+
+
+### 1.9 nieznane/dodatkowe pole w JSON -> ignorowane przez encoding/json domyslnie
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [ { "local_id": "{{$guid}}", "hard_deleted": false, "nieistniejace_pole": "cokolwiek" } ],
+  "full_sync": false,
+  "kolejne_smieciowe_pole": 123
+}
+
+### Oczekiwane: 200, dodatkowe pola zignorowane, notatka trafia do to_upload
+
+
+### 1.10 pusta tablica to_check + full_sync=false -> baseline, sanity check
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [],
+  "full_sync": false
+}
+
+### Oczekiwane: 200, kazda lista w CheckSyncResponse to pusta tablica (nie null,
+### bo pola sa inicjalizowane jako []string{} / []DownloadNote{} w handlerze)
+
+
+###############################################################################
+# SEKCJA 2: CheckNoteSyncStatus - logika biznesowa (stan synchronizacji)
+###############################################################################
+
+### 2.1 Nowa notatka bez cloud_id -> to_upload
+@localIdNowa = {{$guid}}
+
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [ { "local_id": "{{localIdNowa}}", "hard_deleted": false } ],
+  "full_sync": false
+}
+
+### Oczekiwane: 200, to_upload zawiera {{localIdNowa}}
+
+
+### 2.2 cloud_id wskazuje na NIEISTNIEJACY dokument -> to_upload
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [
+    { "local_id": "{{$guid}}", "cloud_id": "507f1f77bcf86cd799439011", "hard_deleted": false, "cloud_version": 1 }
+  ],
+  "full_sync": false
+}
+
+### Oczekiwane: 200, to_upload zawiera ten local_id (ErrNoDocuments -> upload)
+
+
+### 2.3 cloud_id ustawiony, ale cloud_version BRAK (nie hard-delete) -> notes_failed
+# checkNoteSync zwraca blad "cloud version is required when cloud ID is set for note X"
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [
+    { "local_id": "{{$guid}}", "cloud_id": "507f1f77bcf86cd799439011", "hard_deleted": false }
+  ],
+  "full_sync": false
+}
+
+### Oczekiwane: 200, notes_failed zawiera ten local_id
+
+
+### 2.4 Hard delete notatki, ktora NIGDY nie istniala w chmurze (cloud_id = null)
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [ { "local_id": "{{$guid}}", "hard_deleted": true } ]
+}
+
+### Oczekiwane: 200, notatka NIE pojawia sie w zadnej z list (prawdziwy no-op)
+
+
+### 2.5 Hard delete z cloud_id, ale BEZ cloud_version -> notes_failed
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [
+    { "local_id": "{{$guid}}", "cloud_id": "507f1f77bcf86cd799439011", "hard_deleted": true }
+  ]
+}
+
+### Oczekiwane: 200, notes_failed zawiera ten local_id
+
+
+### 2.6 Batch: wiele notatek naraz w roznych stanach (test rownoleglosci goroutine/errgroup)
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [
+    { "local_id": "{{$guid}}", "hard_deleted": false },
+    { "local_id": "{{$guid}}", "cloud_id": "507f1f77bcf86cd799439011", "hard_deleted": false, "cloud_version": 1 },
+    { "local_id": "{{$guid}}", "hard_deleted": true },
+    { "local_id": "{{$guid}}", "cloud_id": "507f1f77bcf86cd799439011", "hard_deleted": false }
+  ],
+  "full_sync": false
+}
+
+### Oczekiwane: 200, kazda notatka wyladowala we WLASCIWEJ liscie, wyniki sie
+### nie pomieszaly miedzy sobie mimo rownoleglego przetwarzania (errgroup + channel)
+
+
+###############################################################################
+# SEKCJA 3: AttachmentSyncCheck - walidacja i edge cases
+###############################################################################
+
+# Do przetestowania zalacznikow potrzebna jest notatka z cloud_id (attachmenty
+# sa sprawdzane tylko gdy cloud_id != nil - patrz checkNoteSync).
+
+# @name uploadNoteZalaczniki
+POST {{baseUrl}}/sync/upload-note
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "local_id": "{{$guid}}",
+  "title": "Notatka pod testy zalacznikow",
+  "content": "...",
+  "created_at": 1735689600,
+  "updated_at": 1735689600,
+  "version": 1,
+  "sync_state": "pending",
+  "is_deleted": false,
+  "encrypted": false
+}
+
+###
+
+@noteMongoIdZal = {{uploadNoteZalaczniki.response.body.$.mongo_id}}
+
+
+### 3.1 attachment_id niepoprawny UUID -> blad parsowania JSON -> 400
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [
+    {
+      "local_id": "{{$guid}}",
+      "cloud_id": "{{noteMongoIdZal}}",
+      "hard_deleted": false,
+      "cloud_version": 1,
+      "attachments": [
+        { "attachment_id": "to-nie-jest-uuid", "checksum_encrypted": "abc", "file_name": "a.png", "mime_type": "image/png", "hard_deleted": false }
+      ]
+    }
+  ]
+}
+
+### Oczekiwane: 400 "Couldnt read body data"
+
+
+### 3.2 Brak wymaganego checksum_encrypted -> 400 walidacji
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [
+    {
+      "local_id": "{{$guid}}",
+      "cloud_id": "{{noteMongoIdZal}}",
+      "hard_deleted": false,
+      "cloud_version": 1,
+      "attachments": [
+        { "attachment_id": "{{$guid}}", "file_name": "a.png", "mime_type": "image/png", "hard_deleted": false }
+      ]
+    }
+  ]
+}
+
+### Oczekiwane: 400 "Wrong check sync struct was sent"
+
+
+### 3.3 file_name jako PUSTY string -> 400 walidacji (required odrzuca "")
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [
+    {
+      "local_id": "{{$guid}}",
+      "cloud_id": "{{noteMongoIdZal}}",
+      "hard_deleted": false,
+      "cloud_version": 1,
+      "attachments": [
+        { "attachment_id": "{{$guid}}", "checksum_encrypted": "abc", "file_name": "", "mime_type": "image/png", "hard_deleted": false }
+      ]
+    }
+  ]
+}
+
+### Oczekiwane: 400 "Wrong check sync struct was sent"
+
+
+### 3.4 size_bytes UJEMNY -> struct nie ma walidacji zakresu, serwer to zaakceptuje
+# Edge case pokazujacy BRAK walidacji biznesowej - warto rozwazyc dodanie min=0
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [
+    {
+      "local_id": "{{$guid}}",
+      "cloud_id": "{{noteMongoIdZal}}",
+      "hard_deleted": false,
+      "cloud_version": 1,
+      "attachments": [
+        { "attachment_id": "{{$guid}}", "checksum_encrypted": "abc", "file_name": "a.png", "mime_type": "image/png", "hard_deleted": false, "size_bytes": -100 }
+      ]
+    }
+  ]
+}
+
+### Oczekiwane: 200 (brak walidacji size_bytes >= 0), attachment trafia do attachments_to_upload
+#TODO dodać walidacje sizebytes
+
+### 3.5 is_encrypted=true, ale crypto_metadata calkowicie pominiete
+# CryptoMetadata to typ wartosciowy (nie wskaznik) bez walidacji required -> zero-value akceptowany
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [
+    {
+      "local_id": "{{$guid}}",
+      "cloud_id": "{{noteMongoIdZal}}",
+      "hard_deleted": false,
+      "cloud_version": 1,
+      "attachments": [
+        { "attachment_id": "{{$guid}}", "checksum_encrypted": "abc", "file_name": "a.png", "mime_type": "image/png", "hard_deleted": false, "is_encrypted": true }
+      ]
+    }
+  ]
+}
+
+### Oczekiwane: 200, presigned URL tworzony z pustym AttachmentNonce w metadanych S3
+### (zero-value struct, serwer NIE sprawdza czy nonce faktycznie jest podany)
+
+
+### 3.6 Duplikat attachment_id w tej samej notatce (dwa identyczne wpisy)
+@dupAttachmentId = {{$guid}}
+
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [
+    {
+      "local_id": "{{$guid}}",
+      "cloud_id": "{{noteMongoIdZal}}",
+      "hard_deleted": false,
+      "cloud_version": 1,
+      "attachments": [
+        { "attachment_id": "{{dupAttachmentId}}", "checksum_encrypted": "abc", "file_name": "a.png", "mime_type": "image/png", "hard_deleted": false },
+        { "attachment_id": "{{dupAttachmentId}}", "checksum_encrypted": "xyz", "file_name": "b.png", "mime_type": "image/png", "hard_deleted": false }
+      ]
+    }
+  ]
+}
+
+### Oczekiwane: 200, oba wpisy przetworzone NIEZALEZNIE (rownolegle goroutines na
+### ten sam S3 key) - mozliwy race warunek / dwa presigned URL dla tego samego ID,
+### serwer nie deduplikuje wewnatrz jednej notatki
+
+
+### 3.7 attachments = [] (pusta tablica) vs pole calkowicie pominiete - powinny dac ten sam efekt
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [
+    { "local_id": "{{$guid}}", "cloud_id": "{{noteMongoIdZal}}", "hard_deleted": false, "cloud_version": 1, "attachments": [] }
+  ]
+}
+
+### Oczekiwane: 200, brak wpisow w attachments_* listach (identycznie jak bez pola "attachments")
+
+
+###############################################################################
+# SEKCJA 4: NoteUploadRequest (upload-note / update-note) - walidacja i edge cases
+###############################################################################
+
+### 4.1 Brak local_id -> 400
+POST {{baseUrl}}/sync/upload-note
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "title": "Notatka bez local_id" }
+
+### Oczekiwane: 400 "Wrong upload note struct was sent"
+
+
+### 4.2 local_id jako pusty string -> 400
+POST {{baseUrl}}/sync/upload-note
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "local_id": "", "title": "..." }
+
+### Oczekiwane: 400 "Wrong upload note struct was sent"
+
+
+### 4.3 crypto_meta = niepoprawny JSON (string, ktory nie parsuje sie jako JSON) -> 400
+POST {{baseUrl}}/sync/upload-note
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "local_id": "{{$guid}}",
+  "title": "...",
+  "encrypted": true,
+  "crypto_meta": "to nie jest poprawny json"
+}
+
+### Oczekiwane: 400 "Invalid crypto_meta"
+
+
+### 4.4 crypto_meta = poprawny JSON, ale PUSTY obiekt "{}" -> akceptowane
+POST {{baseUrl}}/sync/upload-note
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "local_id": "{{$guid}}",
+  "title": "...",
+  "encrypted": true,
+  "crypto_meta": "{}"
+}
+
+### Oczekiwane: 200, crypto_meta zapisany jako NoteCryptoMeta z pustymi stringami
+
+
+### 4.5 crypto_meta = poprawny JSON z NIEZNANYMI polami -> dodatkowe pola ignorowane
+POST {{baseUrl}}/sync/upload-note
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "local_id": "{{$guid}}",
+  "title": "...",
+  "encrypted": true,
+  "crypto_meta": "{\"title_nonce\":\"abc\",\"nieznane_pole\":\"xyz\"}"
+}
+
+### Oczekiwane: 200, nieznane_pole zignorowane, title_nonce zapisany poprawnie
+
+
+### 4.6 title/summary/content jako puste stringi -> brak walidacji required na tych polach
+POST {{baseUrl}}/sync/upload-note
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "local_id": "{{$guid}}",
+  "title": "",
+  "summary": "",
+  "content": ""
+}
+
+### Oczekiwane: 200, notatka utworzona z pustymi polami tekstowymi
+
+
+### 4.7 sync_state = dowolny nieznany string -> serwer nie waliduje wartosci enuma
+POST {{baseUrl}}/sync/upload-note
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "local_id": "{{$guid}}",
+  "title": "...",
+  "sync_state": "cos_zupelnie_losowego"
+}
+
+### Oczekiwane: 200 (sync_state nie jest nawet zapisywany w NoteDocument - patrz
+### struct NoteDocument w sync.go, brak pola SyncState -> wartosc jest po prostu
+### ignorowana przy zapisie do mongo)
+
+
+### 4.8 mongo_id podane w body mimo ze to nowy upload (POST /upload-note)
+# UploadNote nie odczytuje req.MongoID w ogole - pole jest calkowicie ignorowane
+POST {{baseUrl}}/sync/upload-note
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "local_id": "{{$guid}}",
+  "mongo_id": "507f1f77bcf86cd799439011",
+  "title": "..."
+}
+
+### Oczekiwane: 200, NOWY mongo_id wygenerowany przez Mongo (podany w body jest ignorowany)
+
+
+### 4.9 version / cloud_version jako liczby ujemne -> brak walidacji zakresu
+POST {{baseUrl}}/sync/upload-note
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "local_id": "{{$guid}}",
+  "title": "...",
+  "version": -5,
+  "cloud_version": -1
+}
+
+### Oczekiwane: 200 (cloud_version z body i tak jest ignorowany przez UploadNote -
+### realna cloud_version zawsze ustawiana na sztywno na 1)
+
+
+### 4.10 created_at > updated_at (nielogiczne chronologicznie) -> brak sprawdzania spojnosci
+POST {{baseUrl}}/sync/upload-note
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "local_id": "{{$guid}}",
+  "title": "...",
+  "created_at": 1800000000,
+  "updated_at": 1000000000
+}
+
+### Oczekiwane: 200, serwer nie sprawdza ze created_at <= updated_at
+
+
+### 4.11 Bardzo dlugi content (duzy payload, ~50KB tekstu)
+POST {{baseUrl}}/sync/upload-note
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "local_id": "{{$guid}}",
+  "title": "Duza notatka",
+  "content": "Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+}
+
+### Oczekiwane: 200, jesli chcesz przetestowac faktyczny limit body Fiber (BodyLimit,
+### domyslnie 4MB), wklej znacznie wiekszy content recznie i sprawdz czy dostaniesz
+### 413 Request Entity Too Large
+
+
+### 4.12 unicode / znaki specjalne w tresci (emoji, polskie znaki, RTL)
+POST {{baseUrl}}/sync/upload-note
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "local_id": "{{$guid}}",
+  "title": "Zażółć gęślą jaźń 🎉📝",
+  "content": "Tekst z emoji 🚀, polskimi znakami ąćęłńóśźż oraz cudzysłowem \" i backslashem \\"
+}
+
+### Oczekiwane: 200, poprawne zachowanie UTF-8 bez uszkodzenia znakow
+
+
+###############################################################################
+# SEKCJA 5: Bledy parsowania i naglowkow (ogolne, dla kazdego endpointu z body)
+###############################################################################
+
+### 5.1 Kompletnie zepsuty JSON -> 400
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ to_check: [ nie jest to poprawny json
+
+### Oczekiwane: 400 "Couldnt read body data"
+
+
+### 5.2 Pusty body -> 400
+POST {{baseUrl}}/sync/upload-note
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+
+
+### Oczekiwane: 400 "Couldn't read body data"
+
+
+### 5.3 Content-Type: text/plain zamiast application/json
+# Wedlug dokumentacji Fiber v3 body jest brane pod uwage jako zrodlo danych tylko
+# gdy Content-Type jest niepusty I pasuje do zarejestrowanego bindera. Przy zlym
+# Content-Type prawdopodobnie NIE zostanie uzyty JSON binder - sprawdz recznie
+# czy dostajesz 400, czy moze puste/zerowe pola przechodza walidacje required i
+# koncza sie i tak na 400 z innego powodu (brak local_id).
+POST {{baseUrl}}/sync/upload-note
+Authorization: Bearer {{token}}
+Content-Type: text/plain
+
+{ "local_id": "{{$guid}}", "title": "..." }
+
+### Oczekiwane: sprawdz recznie - potencjalna luka jesli serwer zwroci 200
+### mimo ze dane nigdy nie zostaly faktycznie zbindowane
+
+
+### 5.4 Brak naglowka Content-Type w ogole
+POST {{baseUrl}}/sync/upload-note
+Authorization: Bearer {{token}}
+
+{ "local_id": "{{$guid}}", "title": "..." }
+
+### Oczekiwane: sprawdz recznie (jw.)
+
+
+###############################################################################
+# SEKCJA 6: Uwierzytelnianie - 401 dla kazdego chronionego endpointu
+###############################################################################
+
+### 6.1 sync-check bez tokena
+POST {{baseUrl}}/sync/sync-check
+Content-Type: application/json
+
+{ "to_check": [], "full_sync": false }
+
+### Oczekiwane: 401
+
+
+### 6.2 upload-note bez tokena
+POST {{baseUrl}}/sync/upload-note
+Content-Type: application/json
+
+{ "local_id": "{{$guid}}", "title": "..." }
+
+### Oczekiwane: 401
+
+
+### 6.3 update-note bez tokena
+PUT {{baseUrl}}/sync/update-note/507f1f77bcf86cd799439011
+Content-Type: application/json
+
+{ "local_id": "{{$guid}}", "title": "..." }
+
+### Oczekiwane: 401
+
+
+### 6.4 losowy/zmanipulowany token -> 401
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer to.jest.calkowicie.zmyslony.token
+Content-Type: application/json
+
+{ "to_check": [], "full_sync": false }
+
+### Oczekiwane: 401
+
+
+### 6.5 wygasly token (wklej recznie stary/wygasly JWT, jesli masz pod reka)
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer WKLEJ_WYGASLY_TOKEN
+Content-Type: application/json
+
+{ "to_check": [], "full_sync": false }
+
+### Oczekiwane: 401
+
+
+###############################################################################
+# SEKCJA 7: UpdateNote - dodatkowe edge cases specyficzne dla PUT
+###############################################################################
+
+### 7.1 mongo_id w URL o niepoprawnej dlugosci/formacie hex -> 400
+PUT {{baseUrl}}/sync/update-note/za-krotki-id
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "local_id": "{{$guid}}", "title": "..." }
+
+### Oczekiwane: 400 "Invalid mongo_id in path"
+
+
+### 7.2 mongo_id poprawny format, notatka nie istnieje / inny wlasciciel -> 400
+PUT {{baseUrl}}/sync/update-note/507f1f77bcf86cd799439011
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "local_id": "{{$guid}}", "title": "..." }
+
+### Oczekiwane: 400 "Note not found"
+
+
+### 7.3 update z cloud_version w body - pole jest CALKOWICIE ignorowane przez handler
+# UpdateNote robi tylko $inc cloud_version:1, nigdy nie czyta req.CloudVersion.
+# Ten test dokumentuje potencjalne mylace zachowanie API: klient moze myslec ze
+# wysylajac cloud_version cos ustawia, a w rzeczywistosci jest to bez znaczenia.
+PUT {{baseUrl}}/sync/update-note/{{noteMongoIdZal}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "local_id": "{{$guid}}",
+  "title": "...",
+  "cloud_version": 9999
+}
+
+### Oczekiwane: 200, ale rzeczywista cloud_version w bazie rosnie tylko o 1
+### (z 1 na 2), NIE ustawia sie na 9999 - zweryfikuj kolejnym sync-check
+
+
+###############################################################################
+# SEKCJA 8: Pelny happy path - integracyjny lancuch operacji
+###############################################################################
+
+@localIdFull = {{$guid}}
+
+### 8.1 Upload nowej notatki
+# @name fullFlowUpload
+POST {{baseUrl}}/sync/upload-note
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "local_id": "{{localIdFull}}",
+  "title": "Pelny cykl",
+  "summary": "...",
+  "content": "...",
+  "created_at": 1735689600,
+  "updated_at": 1735689600,
+  "version": 1,
+  "sync_state": "pending",
+  "is_deleted": false,
+  "encrypted": false
+}
+
+###
+
+@fullFlowMongoId = {{fullFlowUpload.response.body.$.mongo_id}}
+
+
+### 8.2 sync-check natychmiast po uploadzie - powinna byc juz "synced" (wersja 1==1)
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [
+    { "local_id": "{{localIdFull}}", "cloud_id": "{{fullFlowMongoId}}", "hard_deleted": false, "cloud_version": 1 }
+  ]
+}
+
+### Oczekiwane: 200, notes_synced zawiera {{localIdFull}}
+
+
+### 8.3 Aktualizacja notatki (wersja rosnie 1 -> 2)
+PUT {{baseUrl}}/sync/update-note/{{fullFlowMongoId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "local_id": "{{localIdFull}}",
+  "title": "Pelny cykl - zaktualizowany",
+  "content": "nowa tresc",
+  "version": 2
+}
+
+### Oczekiwane: 200
+
+
+### 8.4 sync-check ze STARA lokalna wersja (1) po aktualizacji na serwerze (2) -> download
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [
+    { "local_id": "{{localIdFull}}", "cloud_id": "{{fullFlowMongoId}}", "hard_deleted": false, "cloud_version": 1 }
+  ]
+}
+
+### Oczekiwane: 200, notes_to_download zawiera notatke z tytulem "Pelny cykl - zaktualizowany"
+
+
+### 8.5 Hard delete notatki na koniec cyklu
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [
+    { "local_id": "{{localIdFull}}", "cloud_id": "{{fullFlowMongoId}}", "hard_deleted": true, "cloud_version": 2 }
+  ]
+}
+
+### Oczekiwane: 200, notes_synced zawiera {{localIdFull}}, notatka staje sie tombstone (wersja 3)
+
+
+### 8.6 Weryfikacja ze notatka faktycznie jest tombstone (kolejny full_sync)
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [],
+  "full_sync": true
+}
+
+### Oczekiwane: 200, notatka {{fullFlowMongoId}} NIE pojawia sie w notes_to_download
+### (checkNotesNotExistingOnClient pomija notatki z hard_deleted=true)
+
+
+###############################################################################
+# SEKCJA 9: Izolacja miedzy uzytkownikami (multi-tenant / IDOR)
+###############################################################################
+# Wymaga DRUGIEGO prawdziwego access tokena - zaloguj sie na inne konto testowe
+# i wklej ponizej. Wszystkie handlery filtruja po owner_id, ta sekcja to weryfikuje.
+
+@token2 = eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YTk0OTM5NDI2MGNjNzQzODczY2NiZjgiLCJhdWQiOlsibGxhdmEtc2VydmVyIl0sImV4cCI6MTc4ODE2NjQyNiwiaWF0IjoxNzg4MTY1NTI2LCJkZXZpY2VfaWQiOiI1NTBlODQwMC1lMjliLTQxZDQtYTcxNi00NDY2NTU0NDAwMDAifQ.K_0YCJcnlii67Fj3DN2xOnn_5_sf0gqdS3FJGg_l9hDzVEYPX-Pms77X0Bi92EqFWGMUJY7Zi_VMgeOjU1__Pg
+@localIdUserA = {{$guid}}
+
+### 9.1 User A (token) uploaduje notatke
+# @name userAUpload
+POST {{baseUrl}}/sync/upload-note
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "local_id": "{{localIdUserA}}",
+  "title": "Notatka usera A",
+  "content": "...",
+  "created_at": 1735689600,
+  "updated_at": 1735689600,
+  "version": 1,
+  "sync_state": "pending",
+  "is_deleted": false,
+  "encrypted": false
+}
+
+###
+
+@userAMongoId = {{userAUpload.response.body.$.mongo_id}}
+
+
+### 9.2 User B robi sync-check z cloud_id nalezacym do User A
+# Oczekiwana logika bezpieczenstwa: FindOne filtruje po owner_id, wiec dla usera B
+# ten dokument "nie istnieje" - notatka NIE powinna wyciec, tylko wyladowac w to_upload
+# (tak jakby to byl zwykly, nieistniejacy cloud_id - zero informacji o tym ze
+# dokument istnieje, tylko naleza do kogos innego)
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token2}}
+Content-Type: application/json
+
+{
+  "to_check": [
+    { "local_id": "{{$guid}}", "cloud_id": "{{userAMongoId}}", "hard_deleted": false, "cloud_version": 1 }
+  ]
+}
+
+### Oczekiwane: 200, to_upload zawiera podany local_id. Notatka NIE pojawia sie
+### w notes_to_download, notes_synced, ani jakiejkolwiek innej liscie - User B
+### nie dostaje zadnej informacji (tytul, tresc) o notatce User A
+
+
+### 9.3 User B probuje zaktualizowac notatke nalezaca do User A (PUT po cudzym mongo_id)
+PUT {{baseUrl}}/sync/update-note/{{userAMongoId}}
+Authorization: Bearer {{token2}}
+Content-Type: application/json
+
+{
+  "local_id": "{{$guid}}",
+  "title": "Podmieniony przez usera B",
+  "content": "haker probuje nadpisac cudza notatke"
+}
+
+### Oczekiwane: 400 "Note not found" (filtr {"_id": objectID, "owner_id": ownerID}
+### nie znajdzie dopasowania, bo owner_id nalezy do User A a nie User B)
+### KRYTYCZNE: jesli to zwroci 200, to jest powazna luka IDOR
+
+
+### 9.4 User B probuje hard-delete notatki nalezacej do User A
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token2}}
+Content-Type: application/json
+
+{
+  "to_check": [
+    { "local_id": "{{$guid}}", "cloud_id": "{{userAMongoId}}", "hard_deleted": true, "cloud_version": 1 }
+  ]
+}
+
+### Oczekiwane: 200, notes_failed zawiera podany local_id (ReplaceOne z
+### owner_id=userB nie trafi w dokument, nastepny FindOne rowniez odfiltruje
+### po owner_id -> "note does not exist in cloud" -> blad -> FailedNotes).
+### Nastepnie zweryfikuj requestem 9.5 ze notatka User A dalej istnieje i NIE
+### zostala skasowana ani jej zalaczniki w S3
+
+
+### 9.5 Weryfikacja: notatka User A nadal istnieje po probie 9.4 (jako User A)
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [
+    { "local_id": "{{localIdUserA}}", "cloud_id": "{{userAMongoId}}", "hard_deleted": false, "cloud_version": 1 }
+  ]
+}
+
+### Oczekiwane: 200, notes_synced zawiera {{localIdUserA}} (notatka NIE zostala
+### skasowana przez probe User B z 9.3/9.4)
+
+
+### 9.6 full_sync=true jako User B - notatka User A nie moze wyciec przez pelny skan
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token2}}
+Content-Type: application/json
+
+{
+  "to_check": [],
+  "full_sync": true
+}
+
+### Oczekiwane: 200, notes_to_download NIE zawiera notatki {{userAMongoId}}
+### (checkNotesNotExistingOnClient filtruje Find() po bson.M{"owner_id": userID})
+
+
+### 9.7 Kolizja local_id miedzy uzytkownikami - to samo local_id, dwaj rozni userzy
+# local_id jest czysto lokalny (per urzadzenie/klient), wiec nie powinien
+# powodowac zadnego konfliktu miedzy kontami
+POST {{baseUrl}}/sync/upload-note
+Authorization: Bearer {{token2}}
+Content-Type: application/json
+
+{
+  "local_id": "{{localIdUserA}}",
+  "title": "Notatka usera B z tym samym local_id co User A",
+  "content": "..."
+}
+
+### Oczekiwane: 200, nowy niezalezny mongo_id, ROZNY od {{userAMongoId}} -
+### zero powiazania miedzy notatkami mimo identycznego local_id
+
+
+
+
+
+
+# Odpalaj WSZYSTKO ponizej w jednej sesji, od gory do dolu, bez przeskakiwania.
+# Cel: rozstrzygnac czy hard-delete z POPRAWNA wersja dziala, a z NIEPOPRAWNA
+# (celowo stara) wersja poprawnie sie broni zwracajac notes_failed.
+
+@localId = {{$guid}}
+
+### KROK 1: Nowa notatka -> serwer ustawia cloud_version = 1
+# @name upload
+POST {{baseUrl}}/sync/upload-note
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "local_id": "{{localId}}",
+  "title": "Test hard delete",
+  "content": "...",
+  "created_at": 1735689600,
+  "updated_at": 1735689600,
+  "version": 1,
+  "sync_state": "pending",
+  "is_deleted": false,
+  "encrypted": false
+}
+
+###
+
+@mongoId = {{upload.response.body.$.mongo_id}}
+
+
+### KROK 2: sync-check z cloud_version=1 -> POWINNO byc "notes_synced"
+# (sanity check: potwierdza ze notatka faktycznie ma teraz wersje 1)
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [
+    { "local_id": "{{localId}}", "cloud_id": "{{mongoId}}", "hard_deleted": false, "cloud_version": 1 }
+  ]
+}
+
+### Oczekiwane: notes_synced = ["{{localId}}"]. Jesli tu juz jest cos innego
+### (np. notes_to_download albo notes_failed) - problem jest wczesniej niz
+### hard-delete, zatrzymaj sie i pokaz mi ten wynik.
+
+
+### KROK 3: Update notatki -> serwer robi $inc cloud_version: 1 -> 2
+PUT {{baseUrl}}/sync/update-note/{{mongoId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "local_id": "{{localId}}",
+  "title": "Test hard delete - po update",
+  "content": "nowa tresc",
+  "version": 2
+}
+
+### Oczekiwane: goly 200. Jesli cokolwiek innego - update sie nie wykonal,
+### co tlumaczyloby dlaczego pozniejszy hard-delete z cloud_version=2 zawiedzie.
+
+
+### KROK 4: sync-check ze STARA wersja (1) -> potwierdza rzeczywista wersje na serwerze
+# DownloadNote.cloud_version w odpowiedzi pokaze REALNA aktualna wersje
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [
+    { "local_id": "{{localId}}", "cloud_id": "{{mongoId}}", "hard_deleted": false, "cloud_version": 1 }
+  ]
+}
+
+### Oczekiwane: notes_to_download zawiera notatke z "cloud_version": 2.
+### <- TO JEST NAJWAZNIEJSZY KROK. Zapisz sobie ta wartosc cloud_version
+### z odpowiedzi, to jest prawda o tym co faktycznie jest w bazie.
+
+
+### KROK 5: Hard delete z CELOWO STARA wersja (1) -> powinno sie NIE udac
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [
+    { "local_id": "{{localId}}", "cloud_id": "{{mongoId}}", "hard_deleted": true, "cloud_version": 1 }
+  ]
+}
+
+### Oczekiwane: notes_failed = ["{{localId}}"]. To jest POPRAWNE zachowanie -
+### ochrona przed skasowaniem notatki w oparciu o nieaktualna wersje.
+### Sprawdz teraz log serwera - powinna pojawic sie linia:
+### "hard delete: note version mismatch..." z actual_server_cloud_version=2
+
+
+### KROK 6: Hard delete z POPRAWNA, aktualna wersja (2) -> powinno sie udac
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [
+    { "local_id": "{{localId}}", "cloud_id": "{{mongoId}}", "hard_deleted": true, "cloud_version": 2 }
+  ]
+}
+
+### Oczekiwane: notes_synced = ["{{localId}}"]. Jesli TU rowniez wyladuje w
+### notes_failed mimo podania prawidlowej wersji z kroku 4 - to jest realny
+### bug w handleClientHardDelete, nie kolejnosc testow. Sprawdz log serwera -
+### jesli zobaczysz "actual_server_cloud_version" inny niz 2, to znaczy ze
+### albo KROK 3 (update) faktycznie sie nie wykonal, albo cos innego w
+### miedzyczasie zmienilo wersje notatki.
+
+
+### KROK 7: Weryfikacja koncowa - notatka powinna byc tombstone
+POST {{baseUrl}}/sync/sync-check
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "to_check": [
+    { "local_id": "{{localId}}", "cloud_id": "{{mongoId}}", "hard_deleted": false, "cloud_version": 2 }
+  ]
+}
+
+### Oczekiwane: notes_to_hard_delete = ["{{localId}}"] (klient "nie wie" jeszcze
+### o usunieciu, serwer mowi mu zeby skasowal lokalnie)

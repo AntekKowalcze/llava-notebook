@@ -28,10 +28,7 @@ onMounted(async()=> {
 await layoutStore.setupReencryptingListener();
 
 })
-const emailPattern = new RegExp(
-  "^[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$",
-  'i'
-);
+const emailPattern = /^[\p{L}\p{N}!#$%&'*+/=?^_`{|}~-]+(?:\.[\p{L}\p{N}!#$%&'*+/=?^_`{|}~-]+)*@(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?\.)+[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?$/u;
 const correctEmail = computed(() => {
   return emailPattern.test(email.value);
 });
@@ -74,16 +71,13 @@ async function submitLogin() {
   }
 
   try {
-    console.log('in try clause');
     await userConfig.init();
     if (!userConfig.settingList) {
       toast.error('Settings not loaded. Try again.');
       return;
     }
-    console.log('after getting config ');
 
     userConfig.updateSettingValue('local.mode', 'off');
-    console.log('setting updated');
 
   isLoading.value = true;
     let online_user_id = await invoke<string>('login_online', {
@@ -105,6 +99,7 @@ async function submitLogin() {
     });
 
     await onlineAuthStore.fetchEmail();
+    void invoke<void>("synchronize_all")
     router.replace('/main/');
   } catch (err: any) {
     console.log(err);

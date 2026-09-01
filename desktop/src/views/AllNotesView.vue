@@ -31,7 +31,7 @@ import TagEdition from '../components/editor/tagEdition.vue';
 import { useAuthStore } from '../stores/auth';
 import { useCurrentNoteStore } from '../stores/currentNoteStore';
 import { useLayoutStore } from '../stores/layoutStore';
-
+import { emit } from '@tauri-apps/api/event';
 interface UiTag {
   tag_id: string;
   name: string;
@@ -530,7 +530,7 @@ async function deleteNote(note: NoteWithTags) {
     });
 
     notes.value = notes.value.filter((current) => current.local_id !== note.local_id);
-
+    await emit("reload-left-panel")
     toast.success('Note deleted');
   } catch (err) {
     console.error(err);

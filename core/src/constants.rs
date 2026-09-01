@@ -49,9 +49,6 @@ pub const LOCAL_USER_DB_INSERT_SQL_SCHEMA: &str = r#"INSERT INTO users_data (
                 nonce_notes_key,
                 kek_salt,
                 kek_argon_params,
-                master_key_enc,
-                master_key_nonce,
-                master_kek_salt,
                 is_online_linked,
                 online_account_email,
                 online_account_id,
@@ -68,9 +65,6 @@ pub const LOCAL_USER_DB_INSERT_SQL_SCHEMA: &str = r#"INSERT INTO users_data (
                 :nonce_notes_key,
                 :kek_salt, 
                 :kek_argon_params,
-                :master_key_enc,
-                :master_key_nonce,
-                :master_kek_salt,
                 :is_online_linked, 
                 :online_account_email, 
                 :online_account_id,
@@ -243,5 +237,3 @@ pub const LOCAL_LOGIN_DB_SCHEMA: &str = r#" CREATE TABLE IF NOT EXISTS users_dat
                         FOREIGN KEY(user_id) REFERENCES users_data(user_id) ON DELETE CASCADE);
                               
                         "#;
-// TODO after reencryption im not changing size in bytes
-// TODO delete unused columns in users_data

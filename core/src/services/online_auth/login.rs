@@ -470,7 +470,6 @@ pub async fn login(
         "authentication successful"
     );
 
-
     let params = argon2::Params::new(
         result.params.m_cost,
         result.params.t_cost,
@@ -492,131 +491,128 @@ pub async fn login(
 
     let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
 
-let mut kek_bytes = [0u8; KEY_ENCRYPTED_KEY_LENGTH];
+    let mut kek_bytes = [0u8; KEY_ENCRYPTED_KEY_LENGTH];
 
-argon2
-    .hash_password_into(
-        password.as_bytes(),
-        result.kek_salt.as_bytes(),
-        &mut kek_bytes,
-    )
-    .context("failed to derive online KEK")
-    .map_err(|e| {
-        tracing::error!(
-            task = "online login",
-            status = "error",
-            user_id = %result.user_id,
-            error = ?e,
-            "failed to derive online KEK"
-        );
-        e
-    })?;
+    argon2
+        .hash_password_into(
+            password.as_bytes(),
+            result.kek_salt.as_bytes(),
+            &mut kek_bytes,
+        )
+        .context("failed to derive online KEK")
+        .map_err(|e| {
+            tracing::error!(
+                task = "online login",
+                status = "error",
+                user_id = %result.user_id,
+                error = ?e,
+                "failed to derive online KEK"
+            );
+            e
+        })?;
 
-let master_key_enc = base64::engine::general_purpose::STANDARD
-    .decode(&result.master_key_enc)
-    .context("failed to decode encrypted master key")
-    .map_err(|e| {
-        tracing::error!(
-            task = "online login",
-            status = "error",
-            user_id = %result.user_id,
-            error = ?e,
-            "failed to decode encrypted master key"
-        );
-        e
-    })?;
+    let master_key_enc = base64::engine::general_purpose::STANDARD
+        .decode(&result.master_key_enc)
+        .context("failed to decode encrypted master key")
+        .map_err(|e| {
+            tracing::error!(
+                task = "online login",
+                status = "error",
+                user_id = %result.user_id,
+                error = ?e,
+                "failed to decode encrypted master key"
+            );
+            e
+        })?;
 
-let master_key_nonce = base64::engine::general_purpose::STANDARD
-    .decode(&result.master_key_nonce)
-    .context("failed to decode master key nonce")
-    .map_err(|e| {
-        tracing::error!(
-            task = "online login",
-            status = "error",
-            user_id = %result.user_id,
-            error = ?e,
-            "failed to decode master key nonce"
-        );
-        e
-    })?;
+    let master_key_nonce = base64::engine::general_purpose::STANDARD
+        .decode(&result.master_key_nonce)
+        .context("failed to decode master key nonce")
+        .map_err(|e| {
+            tracing::error!(
+                task = "online login",
+                status = "error",
+                user_id = %result.user_id,
+                error = ?e,
+                "failed to decode master key nonce"
+            );
+            e
+        })?;
 
-if master_key_nonce.len() != 12 {
+    if master_key_nonce.len() != 12 {
+        kek_bytes.zeroize();
+
+        return Err(anyhow::anyhow!(
+            "invalid master key nonce length: expected 12 bytes, got {}",
+            master_key_nonce.len()
+        )
+        .into());
+    }
+
+    let kek = chacha20poly1305::ChaCha20Poly1305::new(Key::from_slice(&kek_bytes));
+
+    let nonce = chacha20poly1305::Nonce::from_slice(&master_key_nonce);
+
+    let notes_key = kek
+        .decrypt(nonce, master_key_enc.as_ref())
+        .map_err(|_| {
+            tracing::error!(
+                task = "online login",
+                status = "error",
+                user_id = %result.user_id,
+                "failed to decrypt notes encryption key"
+            );
+
+            anyhow::anyhow!("failed to decrypt master key")
+        })
+        .context("master_key_enc decryption failed")?;
+
     kek_bytes.zeroize();
 
-    return Err(anyhow::anyhow!(
-        "invalid master key nonce length: expected 12 bytes, got {}",
-        master_key_nonce.len()
+    if notes_key.len() != 32 {
+        return Err(anyhow::anyhow!(
+            "invalid notes key length: expected 32 bytes, got {}",
+            notes_key.len()
+        )
+        .into());
+    }
+
+    let entry = keyring::Entry::new(
+        "llava_desktop",
+        &format!("refresh_token_id:{}", &result.user_id),
     )
-    .into());
-}
-
-let kek = chacha20poly1305::ChaCha20Poly1305::new(
-    Key::from_slice(&kek_bytes),
-);
-
-let nonce = chacha20poly1305::Nonce::from_slice(&master_key_nonce);
-
-let notes_key = kek
-    .decrypt(nonce, master_key_enc.as_ref())
-    .map_err(|_| {
-        tracing::error!(
-            task = "online login",
-            status = "error",
-            user_id = %result.user_id,
-            "failed to decrypt notes encryption key"
-        );
-
-        anyhow::anyhow!("failed to decrypt master key")
-    })
-    .context("master_key_enc decryption failed")?;
-
-kek_bytes.zeroize();
-
-if notes_key.len() != 32 {
-    return Err(anyhow::anyhow!(
-        "invalid notes key length: expected 32 bytes, got {}",
-        notes_key.len()
-    )
-    .into());
-}
-
-let entry = keyring::Entry::new(
-    "llava_desktop",
-    &format!("refresh_token_id:{}", &result.user_id),
-)
-.context("failed to create keyring entry")
-.map_err(|e| {
-    tracing::error!(
-        task = "online login",
-        status = "error",
-        user_id = %result.user_id,
-        error = ?e,
-        "failed to create keyring entry"
-    );
-    e
-})?;
-
-entry
-    .set_password(&result.refresh_token.0)
-    .context("failed to store refresh token in keyring")
+    .context("failed to create keyring entry")
     .map_err(|e| {
         tracing::error!(
             task = "online login",
             status = "error",
             user_id = %result.user_id,
             error = ?e,
-            "failed to store refresh token in keyring"
+            "failed to create keyring entry"
         );
         e
     })?;
 
-tracing::debug!(
-    task = "online login",
-    status = "success",
-    user_id = %result.user_id,
-    "online login completed successfully"
-);
+    entry
+        .set_password(&result.refresh_token.0)
+        .context("failed to store refresh token in keyring")
+        .map_err(|e| {
+            tracing::error!(
+                task = "online login",
+                status = "error",
+                user_id = %result.user_id,
+                error = ?e,
+                "failed to store refresh token in keyring"
+            );
+            e
+        })?;
 
-Ok((result.access_token, result.user_id, notes_key))
+    tracing::debug!(
+        task = "online login",
+        status = "success",
+        user_id = %result.user_id,
+        "online login completed successfully"
+    );
 
+    Ok((result.access_token, result.user_id, notes_key))
 }

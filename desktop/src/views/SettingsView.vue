@@ -18,12 +18,14 @@ import ChangeUsername from '../components/settings/ChangeUsername.vue';
 import { useUserConfigStore } from '../stores/userConfig';
 import { storeToRefs } from 'pinia';
 import { useOnlineAuthStore } from '../stores/onlineAuth';
+import { emit } from '@tauri-apps/api/event';
 const toast = useToast();
 const authStore = useAuthStore();
 const onlineAuthStore = useOnlineAuthStore();
 const router = useRouter();
 const userConfigStore = useUserConfigStore();
 const { settingList, isDefault } = storeToRefs(userConfigStore);
+const shouldSyncOnLogout = ref<boolean>(true)
 const cardSettingsIdList: string[] = [
   'local.mode',
   'local.encryption',
@@ -200,7 +202,6 @@ async function handleUpdate(id: string) {
         });
 
         toast.success('logged out successfully');
-
         router.replace('/');
       } catch (err) {
         toast.error('Error while logggin out');
@@ -257,31 +258,32 @@ async function handleUpdate(id: string) {
       }
       break;
     }
-    case 'local.changeUsername': {
-      try {
-        showUsernameInput.value = true;
-      } catch (err) {
-        showUsernameInput.value = false;
-        newUsername.value = '';
-        console.log(err);
-        toast.error('failed to change username');
-      }
-      break;
-    }
+    // case 'local.changeUsername': {
+    //   try {
+    //     showUsernameInput.value = true;
+    //   } catch (err) {
+    //     showUsernameInput.value = false;
+    //     newUsername.value = '';
+    //     console.log(err);
+    //     toast.error('failed to change username');
+    //   }
+     
+    //   break;
+    // }
     case 'local.changePassword': {
       router.replace({ name: 'recovery', query: { origin: 'settings' } });
       break;
     }
     case 'online.logout': {
       try {
-        await invoke<void>('online_logout', {});
+        await invoke<void>('online_logout', {sync: shouldSyncOnLogout.value});
         onlineAuthStore.$patch({
           loggedIn: false,
           loggedInEmail: null,
           loggedInId: null,
         });
         authStore.linked = false;
-        toast.success('Disconnected online account from local account successfully');
+        toast.success('Disconnected online account from local account successfully. Notes synchronized with this account will be removed from this device. Local-only notes will remain.');
       } catch (err: any) {
         console.log(err);
         if (err?.NoInternetConnection) {
@@ -290,6 +292,16 @@ async function handleUpdate(id: string) {
           toast.error('Server error. Try again later.');
         } else if (err?.ServerNotAvailable) {
           toast.error('Server unavailable. Try again later.');
+        }else if (err?.SyncFailed){
+          toast.error('Synchronization failed, some notes may be lost if you proceed to disconnect accounts, to disconnect, click disconnect again')
+          shouldSyncOnLogout.value = false
+          try {
+          await invoke<void>('online_logout', {sync: shouldSyncOnLogout.value});
+            toast.success('Disconnected online account from local account successfully. Notes synchronized with this account will be removed from this device. Local-only notes will remain.');
+          }catch(err) {
+            toast.error("Couldnt disconnect accounts, try again later")
+          }
+          shouldSyncOnLogout.value = true
         } else {
           toast.error('Logout failed');
         }
@@ -307,6 +319,14 @@ async function handleUpdate(id: string) {
       try {
       } catch (err) {}
       break;
+    }
+    case 'online.sync': {
+      await emit("reload-left-panel")
+      break;
+    }
+     case 'online.ai': {
+        toast.success("Remember that using Ai features means that your information may be used to train Ai models. Use it responsibly.")
+        break;
     }
   }
 }

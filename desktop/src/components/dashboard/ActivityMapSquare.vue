@@ -10,7 +10,6 @@ const opacity = computed(() => {
   const contributions = props.numberOfContributions;
 
   if (contributions === 0) return 0;
-// TODO note creation, fresh account has sync offline on and button disabled
   return 0.15 + (Math.log(Math.min(contributions, 50) + 1) / Math.log(51)) * 0.85;
 });
 
@@ -31,4 +30,3 @@ const titleString = computed(() => `${props.numberOfContributions} edition(s) â€
 </template>
 
 <style scoped></style>
-<!-- TODO finish online login path, when keys are exchanged (reencrypt everyting, notes, titles, attachments with new key) -->

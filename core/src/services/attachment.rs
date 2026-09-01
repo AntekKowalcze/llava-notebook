@@ -7,7 +7,7 @@ use chacha20poly1305::{
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AttachmentCryptoMetadata {
     pub attachment_nonce: String,
 }

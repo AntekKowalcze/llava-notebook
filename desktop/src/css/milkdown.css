@@ -105,7 +105,8 @@ z-index: 120;
 
 .milkdown [role='menuitem']:hover svg,
 .milkdown [role='option']:hover svg {
-  color: #f97316;
+
+  color: #0f0f10 !important;
 }
 
 /* Selected item */
@@ -260,4 +261,8 @@ z-index: 120;
 
 .milkdown .image-resize-handle:hover {
   transform: scale(1.25);
+}
+
+.ai-instruction-item-label{
+   color: #fffbeb !important
 }

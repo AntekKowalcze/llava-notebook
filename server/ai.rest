@@ -1,0 +1,21 @@
+@baseUrl = http://localhost:3000
+@authToken = eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YTk0OTM5NDI2MGNjNzQzODczY2NiZjgiLCJhdWQiOlsibGxhdmEtc2VydmVyIl0sImV4cCI6MTc4ODE4NzI0NCwiaWF0IjoxNzg4MTg2MzQ0LCJkZXZpY2VfaWQiOiI1NTBlODQwMC1lMjliLTQxZDQtYTcxNi00NDY2NTU0NDAwMDAifQ.F8glYzaZGOsXOOycjglMBrUCNZRm-oRrle3t5vrzBowo20gRLDrOIKfdHYpoUJNBGciL2KzHEaYMTdg_xmjjWw
+### Test Gemini AI Endpoint (Streaming Response)
+POST {{baseUrl}}/ai/
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "prompt": "Instruction: Fix grammar & spelling\n\nSelection:\nThis are a simple test to verify streaming works.\n\nDocument:\nThis are a simple test to verify streaming works.",
+  "systemPrompt": "You are an AI assistant helping to edit markdown text. Return only the improved text.",
+  "text": "This are a simple test to verify streaming works."
+}
+
+### Simple Prompt Test (No System Prompt)
+POST {{baseUrl}}/ai/
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "prompt": "Write a 2-sentence summary of why Go Fiber is fast."
+}

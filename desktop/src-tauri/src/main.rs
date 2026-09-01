@@ -113,7 +113,14 @@ pub fn main() {
                 }
                 let handle = app.handle().clone();
 
-                crate::commands::utils::start_connection_monitor(handle);
+                crate::commands::utils::start_connection_monitor(handle.clone());
+                    let handle = app.handle().clone();
+                    tauri::async_runtime::spawn(async move {
+                        crate::commands::sync::sync::run_sync_loop(handle).await;
+                    });
+
+
+
             }
             Ok(())
         })
@@ -162,6 +169,8 @@ pub fn main() {
             commands::note_managing_views::get_all_removed_notes_data,
             commands::attachments::create_attachment::create_attachment,
             commands::attachments::clean_attachments::clean_attachments,
+            commands::sync::sync::synchronize_all,
+            commands::ai::ai::ai_request,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

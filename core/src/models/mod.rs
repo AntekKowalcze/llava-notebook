@@ -2,4 +2,5 @@
 pub mod attachment;
 pub mod note;
 pub mod note_tags;
+pub mod sync;
 pub mod tag;

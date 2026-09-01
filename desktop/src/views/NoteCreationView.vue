@@ -13,6 +13,8 @@ import { useCurrentNoteStore } from '../stores/currentNoteStore.ts';
 import { useRouter } from 'vue-router';
 import { useUserConfigStore } from '../stores/userConfig.ts';
 import DisabledSwitch from '../components/settings/DisabledSwitch.vue';
+import TestButton from '../components/tests/TestButton.vue';
+import { emit } from '@tauri-apps/api/event';
 const router = useRouter();
 const toast = useToast();
 const userSettings = useUserConfigStore();
@@ -24,17 +26,14 @@ const syncStatus = computed(() => {
   } = userSettings.config;
 
   if (localMode === 'on') {
-    return localSync === 'on'
-      ? { canSync: true, whyDisabled: '' }
-      : {
+    return {
           canSync: false,
           whyDisabled:
-            'You are in offline mode and offline sync is turned off. Enable it in settings if you want to sync.',
+            'You are in offline mode.',
         };
   }
 
-  // localMode === 'off' → online mode
-  return onlineSync === 'on'
+  return onlineSync == 'on'
     ? { canSync: true, whyDisabled: '' }
     : {
         canSync: false,
@@ -112,10 +111,12 @@ async function createNote(): Promise<void> {
     currentNoteStore.$patch({
       currentNote: createdNote,
     });
+    await emit("reload-left-panel")
 
     toast.success('Note created successfully');
 
     await router.push(`/main/editor/${createdNote.local_id}`);
+
   } catch (err: unknown) {
     console.error('Failed to create note:', err);
 
@@ -155,6 +156,8 @@ async function createNote(): Promise<void> {
 
       <!-- Heading -->
       <div class="mt-10 text-center">
+
+  
         <h1 class="mx-auto mt-6 max-w-2xl text-4xl font-bold leading-relaxed text-note-pumice">
           <span class="text-note-paprika">Your ideas</span>
           deserve a place to stay.

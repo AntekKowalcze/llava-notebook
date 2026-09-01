@@ -75,7 +75,6 @@ async function submit() {
     clearFields();
   } catch (err: unknown) {
     console.log(err);
-    // TODO online login is not implemented in full spec because of key manipulatino
     const message = getErrorText(err).toLowerCase();
     if (message.includes('wrong password')) {
       toast.warning('Wrong Password');

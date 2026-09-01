@@ -1,17 +1,21 @@
 <script setup lang="ts">
 import { NotebookPen, Settings, UserRound, X, FileText, Star, Cloud } from 'lucide-vue-next';
 import { invoke } from '@tauri-apps/api/core';
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useUserConfigStore } from '../stores/userConfig.ts';
 import { useLayoutStore } from '../stores/layoutStore';
 import { useRouter } from 'vue-router';
 import ScreenDeviderHorizontal from './dashboard/ScreenDeviderHorizontal.vue';
 import IconComponent from './main/IconComponent.vue';
 import { ArrowRight, Trash2 } from 'lucide-vue-next';
-
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 const layout = useLayoutStore();
 const router = useRouter();
 const userConfig = useUserConfigStore();
+
+let unlistenReload: UnlistenFn | null = null;
+
+
 
 type PanelData = {
   recentlyEdited: {
@@ -29,8 +33,19 @@ const panelData = ref<PanelData | null>(null);
 const syncStatus = ref('Loading...');
 
 onMounted(async () => {
+  unlistenReload = await listen('reload-left-panel', async () => {
+    if (userConfig.settingList) {
+      syncStatus.value = userConfig.getValueBySettingId(
+        userConfig.settingList.sections,
+        'online.sync'
+      );
+    }
+  panelData.value = await invoke<PanelData>('get_panel_data');
+});
+
+
+
   try {
-    await userConfig.init();
 
     if (userConfig.settingList) {
       syncStatus.value = userConfig.getValueBySettingId(
@@ -38,12 +53,25 @@ onMounted(async () => {
         'online.sync'
       );
     }
-
+  
     panelData.value = await invoke<PanelData>('get_panel_data');
   } catch (error) {
     console.error('Failed to load sliding panel data:', error);
   }
 });
+
+onUnmounted(()=> {
+
+if (unlistenReload) {
+    unlistenReload();
+    unlistenReload = null;
+  }
+
+})
+
+
+
+
 
 function togglePanel() {
   layout.toggleLeftPanel();

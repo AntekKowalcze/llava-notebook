@@ -8,32 +8,38 @@ import {
   LockOpen,
   HardDrive,
   Server,
-  Cloud,
+  RefreshCw,
   RefreshCwOff,
   CloudCheck,
   Save,
+  CloudAlert,
+  CloudSync,
 } from 'lucide-vue-next';
 import { useMetaStore } from '../../stores/metaStore';
 import { useRoute } from 'vue-router';
 import { useCurrentNoteStore } from '../../stores/currentNoteStore';
-
+import { useOnlineAuthStore } from '../../stores/onlineAuth';
+const syncResult = computed(() => metaStore.syncResult);
 const userConfig = useUserConfigStore();
 const metaStore = useMetaStore();
 const route = useRoute();
 const currentNoteStore = useCurrentNoteStore();
-
+const onlineAuthStore = useOnlineAuthStore()
 const now = ref(Date.now());
 const isSaving = ref(false);
 
 let timeInterval: ReturnType<typeof setInterval> | null = null;
 let unlistenSave: UnlistenFn | null = null;
+const isLoggedInOnline = computed(()=> {
+  return onlineAuthStore.loggedIn
+})
 
 onMounted(async () => {
   void userConfig.init();
 
-  unlistenSave = await listen('note-saved', () => {
+  unlistenSave = await listen('note-saved', async () => {
     isSaving.value = true;
-
+    
     setTimeout(() => {
       isSaving.value = false;
     }, 1000);
@@ -70,7 +76,16 @@ const currentLocation = computed(() => route.name);
 const isEditor = computed(() => route.name === 'editor');
 
 const encrypted = computed(() => userConfig.config['local.encryption']);
-const local = computed(() => userConfig.config['online.sync'] === 'off');
+const local = computed(() => {
+  return  userConfig.config['local.mode'] == 'on'
+})
+const syncPossible = computed(() =>
+  userConfig.config['online.sync'] === 'on' &&
+  isLoggedInOnline.value
+);
+const syncEnabled = computed(() => {
+   return userConfig.config['online.sync'] === 'on'
+})
 
 const isLocal = computed(() => userConfig.config['local.mode'] === 'off');
 
@@ -112,7 +127,6 @@ function formatTimeAgo(timestamp: number, currentTime: number): string {
   return `${months} month${months === 1 ? '' : 's'} ago`;
 }
 </script>
-
 <template>
   <div
     class="flex h-7 w-full select-none flex-row items-center justify-between border-t border-white/5 bg-black/40 px-4 text-xs"
@@ -121,20 +135,17 @@ function formatTimeAgo(timestamp: number, currentTime: number): string {
       v-if="isEditor"
       class="flex items-center gap-3 text-note-pumice"
     >
-      <span>{{ lastEdited }}</span>
+      <span>{{ currentNoteStore.words }}</span>
+      <span>{{ currentNoteStore.words == 1 ? 'word' : 'words' }}</span>
 
       <div class="h-3 w-px bg-white/10" />
 
-      <span>
-        {{ currentNoteStore.words }}
-        {{ currentNoteStore.words == 1 ? 'word' : 'words' }}
-      </span>
+      <span>{{ lastEdited }}</span>
 
       <div class="h-3 w-px bg-white/10" />
 
       <span>Markdown</span>
 
-      <!-- save -->
       <div class="h-3 w-px bg-white/10" />
 
       <div
@@ -150,7 +161,11 @@ function formatTimeAgo(timestamp: number, currentTime: number): string {
 
         <span
           class="transition-all duration-300"
-          :class="isSaving ? 'opacity-100' : 'w-0 overflow-hidden opacity-0'"
+          :class="
+            isSaving
+              ? 'opacity-100'
+              : 'w-0 overflow-hidden opacity-0'
+          "
         >
           Saved
         </span>
@@ -165,23 +180,64 @@ function formatTimeAgo(timestamp: number, currentTime: number): string {
     </div>
 
     <div class="flex items-center gap-2">
+      <!-- sync result -->
+      <div
+        v-if="!local && syncPossible"
+        class="flex items-center gap-1.5"
+      >
+        <div
+          v-if="syncResult === 'InProgress'"
+          class="flex items-center gap-1.5 text-note-paprika"
+        >
+          <RefreshCw
+            :size="13"
+            class="animate-spin"
+          />
+          <span>Sync in progress</span>
+        </div>
+
+        <div
+          v-else-if="syncResult === 'Done'"
+          class="flex items-center gap-1.5 text-green-500"
+        >
+          <CloudCheck :size="13" />
+          <span>Synced</span>
+        </div>
+
+        <div
+          v-else-if="syncResult === 'Error'"
+          class="flex items-center gap-1.5 text-note-garnet"
+        >
+          <CloudOff :size="13" />
+          <span>Error</span>
+        </div>
+
+        <div
+          v-else-if="syncResult === 'NotSynced'"
+          class="flex items-center gap-1.5 text-note-garnet"
+        >
+          <CloudAlert :size="13" />
+          <span>Not synced yet</span>
+        </div>
+      </div>
+
       <div class="h-3 w-px bg-white/10" />
 
       <!-- sync off -->
       <div
+        v-if="!syncEnabled"
         class="flex items-center gap-1.5 text-note-garnet"
-        v-if="local"
       >
         <RefreshCwOff :size="12" />
         <span>Sync off</span>
       </div>
 
-      <!-- synced -->
+      <!-- sync on -->
       <div
+        v-else
         class="flex items-center gap-1.5 text-green-500"
-        v-if="!local"
       >
-        <CloudCheck :size="12" />
+        <CloudSync :size="12" />
         <span>Sync on</span>
       </div>
 
@@ -189,28 +245,28 @@ function formatTimeAgo(timestamp: number, currentTime: number): string {
 
       <!-- encrypted -->
       <div
-        class="flex items-center gap-1 rounded bg-note-glow/10 px-1.5 py-0.5 text-note-glow"
         v-if="encrypted == 'on'"
+        class="flex items-center gap-1 rounded bg-note-glow/10 px-1.5 py-0.5 text-note-glow"
       >
         <Lock :size="11" />
-        <span>Encrypted</span>
+        <span>Encrypted by default</span>
       </div>
 
       <!-- unencrypted -->
       <div
-        class="flex items-center gap-1 rounded bg-note-garnet/10 px-1.5 py-0.5 text-note-garnet"
         v-else
+        class="flex items-center gap-1 rounded bg-note-garnet/10 px-1.5 py-0.5 text-note-garnet"
       >
         <LockOpen :size="11" />
-        <span>Unencrypted</span>
+        <span>Unencrypted by default</span>
       </div>
 
       <div class="h-3 w-px bg-white/10" />
 
       <!-- local -->
       <div
-        class="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 text-note-pumice"
         v-if="!isLocal"
+        class="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 text-note-pumice"
       >
         <HardDrive :size="11" />
         <span>Local mode</span>
@@ -218,8 +274,8 @@ function formatTimeAgo(timestamp: number, currentTime: number): string {
 
       <!-- cloud -->
       <div
-        class="flex items-center gap-1 rounded bg-note-paprika/10 px-1.5 py-0.5 text-note-paprika"
         v-else
+        class="flex items-center gap-1 rounded bg-note-paprika/10 px-1.5 py-0.5 text-note-paprika"
       >
         <Server :size="11" />
         <span>Online mode</span>
@@ -227,7 +283,9 @@ function formatTimeAgo(timestamp: number, currentTime: number): string {
 
       <div class="h-3 w-px bg-white/10" />
 
-      <span class="text-note-pumice/30">v{{ version }}</span>
+      <span class="text-note-pumice/30">
+        v{{ version }}
+      </span>
     </div>
   </div>
 </template>

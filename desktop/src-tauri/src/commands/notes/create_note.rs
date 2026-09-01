@@ -63,4 +63,3 @@ pub async fn create_note(
 
     Ok(note)
 }
-// TODO THEN create sync manager

@@ -630,7 +630,6 @@ pub fn get_timeout(users_db: &Connection, uuid: &uuid::Uuid) -> Result<i64, crat
     Ok(timeout)
 }
 
-
 pub fn session_operations(
     users_db: &Connection,
     user_id: uuid::Uuid,
@@ -864,7 +863,7 @@ pub async fn check_online_login(
         .get_password()
         .map_err(|_| crate::errors::Error::NotLoggedIn)?;
     let req: RefreshRequest = RefreshRequest { refresh_token };
-    let response = client
+    let response: reqwest::Response = client
         .post(format!("{}auth/refresh", SERVER_ADDRESS))
         .json(&req)
         .send()
@@ -908,15 +907,29 @@ pub async fn check_online_login(
     Ok(tokens.access_token)
 }
 
-
-pub fn invalidate_session_for_user(user_id: &str, users_db: &Connection) -> Result<(), crate::errors::Error> {
-    users_db.execute("DELETE FROM session_data WHERE user_id = ?1", rusqlite::params![user_id]).context("Failed to invalidate sesisons")?;
-Ok(())
+pub fn invalidate_session_for_user(
+    user_id: &str,
+    users_db: &Connection,
+) -> Result<(), crate::errors::Error> {
+    users_db
+        .execute(
+            "DELETE FROM session_data WHERE user_id = ?1",
+            rusqlite::params![user_id],
+        )
+        .context("Failed to invalidate sesisons")?;
+    Ok(())
 }
 
-pub fn invalidate_recovery_keys(users_db: &Connection ,user_id: &str) -> Result<(), crate::errors::Error> {
-
-    users_db.execute("DELETE FROM recovery_keys WHERE user_id = ?1", rusqlite::params![user_id]).context("failed to invalidate recovery keys")?;
+pub fn invalidate_recovery_keys(
+    users_db: &Connection,
+    user_id: &str,
+) -> Result<(), crate::errors::Error> {
+    users_db
+        .execute(
+            "DELETE FROM recovery_keys WHERE user_id = ?1",
+            rusqlite::params![user_id],
+        )
+        .context("failed to invalidate recovery keys")?;
 
     Ok(())
 }
@@ -944,5 +957,3 @@ fn login_test() {
     let home_path = std::env::temp_dir();
     local_log_in(username, password, &mut users_db, &paths).unwrap();
 }
-
-

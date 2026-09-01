@@ -2,8 +2,9 @@ package middleware
 
 import (
 	"errors"
-	"github.com/gofiber/fiber/v3"
 	"log/slog"
+
+	"github.com/gofiber/fiber/v3"
 )
 
 type AppError struct {

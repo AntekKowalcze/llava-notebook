@@ -96,6 +96,20 @@ pub enum Error {
     #[error("Tag already exists")]
     TagAlreadyExists,
 
+    #[error("Invalid mime type")]
+    InvalidMimeType,
+
+    #[error("Sync failed")]
+    SyncFailed,
+
+    #[error("Attachment upload failed")]
+    FailedToUploadAttachment,
+    #[error("Attachment download failed")]
+    AttachmendDownloadFailed,
+
+    #[error("Ai request erorr")]
+    AiError,
+    
     #[error("Request error")]
     RequestError((u16, String)),
 

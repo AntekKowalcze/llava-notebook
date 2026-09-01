@@ -23,6 +23,7 @@ pub async fn get_username_from_uuid(
 }
 
 pub fn start_connection_monitor(app_handle: AppHandle) {
+    
     let mut fail_count = 0u32;
     async_runtime::spawn(async move {
         let state = app_handle.state::<AppState>();
@@ -111,3 +112,6 @@ pub fn get_connection_status(
         .map_err(|_| llava_core::Error::LockError)?;
     Ok((server, internet))
 }
+
+
+

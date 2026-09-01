@@ -233,7 +233,7 @@ fn get_current_crypto_metadata(
     Ok(crypto_meta)
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NoteCryptoMetadata {
     pub title_nonce: String,
     pub summary_nonce: String,
@@ -479,7 +479,7 @@ pub fn encrypt_attachment(
 
     let crypto_meta_json = serde_json::to_string(&crypto_meta)
         .context("failed to serialize attachment crypto metadata")?;
-
+    let size_bytes = encrypted_file.len() as i64;
     notes_db
         .execute(
             r#"
@@ -488,13 +488,16 @@ pub fn encrypt_attachment(
                 crypto_meta = ?1,
                 encrypted = 1,
                 updated_at = ?2,
-                checksum_encrypted = ?3
-            WHERE attachment_id = ?4
+                checksum_encrypted = ?3,
+                size_bytes = ?4
+
+            WHERE attachment_id = ?5
             "#,
             rusqlite::params![
                 crypto_meta_json,
                 crate::utils::get_time(),
                 encrypted_checksum.to_string(),
+                size_bytes,
                 attachment_id
             ],
         )
@@ -553,57 +556,73 @@ pub fn decrypt_attachment(
         .decrypt(nonce, encrypted_file.as_ref())
         .context("failed to decrypt attachment")?;
     let decrypted_checksum = blake3::hash(&decrypted_file);
+    let size_bytes = decrypted_file.len() as i64;
 
     notes_db
         .execute(
-            "UPDATE attachments SET checksum_encrypted = ?1 WHERE attachment_id = ?2",
-            rusqlite::params![decrypted_checksum.to_string(), attachment_id],
+            "UPDATE attachments SET checksum_encrypted = ?1, size_bytes = ?2 WHERE attachment_id = ?3",
+            rusqlite::params![decrypted_checksum.to_string(), size_bytes ,attachment_id],
         )
         .context("failed to update checksum in db")?;
-
     Ok(decrypted_file)
 }
 
-
-pub fn reencrypt_db(notes_db: &Connection, old_key: &Key, new_key: &Key) -> Result<(), crate::errors::Error>{
+pub fn reencrypt_db(
+    notes_db: &Connection,
+    old_key: &Key,
+    new_key: &Key,
+) -> Result<(), crate::errors::Error> {
     validate_reencrypt_db(notes_db)?;
-    let mut stmt = notes_db.prepare("SELECT local_id, content_path FROM notes WHERE encrypted = 1;").context("Failed to prepare statement")?;
-    let mut handle = stmt.query(rusqlite::params![]).context("Failed to get encrypted notes")?; 
-    while let Some(row) = handle.next().context("failed to get next row")?{
+    let mut stmt = notes_db
+        .prepare("SELECT local_id, content_path FROM notes WHERE encrypted = 1;")
+        .context("Failed to prepare statement")?;
+    let mut handle = stmt
+        .query(rusqlite::params![])
+        .context("Failed to get encrypted notes")?;
+    while let Some(row) = handle.next().context("failed to get next row")? {
         let id: String = row.get(0).context("failed to get next id")?;
         let path: String = row.get(1).context("failed to get content path")?;
         let path = PathBuf::from(path);
         //DO not changing updated at  here it would provide mess
         let mut new_stmt = notes_db.prepare("SELECT attachment_id, local_path FROM attachments WHERE encrypted = 1 AND note_local_id = ?1").context("Failed to prepare attachemtn statemetn")?;
-        let mut attachment_handle = new_stmt.query(rusqlite::params![&id]).context("failed to get attachment handle")?;
+        let mut attachment_handle = new_stmt
+            .query(rusqlite::params![&id])
+            .context("failed to get attachment handle")?;
 
-        let current_saved_content = crate::storage::get_note_content(&path)?;//encrypted content
+        let current_saved_content = crate::storage::get_note_content(&path)?; //encrypted content
         let decrypted_content = decrypt_note(old_key, current_saved_content, &id, notes_db)?;
-       
+
         let decrypted_title = decrypt_title(&id, old_key, notes_db)?;
-   
+
         let encrypted_content = encrypt_data(new_key, decrypted_content, notes_db, &id)?;
         let encrypted_title = encrypt_title(new_key, &id, notes_db, decrypted_title)?;
         atomic_write(&path, &encrypted_content.as_bytes())?;
-        notes_db.execute("UPDATE notes SET title = ?1 WHERE local_id = ?2", rusqlite::params![encrypted_title, &id] ).context("Failed to update title")?;
+        notes_db
+            .execute(
+                "UPDATE notes SET title = ?1 WHERE local_id = ?2",
+                rusqlite::params![encrypted_title, &id],
+            )
+            .context("Failed to update title")?;
 
-        while let Some(attachment_row) = attachment_handle.next().context("failed to get next attachment row")? {
-             let attachment_id: String = attachment_row.get(0).context("failed to get next id")?;
-             let attachment_path: String = attachment_row.get(1).context("failed to get content path")?;
-             let attachment_path: PathBuf = PathBuf::from(attachment_path);
-             let decypted_attachment = decrypt_attachment(old_key, notes_db, attachment_id.clone())?;
-            let encrypted_with_new_key = encrypt_attachment(new_key, notes_db, &decypted_attachment, attachment_id)?;
+        while let Some(attachment_row) = attachment_handle
+            .next()
+            .context("failed to get next attachment row")?
+        {
+            let attachment_id: String = attachment_row.get(0).context("failed to get next id")?;
+            let attachment_path: String = attachment_row
+                .get(1)
+                .context("failed to get content path")?;
+            let attachment_path: PathBuf = PathBuf::from(attachment_path);
+            let decypted_attachment = decrypt_attachment(old_key, notes_db, attachment_id.clone())?;
+            let encrypted_with_new_key =
+                encrypt_attachment(new_key, notes_db, &decypted_attachment, attachment_id)?;
             atomic_write(&attachment_path, &encrypted_with_new_key)?;
         }
     }
     Ok(())
 }
-// TODO check if blake is recalculated on attachment encryption change
 
-fn atomic_write(
-    path: &Path,
-    data: &[u8],
-) -> std::io::Result<()> {
+fn atomic_write(path: &Path, data: &[u8]) -> std::io::Result<()> {
     let tmp_path = path.with_extension("rekey_tmp");
 
     std::fs::write(&tmp_path, data)?;
@@ -612,10 +631,7 @@ fn atomic_write(
     Ok(())
 }
 
-
-fn validate_reencrypt_db(
-    notes_db: &Connection,
-) -> Result<(), crate::errors::Error> {
+fn validate_reencrypt_db(notes_db: &Connection) -> Result<(), crate::errors::Error> {
     // Validate encrypted notes.
     let mut stmt = notes_db
         .prepare(
@@ -627,25 +643,14 @@ fn validate_reencrypt_db(
         )
         .context("failed to prepare encrypted notes validation query")?;
 
-    let mut rows = stmt
-        .query([])
-        .context("failed to query encrypted notes")?;
+    let mut rows = stmt.query([]).context("failed to query encrypted notes")?;
 
-    while let Some(row) = rows
-        .next()
-        .context("failed to get next encrypted note")?
-    {
-        let note_id: String = row
-            .get(0)
-            .context("failed to get note id")?;
+    while let Some(row) = rows.next().context("failed to get next encrypted note")? {
+        let note_id: String = row.get(0).context("failed to get note id")?;
 
-        let content_path: String = row
-            .get(1)
-            .context("failed to get note content path")?;
+        let content_path: String = row.get(1).context("failed to get note content path")?;
 
-        let crypto_meta_json: String = row
-            .get(2)
-            .context("failed to get note crypto metadata")?;
+        let crypto_meta_json: String = row.get(2).context("failed to get note crypto metadata")?;
 
         let content_path = PathBuf::from(&content_path);
 
@@ -658,14 +663,8 @@ fn validate_reencrypt_db(
             .into());
         }
 
-        let crypto_meta: NoteCryptoMetadata =
-            serde_json::from_str(&crypto_meta_json)
-                .with_context(|| {
-                    format!(
-                        "failed to parse crypto metadata for note {}",
-                        note_id
-                    )
-                })?;
+        let crypto_meta: NoteCryptoMetadata = serde_json::from_str(&crypto_meta_json)
+            .with_context(|| format!("failed to parse crypto metadata for note {}", note_id))?;
 
         validate_nonce(&crypto_meta.content_nonce, "content", &note_id)?;
         validate_nonce(&crypto_meta.title_nonce, "title", &note_id)?;
@@ -689,13 +688,9 @@ fn validate_reencrypt_db(
         .next()
         .context("failed to get next encrypted attachment")?
     {
-        let attachment_id: String = row
-            .get(0)
-            .context("failed to get attachment id")?;
+        let attachment_id: String = row.get(0).context("failed to get attachment id")?;
 
-        let local_path: String = row
-            .get(1)
-            .context("failed to get attachment path")?;
+        let local_path: String = row.get(1).context("failed to get attachment path")?;
 
         let crypto_meta_json: String = row
             .get(2)
@@ -712,40 +707,24 @@ fn validate_reencrypt_db(
             .into());
         }
 
-        let crypto_meta: AttachmentCryptoMetadata =
-            serde_json::from_str(&crypto_meta_json)
-                .with_context(|| {
-                    format!(
-                        "failed to parse crypto metadata for attachment {}",
-                        attachment_id
-                    )
-                })?;
+        let crypto_meta: AttachmentCryptoMetadata = serde_json::from_str(&crypto_meta_json)
+            .with_context(|| {
+                format!(
+                    "failed to parse crypto metadata for attachment {}",
+                    attachment_id
+                )
+            })?;
 
-        validate_nonce(
-            &crypto_meta.attachment_nonce,
-            "attachment",
-            &attachment_id,
-        )?;
+        validate_nonce(&crypto_meta.attachment_nonce, "attachment", &attachment_id)?;
     }
 
     Ok(())
 }
 
-
-
-fn validate_nonce(
-    nonce_base64: &str,
-    field: &str,
-    id: &str,
-) -> Result<(), crate::errors::Error> {
+fn validate_nonce(nonce_base64: &str, field: &str, id: &str) -> Result<(), crate::errors::Error> {
     let nonce = BASE64
         .decode(nonce_base64)
-        .with_context(|| {
-            format!(
-                "failed to decode {} nonce for {} {}",
-                field, field, id
-            )
-        })?;
+        .with_context(|| format!("failed to decode {} nonce for {} {}", field, field, id))?;
 
     if nonce.len() != 12 {
         return Err(anyhow::anyhow!(

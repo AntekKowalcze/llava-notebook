@@ -18,6 +18,7 @@ import { useLayoutStore } from '../../stores/layoutStore.ts';
 import TagEdition from '../../components/editor/tagEdition.vue';
 import NoteHeader from '../../components/editor/NoteHeader.vue';
 import QuitModal from '../../components/editor/QuitModal.vue';
+let leftPanelReloaded = ref<boolean>(false)
 const currentNoteStore = useCurrentNoteStore();
 let isDirty = false;
 let isClosing = false;
@@ -55,7 +56,7 @@ async function retrySave() {
   showForceQuitModal.value = false;
 
   const success = await saveNote();
-
+ 
   if (!success) {
     showForceQuitModal.value = true;
   }
@@ -82,6 +83,7 @@ const defaultValue = computed(() => {
 });
 
 async function loadNoteContent(id: string): Promise<string> {
+  leftPanelReloaded.value = false
   try {
     const contentFromDb = await invoke<string>('get_note_content', {
       noteId: id,
@@ -286,7 +288,11 @@ function getErrorText(err: unknown): string {
 
 async function saveNote(id: string = noteId.value): Promise<boolean> {
   try {
-    console.log(noteContent.value);
+     if (!leftPanelReloaded.value) {
+  await emit("reload-left-panel")
+  leftPanelReloaded.value = true
+
+  }
     await invoke('save_note', {
       noteId: id,
       content: noteContent.value,

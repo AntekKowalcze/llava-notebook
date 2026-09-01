@@ -36,7 +36,7 @@ pub struct RegisterUserPayload {
     pub argon2_params: ArgonParams,
 }
 
-/// Received from the server — full user object NOT useful i think?
+/// Received from the server — full user object
 // #[serde_as]
 // #[derive(Debug, Deserialize)]
 // pub struct OnlineUser {

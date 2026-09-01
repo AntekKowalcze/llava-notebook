@@ -8,3 +8,4 @@ pub mod storage;
 pub mod sync;
 pub mod user_settings;
 pub mod user_stats;
+pub mod ai;

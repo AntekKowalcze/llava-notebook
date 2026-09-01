@@ -5,6 +5,13 @@ import LoadingCircle from './components/main/LoadingCircle.vue';
 import SessionExpired from './components/main/SessionExpired.vue';
 import TitleBar from './components/TitleBar/TitleBar.vue';
 import { useLayoutStore } from './stores/layoutStore.ts';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import { useToast } from 'vue-toastification'
+const toast = useToast()
+
+let unlisten: UnlistenFn | null = null
+let shown = false
+
 const authStore = useAuthStore();
 const showSessionLoader = computed(() => !authStore.sessionReady);
 const layoutStore = useLayoutStore();
@@ -19,14 +26,28 @@ function handleKeyDown(event: KeyboardEvent) {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   void authStore.ensureSession();
   window.addEventListener('keydown', handleKeyDown);
+   unlisten = await listen('quota_exceeded', () => {
+    if (shown) return
+
+    shown = true
+
+    toast.error(
+      'Your storage quota has been exceeded. New uploads are currently unavailable.',
+      {
+        timeout: 20000,
+      },
+    )
+  })
 });
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyDown);
+   unlisten?.()
 });
+
 </script>
 <template>
   <div class="flex h-dvh flex-col overflow-hidden bg-note-graphite bg-cover bg-center">

@@ -22,8 +22,7 @@ type User struct {
 	KekSalt        string      `bson:"kek_salt" json:"kek_salt" validate:"required"`
 	ArgonParams    ArgonParams `bson:"argon2_params" json:"argon2_params" validate:"required"`
 
-	StorageUsed    int64  `bson:"storage_used_bytes" json:"storage_used_bytes"`
-	QuotaBytes     int64  `bson:"quota_bytes" json:"quota_bytes"`
+	QuotaUsed      int64  `bson:"quota_used_bytes" json:"quota_used_bytes"`
 	FailedAttempts int64  `bson:"failed_attempts" json:"failed_attempts"`
 	LockoutUntil   *int64 `bson:"lockout_until" json:"lockout_until"`
 	CreatedAt      int64  `bson:"created_at" json:"created_at"`
@@ -44,7 +43,7 @@ type LocalUserModel struct {
 	ArgonParams    ArgonParams `bson:"argon2_params" json:"argon2_params" validate:"required"`
 
 	StorageUsed    int64  `bson:"storage_used_bytes" json:"storage_used_bytes"`
-	QuotaBytes     int64  `bson:"quota_bytes" json:"quota_bytes"`
+	QuotaBytes     int64  `bson:"quota_used_bytes" json:"quota_used_bytes"`
 	FailedAttempts int64  `bson:"failed_attempts" json:"failed_attempts"`
 	LockoutUntil   *int64 `bson:"lockout_until" json:"lockout_until"`
 	CreatedAt      int64  `bson:"created_at" json:"created_at"`

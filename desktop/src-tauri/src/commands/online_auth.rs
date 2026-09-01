@@ -3,6 +3,7 @@ use llava_core::AppState;
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use anyhow::Context;
 use crate::commands::local_auth::LoggedInOnline;
+use crate::commands::sync::sync::synchronize_all;
 use anyhow::anyhow;
 use chacha20poly1305::aead::generic_array;
 use chacha20poly1305::aead::generic_array::GenericArray;
@@ -117,9 +118,34 @@ pub async fn register_user_online(
 // }
 
 #[tauri::command]
-pub async fn online_logout(state: tauri::State<'_, AppState>) -> Result<(), llava_core::Error> {
+pub async fn online_logout(app_handle: AppHandle, state: tauri::State<'_, AppState>, sync: bool) -> Result<(), llava_core::Error> {
     crate::commands::utils::check_connection_before_request(state.clone())?;
+    if sync {
+   let res = synchronize_all(state.clone(), app_handle).await;
 
+   if res.is_err() {
+    return Err(llava_core::Error::SyncFailed)
+   }
+   let mut notes_db_guard = state
+        .notes_db
+        .lock()
+        .map_err(|_| llava_core::Error::LockError)?;
+
+    let notes_db = notes_db_guard
+        .as_mut()
+        .ok_or(llava_core::Error::LockError)?;
+     let local_user_id: uuid::Uuid = {
+        let user_uuid_guard = state
+            .current_user
+            .lock()
+            .map_err(|_| llava_core::Error::LockError)?;
+        *user_uuid_guard
+            .as_ref()
+            .ok_or(llava_core::Error::LockError)?
+    };
+    llava_core::online_auth::delete_synced_notes_on_logout(notes_db, local_user_id.to_string())?;
+
+    }
     let user_id = {
         let guard = state
             .online_user_id
@@ -131,6 +157,10 @@ pub async fn online_logout(state: tauri::State<'_, AppState>) -> Result<(), llav
             .clone()
     };
 
+   
+
+
+   
     let access_token = {
         let guard = state
             .access_token
@@ -641,7 +671,7 @@ pub async fn login_online(
         &state,
         &app_handle,
     )?;
-
+    let _ =  synchronize_all(state, app_handle);
     tracing::info!(
         task = "online login",
         status = "success",
@@ -780,6 +810,3 @@ pub async fn try_refresh_if_logged_in(
     });
     Ok(())
 }
-
-
-// TODO add to cleaner cleaning expired sessions

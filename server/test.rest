@@ -15,6 +15,7 @@ Content-Type: application/json
     "user": {
         "email": "d@example.com",
         "password_hash": "$argon2id$v=19$m=65536,t=3,p=4$c2FsdHNhbHRzYWx0c2FsdA$hash",
+        "password_salt": "c2FsdHNhbHRzYWx0c2FsdA==",
         "master_key_enc": "AQID/xAQEB8fHx8=",
         "master_key_nonce": "CQgHBgUEAwIB",
         "kek_salt": "c2FsdHNhbHRzYWx0",
@@ -121,3 +122,142 @@ Content-Type: application/json
 }
 
 
+### sync-check
+POST http://127.0.0.1:3000/sync/sync-check
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2YTkyNTYzODg1MGYyNzI3OWI0YTI2MGYiLCJhdWQiOlsibGxhdmEtc2VydmVyIl0sImV4cCI6MTc4Nzk3NjE2NCwiaWF0IjoxNzg3OTc1MjY0LCJkZXZpY2VfaWQiOiI1NTBlODQwMC1lMjliLTQxZDQtYTcxNi00NDY2NTU0NDAwMDAifQ.tLHsSVJGcZVVNOCxUFGMwP9plOHkB-mMJQQsYmihM-SAR58nbW0TD3ETHafXhqQxD0NnreBwffWoninTGdvprg
+
+{
+  "to_check": [
+    {
+      "local_id": "550e8400-e29b-41d4-a716-446655440010",
+      "cloud_id": "66c8f1e0a4b6c12345678901",
+      "cloud_version": 12,
+      "attachments": [
+        {
+          "attachment_id": "550e8400-e29b-41d4-a716-446655440000",
+          "cloud_key": "test-user/attachments/550e8400-e29b-41d4-a716-446655440000",
+          "checksum_encrypted": "8b1a9953c4611296a827abf8c47804d7f4f7f3f7",
+          "size_bytes": 123456,
+          "is_encrypted": true,
+          "file_name": "document.pdf",
+          "mime_type": "application/pdf",
+          "crypto_metadata": {
+            "attachment_nonce": "dGVzdG5vbmNl"
+          }
+        },
+        {
+          "attachment_id": "550e8400-e29b-41d4-a716-446655440001",
+          "cloud_key": null,
+          "checksum_encrypted": "4a7d1ed414474e4033ac29ccb8653d9b",
+          "size_bytes": 54321,
+          "is_encrypted": false,
+          "file_name": "image.png",
+          "mime_type": "image/png",
+          "crypto_metadata": {}
+        }
+      ]
+    },
+    {
+      "local_id": "550e8400-e29b-41d4-a716-446655440011",
+      "cloud_id": "66c8f1e0a4b6c12345678902",
+      "cloud_version": 7,
+      "attachments": []
+    },
+    {
+      "local_id": "550e8400-e29b-41d4-a716-446655440012",
+      "cloud_id": null,
+      "cloud_version": null,
+      "attachments": [
+        {
+          "attachment_id": "550e8400-e29b-41d4-a716-446655440002",
+          "cloud_key": null,
+          "checksum_encrypted": "aabbccddeeff00112233445566778899",
+          "size_bytes": 99999,
+          "is_encrypted": true,
+          "file_name": "test.txt",
+          "mime_type": "text/plain",
+          "crypto_metadata": {
+            "attachment_nonce": "dGVzdG5vbmNl"
+          }
+        }
+      ]
+    }
+  ]
+}
+
+### upload-notes
+POST http://127.0.0.1:3000/sync/upload-notes
+Content-Type: application/json
+
+{
+{
+  "notes": [
+    {
+      "cloud_id": "66c8f1e0a4b6c12345678901",
+      "cloud_version": null,
+      "title": "My first note",
+      "summary": "A test note for synchronization.",
+      "content": "# Hello World\n\nThis is **encrypted test content**.",
+      "created_at": "2026-08-28T07:30:00Z",
+      "updated_at": "2026-08-28T08:05:12Z",
+      "is_deleted": false,
+      "deleted_at": null,
+      "is_encrypted": true,
+      "crypto_meta": {
+        "title_nonce": "MDEyMzQ1Njc4OTAx",
+        "summary_nonce": "YWJjZGVmZ2hpamts",
+        "content_nonce": "cXdlcnR5dWlvcGFz"
+      }
+    },
+    {
+      "cloud_id": "66c8f1e0a4b6c12345678902",
+      "cloud_version": 7,
+      "title": "Unencrypted note",
+      "summary": "Plaintext summary.",
+      "content": "# Plaintext\n\nThis note is not encrypted.",
+      "created_at": "2026-08-27T15:10:00Z",
+      "updated_at": "2026-08-28T07:58:41Z",
+      "is_deleted": false,
+      "deleted_at": null,
+      "is_encrypted": false,
+      "crypto_meta": null
+    }
+  ]
+}
+}
+
+### upload-attachments
+POST http://127.0.0.1:3000/sync/upload-attachments
+Content-Type: application/json
+
+{
+{
+  "attachments": [
+    {
+      "attachment_id": "550e8400-e29b-41d4-a716-446655440000",
+      "file_name": "photo.png",
+      "mime_type": "image/png",
+      "size_bytes": 248731,
+      "cloud_key": "notes/66c8f1e0a4b6c12345678901/attachments/550e8400-e29b-41d4-a716-446655440000",
+      "checksum_encrypted": "8b1a9953c4611296a827abf8c47804d7f4f7f3f7",
+      "is_encrypted": true,
+      "crypto_meta": {
+        "attachment_nonce": "YWJjMTIzNDU2Nzg5"
+      },
+      "created_at": "2026-08-28T07:35:00Z"
+    },
+    {
+      "attachment_id": "550e8400-e29b-41d4-a716-446655440001",
+      "file_name": "document.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 1048576,
+      "cloud_key": "notes/66c8f1e0a4b6c12345678901/attachments/550e8400-e29b-41d4-a716-446655440001",
+      "checksum_encrypted": "4a7d1ed414474e4033ac29ccb8653d9b",
+      "is_encrypted": false,
+      "crypto_meta": null,
+      "created_at": "2026-08-28T07:40:00Z"
+    }goroutines
+  ]
+}
+}

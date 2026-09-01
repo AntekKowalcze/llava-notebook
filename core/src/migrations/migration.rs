@@ -32,41 +32,6 @@ pub fn run_users_migration(users_db: &rusqlite::Connection) -> Result<(), crate:
         .query_row("PRAGMA user_version;", [], |r| r.get(0))
         .unwrap_or(0);
 
-    if version < 1 {
-        let tx = users_db
-            .unchecked_transaction()
-            .context("failed to create transaction")?;
-
-        if !column_exists(&tx, "users_data", "master_key_enc")? {
-            tx.execute("ALTER TABLE users_data ADD COLUMN master_key_enc BLOB", [])
-                .context("failed to add users_data.master_key_enc")?;
-        }
-        if !column_exists(&tx, "users_data", "master_key_nonce")? {
-            tx.execute(
-                "ALTER TABLE users_data ADD COLUMN master_key_nonce BLOB",
-                [],
-            )
-            .context("failed to add users_data.master_key_nonce")?;
-        }
-        if !column_exists(&tx, "users_data", "master_kek_salt")? {
-            tx.execute("ALTER TABLE users_data ADD COLUMN master_kek_salt TEXT", [])
-                .context("failed to add users_data.master_kek_salt")?;
-        }
-
-        tx.pragma_update(None, "user_version", crate::constants::USERS_DB_VERSION)
-            .context("Failed to update db version")?;
-        tx.commit()
-            .inspect_err(|e| {
-                tracing::error!(
-                    task = "migrating database",
-                    status = "error",
-                    error = ?e,
-                    %version,
-                    "failed to commit transaction"
-                )
-            })
-            .context("Failed to commit migration transaction on users database")?;
-    }
     if version < 2 {
         let tx = users_db
             .unchecked_transaction()
@@ -82,7 +47,7 @@ pub fn run_users_migration(users_db: &rusqlite::Connection) -> Result<(), crate:
             tx.execute(r#"UPDATE users_data SET kek_argon_params = '{"m_cost": 19456, "t_cost": 2, "p_cost": 1}'"#, []).context("failed to update params")?;
         }
 
-        tx.pragma_update(None, "user_version", crate::constants::USERS_DB_VERSION)
+        tx.pragma_update(None, "user_version", 2)
             .context("Failed to update db version")?;
         tx.commit()
             .inspect_err(|e| {
@@ -110,7 +75,7 @@ pub fn run_users_migration(users_db: &rusqlite::Connection) -> Result<(), crate:
             .context("failed to add users_data.online_account_id")?;
         }
 
-        tx.pragma_update(None, "user_version", crate::constants::USERS_DB_VERSION)
+        tx.pragma_update(None, "user_version", 3)
             .context("Failed to update db version")?;
         tx.commit()
             .inspect_err(|e| {
