@@ -89,26 +89,21 @@
 //! * [`crate::commands::utils`] — Provides connectivity checks before network
 //!   synchronization.
 
-use llava_core::{
-    sync::DbOperation,
-    AppState,
-    ProgramFiles,
-};
-use tauri::Emitter;
-use serde::Serialize;
 use llava_core::online_auth::AccessToken;
+use llava_core::{sync::DbOperation, AppState, ProgramFiles};
+use serde::Serialize;
 use tauri::AppHandle;
+use tauri::Emitter;
 struct SyncProcessResult {
     failed_notes: Vec<String>,
     newly_uploaded_notes: Vec<String>,
 }
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "PascalCase")]
- enum SyncResult {
+enum SyncResult {
     Done,
     InProgress,
     Error,
-    NotSynced,
 }
 use tauri::Manager;
 
@@ -117,262 +112,201 @@ pub async fn synchronize_all(
     state: tauri::State<'_, AppState>,
     app_handle: AppHandle,
 ) -> Result<(), llava_core::Error> {
-       let is_local_only: bool = match state.user_config.lock() {
-                Ok(config) => config
-                    .as_ref()
-                    .and_then(|map| map.get("local.mode"))
-                    .map(|value| value == "on")
-                    .unwrap_or(false),
-                Err(_) => true,
-            };
-               let is_online_sync_off: bool = match state.user_config.lock() {
-                Ok(config) => config
-                    .as_ref()
-                    .and_then(|map| map.get("online.sync"))
-                    .map(|value| value == "off")
-                    .unwrap_or(false),
-                Err(_) => true,
-            };
-        if is_local_only {
-            return Err(llava_core::Error::InternalError("cannot sync in local mode".to_string()))
-        }else {
-            if is_online_sync_off {
-            return Ok(())
-            }
+    let is_local_only: bool = match state.user_config.lock() {
+        Ok(config) => config
+            .as_ref()
+            .and_then(|map| map.get("local.mode"))
+            .map(|value| value == "on")
+            .unwrap_or(false),
+        Err(_) => true,
+    };
+    let is_online_sync_off: bool = match state.user_config.lock() {
+        Ok(config) => config
+            .as_ref()
+            .and_then(|map| map.get("online.sync"))
+            .map(|value| value == "off")
+            .unwrap_or(false),
+        Err(_) => true,
+    };
+    if is_local_only {
+        return Err(llava_core::Error::InternalError(
+            "cannot sync in local mode".to_string(),
+        ));
+    } else if is_online_sync_off {
+            return Ok(());
         }
+    
 
     let _ = app_handle.emit("sync_progress", SyncResult::InProgress);
     let result = async {
-    crate::commands::utils::check_connection_before_request(
-        state.clone(),
-    )?;
+        crate::commands::utils::check_connection_before_request(state.clone())?;
 
-    let client = state.server_client.clone();
+        let client = state.server_client.clone();
 
-    let mut access_token: AccessToken = {
-        let guard = state
-            .access_token
-            .lock()
-            .map_err(|_| llava_core::Error::LockError)?;
+        let mut access_token: AccessToken = {
+            let guard = state
+                .access_token
+                .lock()
+                .map_err(|_| llava_core::Error::LockError)?;
 
-        guard
-            .as_ref()
-            .ok_or(llava_core::Error::NotLoggedIn)?
-            .clone()
-    };
+            guard
+                .as_ref()
+                .ok_or(llava_core::Error::NotLoggedIn)?
+                .clone()
+        };
 
-    let online_id: String = {
-        let guard = state
-            .online_user_id
-            .lock()
-            .map_err(|_| llava_core::Error::LockError)?;
+        let online_id: String = {
+            let guard = state
+                .online_user_id
+                .lock()
+                .map_err(|_| llava_core::Error::LockError)?;
 
-        guard
-            .as_ref()
-            .ok_or(llava_core::Error::LockError)?
-            .clone()
-    };
+            guard.as_ref().ok_or(llava_core::Error::LockError)?.clone()
+        };
 
-    let notes_to_sync = get_notes_to_sync(&state)?;
+        let notes_to_sync = get_notes_to_sync(&state)?;
 
-    let first_response = match llava_core::sync::sync(
-        client.clone(),
-        notes_to_sync,
-        &access_token,
-        true,
-    )
-    .await
-    {
-        Ok(response) => response,
+        let first_response = match llava_core::sync::sync(
+            client.clone(),
+            notes_to_sync,
+            &access_token,
+            true,
+        )
+        .await
+        {
+            Ok(response) => response,
 
-        Err(llava_core::Error::OnlineSessionExpired) => {
-            access_token =
-                refresh_access_token(
-                    &state,
-                    &client,
-                    &online_id,
+            Err(llava_core::Error::OnlineSessionExpired) => {
+                access_token = refresh_access_token(&state, &client, &online_id).await?;
+
+                let notes_to_sync = get_notes_to_sync(&state)?;
+
+                llava_core::sync::sync(client.clone(), notes_to_sync, &access_token, true).await?
+            }
+
+            Err(err) => return Err(err),
+        };
+        if first_response.quota_exceeded {
+            let _ = app_handle.emit("quota_exceeded", ());
+        }
+
+        let mut process_result = process_sync_response(
+            state.clone(),
+            client.clone(),
+            first_response,
+            access_token.clone(),
+            online_id.clone(),
+        )
+        .await?;
+
+        if !process_result.newly_uploaded_notes.is_empty() {
+            let second_notes =
+                get_notes_by_local_ids(&state, &process_result.newly_uploaded_notes)?;
+
+            if !second_notes.is_empty() {
+                let second_response = match llava_core::sync::sync(
+                    client.clone(),
+                    second_notes,
+                    &access_token,
+                    false,
+                )
+                .await
+                {
+                    Ok(response) => response,
+
+                    Err(llava_core::Error::OnlineSessionExpired) => {
+                        access_token = refresh_access_token(&state, &client, &online_id).await?;
+
+                        let second_notes =
+                            get_notes_by_local_ids(&state, &process_result.newly_uploaded_notes)?;
+
+                        llava_core::sync::sync(client.clone(), second_notes, &access_token, false)
+                            .await?
+                    }
+
+                    Err(err) => return Err(err),
+                };
+
+                let second_result = process_sync_response(
+                    state.clone(),
+                    client.clone(),
+                    second_response,
+                    access_token.clone(),
+                    online_id.clone(),
                 )
                 .await?;
 
-            let notes_to_sync = get_notes_to_sync(&state)?;
-
-            llava_core::sync::sync(
-                client.clone(),
-                notes_to_sync,
-                &access_token,
-                true,
-            )
-            .await?
+                process_result
+                    .failed_notes
+                    .extend(second_result.failed_notes);
+            }
         }
 
-        Err(err) => return Err(err),
-    };
-    if first_response.quota_exceeded {
-        let _ = app_handle.emit("quota_exceeded", ());
-    }
+        let failed_notes = deduplicate_ids(process_result.failed_notes);
 
-    let mut process_result = process_sync_response(
-        state.clone(),
-        client.clone(),
-        first_response,
-        access_token.clone(),
-        online_id.clone(),
-    )
-    .await?;
+        if failed_notes.is_empty() {
+            return Ok(());
+        }
 
-    if !process_result.newly_uploaded_notes.is_empty() {
-        let second_notes = get_notes_by_local_ids(
-            &state,
-            &process_result.newly_uploaded_notes,
-        )?;
+        let retry_notes = get_notes_by_local_ids(&state, &failed_notes)?;
 
-        if !second_notes.is_empty() {
-            let second_response = match llava_core::sync::sync(
-                client.clone(),
-                second_notes,
-                &access_token,
-                false,
-            )
-            .await
-            {
+        if retry_notes.is_empty() {
+            return Ok(());
+        }
+
+        let retry_response =
+            match llava_core::sync::sync(client.clone(), retry_notes, &access_token, false).await {
                 Ok(response) => response,
 
                 Err(llava_core::Error::OnlineSessionExpired) => {
-                    access_token =
-                        refresh_access_token(
-                            &state,
-                            &client,
-                            &online_id,
-                        )
-                        .await?;
+                    access_token = refresh_access_token(&state, &client, &online_id).await?;
 
-                    let second_notes = get_notes_by_local_ids(
-                        &state,
-                        &process_result.newly_uploaded_notes,
-                    )?;
+                    let retry_notes = get_notes_by_local_ids(&state, &failed_notes)?;
 
-                    llava_core::sync::sync(
-                        client.clone(),
-                        second_notes,
-                        &access_token,
-                        false,
-                    )
-                    .await?
+                    llava_core::sync::sync(client.clone(), retry_notes, &access_token, false)
+                        .await?
                 }
 
                 Err(err) => return Err(err),
             };
 
-            let second_result = process_sync_response(
-                state.clone(),
-                client.clone(),
-                second_response,
-                access_token.clone(),
-                online_id.clone(),
-            )
-            .await?;
+        let retry_result = process_sync_response(
+            state.clone(),
+            client,
+            retry_response,
+            access_token,
+            online_id,
+        )
+        .await?;
 
-            process_result
-                .failed_notes
-                .extend(second_result.failed_notes);
+        let retry_failed_notes = deduplicate_ids(retry_result.failed_notes);
+
+        if !retry_failed_notes.is_empty() {
+            let operations = retry_failed_notes
+                .into_iter()
+                .map(|local_id| DbOperation::MarkNoteError { local_id })
+                .collect::<Vec<_>>();
+
+            let mut notes_db_guard = state
+                .notes_db
+                .lock()
+                .map_err(|_| llava_core::Error::LockError)?;
+
+            let notes_db = notes_db_guard
+                .as_mut()
+                .ok_or(llava_core::Error::LockError)?;
+
+            llava_core::sync::execute_db_operations(notes_db, operations)?;
         }
-    }
-
-    let failed_notes = deduplicate_ids(
-        process_result.failed_notes,
-    );
-
-    if failed_notes.is_empty() {
-        return Ok(());
-    }
-
-    let retry_notes = get_notes_by_local_ids(
-        &state,
-        &failed_notes,
-    )?;
-
-    if retry_notes.is_empty() {
-        return Ok(());
-    }
-
-    let retry_response = match llava_core::sync::sync(
-        client.clone(),
-        retry_notes,
-        &access_token,
-        false,
-    )
-    .await
-    {
-        Ok(response) => response,
-
-        Err(llava_core::Error::OnlineSessionExpired) => {
-            access_token =
-                refresh_access_token(
-                    &state,
-                    &client,
-                    &online_id,
-                )
-                .await?;
-
-            let retry_notes = get_notes_by_local_ids(
-                &state,
-                &failed_notes,
-            )?;
-
-            llava_core::sync::sync(
-                client.clone(),
-                retry_notes,
-                &access_token,
-                false,
-            )
-            .await?
-        }
-
-        Err(err) => return Err(err),
-    };
-
-    let retry_result = process_sync_response(
-        state.clone(),
-        client,
-        retry_response,
-        access_token,
-        online_id,
-    )
-    .await?;
-
-    let retry_failed_notes =
-        deduplicate_ids(retry_result.failed_notes);
-
-    if !retry_failed_notes.is_empty() {
-        let operations = retry_failed_notes
-            .into_iter()
-            .map(|local_id| {
-                DbOperation::MarkNoteError { local_id }
-            })
-            .collect::<Vec<_>>();
-
-        let mut notes_db_guard = state
-            .notes_db
-            .lock()
-            .map_err(|_| llava_core::Error::LockError)?;
-
-        let notes_db = notes_db_guard
-            .as_mut()
-            .ok_or(llava_core::Error::LockError)?;
-
-        llava_core::sync::execute_db_operations(
-            notes_db,
-            operations,
-        )?;
-    }
         Ok::<(), llava_core::Error>(())
-}.await;
-if result.is_err() {
-   let _ =  app_handle.emit("sync_progress", SyncResult::Error);
-}else {
-   let _ = app_handle.emit("sync_progress", SyncResult::Done);
-}
-result
+    }
+    .await;
+    if result.is_err() {
+        let _ = app_handle.emit("sync_progress", SyncResult::Error);
+    } else {
+        let _ = app_handle.emit("sync_progress", SyncResult::Done);
+    }
+    result
 }
 
 pub async fn refresh_access_token(
@@ -381,11 +315,7 @@ pub async fn refresh_access_token(
     online_id: &str,
 ) -> Result<AccessToken, llava_core::Error> {
     let new_access_token =
-        llava_core::online_auth::check_if_logged_in_online(
-            online_id,
-            client.clone(),
-        )
-        .await?;
+        llava_core::online_auth::check_if_logged_in_online(online_id, client.clone()).await?;
 
     {
         let mut guard = state
@@ -401,10 +331,7 @@ pub async fn refresh_access_token(
 
 fn get_notes_to_sync(
     state: &tauri::State<'_, AppState>,
-) -> Result<
-    Vec<llava_core::sync::CheckNoteSyncStatus>,
-    llava_core::Error,
-> {
+) -> Result<Vec<llava_core::sync::CheckNoteSyncStatus>, llava_core::Error> {
     let notes_db_guard = state
         .notes_db
         .lock()
@@ -420,10 +347,7 @@ fn get_notes_to_sync(
 fn get_notes_by_local_ids(
     state: &tauri::State<'_, AppState>,
     local_ids: &[String],
-) -> Result<
-    Vec<llava_core::sync::CheckNoteSyncStatus>,
-    llava_core::Error,
-> {
+) -> Result<Vec<llava_core::sync::CheckNoteSyncStatus>, llava_core::Error> {
     if local_ids.is_empty() {
         return Ok(Vec::new());
     }
@@ -437,8 +361,7 @@ fn get_notes_by_local_ids(
         .as_ref()
         .ok_or(llava_core::Error::LockError)?;
 
-    let all_notes =
-        llava_core::sync::get_all_notes_to_sync(notes_db)?;
+    let all_notes = llava_core::sync::get_all_notes_to_sync(notes_db)?;
 
     Ok(all_notes
         .into_iter()
@@ -461,10 +384,7 @@ async fn process_sync_response(
             .lock()
             .map_err(|_| llava_core::Error::LockError)?;
 
-        guard
-            .as_ref()
-            .ok_or(llava_core::Error::LockError)?
-            .clone()
+        guard.as_ref().ok_or(llava_core::Error::LockError)?.clone()
     };
 
     let user_id: String = {
@@ -479,12 +399,9 @@ async fn process_sync_response(
             .to_string()
     };
 
-    let mut notes_to_upload = Vec::<
-        llava_core::sync::NoteForUpload,
-    >::new();
+    let mut notes_to_upload = Vec::<llava_core::sync::NoteForUpload>::new();
 
-    let mut attachments_to_upload =
-        Vec::<(llava_core::sync::AttachmentForUpload, String)>::new();
+    let mut attachments_to_upload = Vec::<(llava_core::sync::AttachmentForUpload, String)>::new();
 
     let (
         notes_to_download_operations,
@@ -501,30 +418,22 @@ async fn process_sync_response(
             .as_ref()
             .ok_or(llava_core::Error::LockError)?;
 
-        let notes_to_download_operations =
-            llava_core::sync::handle_notes_to_download(
-                next_steps.notes_to_download.clone(),
-                notes_db,
-                &paths.notes_path,
-                user_id,
-            )?;
+        let notes_to_download_operations = llava_core::sync::handle_notes_to_download(
+            next_steps.notes_to_download.clone(),
+            notes_db,
+            &paths.notes_path,
+            user_id,
+        )?;
 
         let mut newly_uploaded_notes = Vec::new();
 
         for local_id in &next_steps.to_upload {
-            match llava_core::sync::get_note_for_upload(
-                notes_db,
-                local_id,
-            ) {
+            match llava_core::sync::get_note_for_upload(notes_db, local_id) {
                 Ok(note) => {
-                    let is_new = note
-                        .mongo_id
-                        .as_ref()
-                        .map_or(true, |id| id.is_empty());
+                    let is_new = note.mongo_id.as_ref().map_or(true, |id| id.is_empty());
 
                     if is_new {
-                        newly_uploaded_notes
-                            .push(note.local_id.clone());
+                        newly_uploaded_notes.push(note.local_id.clone());
                     }
 
                     notes_to_upload.push(note);
@@ -542,15 +451,10 @@ async fn process_sync_response(
         }
 
         for upload_data in &next_steps.attachments_to_upload {
-            match llava_core::sync::get_attachment_for_upload(
-                notes_db,
-                &upload_data.attachment_id,
-            ) {
+            match llava_core::sync::get_attachment_for_upload(notes_db, &upload_data.attachment_id)
+            {
                 Ok(attachment) => {
-                    attachments_to_upload.push((
-                        attachment,
-                        upload_data.upload_url.clone(),
-                    ));
+                    attachments_to_upload.push((attachment, upload_data.upload_url.clone()));
                 }
 
                 Err(err) => {
@@ -564,11 +468,10 @@ async fn process_sync_response(
             }
         }
 
-        let notes_hard_delete_operations =
-            llava_core::sync::handle_notes_to_hard_delete(
-                next_steps.notes_to_hard_delete.clone(),
-                notes_db,
-            )?;
+        let notes_hard_delete_operations = llava_core::sync::handle_notes_to_hard_delete(
+            next_steps.notes_to_hard_delete.clone(),
+            notes_db,
+        )?;
 
         let attachments_hard_delete_operations =
             llava_core::sync::handle_attachments_to_hard_delete(
@@ -584,44 +487,33 @@ async fn process_sync_response(
         )
     };
 
-    db_operations.extend(
-        notes_to_download_operations,
-    );
+    db_operations.extend(notes_to_download_operations);
 
-    db_operations.extend(
-        notes_hard_delete_operations,
-    );
+    db_operations.extend(notes_hard_delete_operations);
 
-    db_operations.extend(
-        attachments_hard_delete_operations,
-    );
+    db_operations.extend(attachments_hard_delete_operations);
 
-    let server_operations =
-        llava_core::sync::execute_server_operations(
-            client,
-            attachments_to_upload,
-            notes_to_upload,
-            next_steps.clone(),
-            access_token,
-            online_id.clone(),
-            &paths.assets_path,
-        )
-        .await?;
+    let server_operations = llava_core::sync::execute_server_operations(
+        client,
+        attachments_to_upload,
+        notes_to_upload,
+        next_steps.clone(),
+        access_token,
+        online_id.clone(),
+        &paths.assets_path,
+    )
+    .await?;
 
     db_operations.extend(server_operations);
 
-    db_operations.extend(
-        llava_core::sync::handle_notes_synced(
-            next_steps.notes_synced,
-        ),
-    );
+    db_operations.extend(llava_core::sync::handle_notes_synced(
+        next_steps.notes_synced,
+    ));
 
-    db_operations.extend(
-        llava_core::sync::handle_attachment_synced(
-            next_steps.attachments_synced,
-            online_id,
-        ),
-    );
+    db_operations.extend(llava_core::sync::handle_attachment_synced(
+        next_steps.attachments_synced,
+        online_id,
+    ));
 
     {
         let mut notes_db_guard = state
@@ -633,10 +525,7 @@ async fn process_sync_response(
             .as_mut()
             .ok_or(llava_core::Error::LockError)?;
 
-        llava_core::sync::execute_db_operations(
-            notes_db,
-            db_operations,
-        )?;
+        llava_core::sync::execute_db_operations(notes_db, db_operations)?;
     }
 
     Ok(SyncProcessResult {
@@ -658,7 +547,6 @@ fn deduplicate_ids(ids: Vec<String>) -> Vec<String> {
 }
 
 pub async fn run_sync_loop(app_handle: AppHandle) {
-
     let mut ticker = tokio::time::interval(tokio::time::Duration::from_secs(60));
 
     loop {
@@ -686,17 +574,16 @@ pub async fn run_sync_loop(app_handle: AppHandle) {
         };
 
         if is_local_only || is_online_sync_off || !has_user_id {
-        continue;
-    }
+            continue;
+        }
 
         if let Err(e) = synchronize_all(state, app_handle.clone()).await {
             tracing::error!(
-        task = "auto sync",
-        status = "error",
-        %e,
-        "error"
-    );
+                task = "auto sync",
+                status = "error",
+                %e,
+                "error"
+            );
         }
     }
 }
-

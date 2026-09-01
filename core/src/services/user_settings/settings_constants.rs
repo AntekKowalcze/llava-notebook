@@ -36,7 +36,6 @@ pub const SETTING_NAME_LIST: &[&str] = &[
     "online.aiFeatures",
 ];
 
-
 pub const NUMBER_OF_SETTINGS: i64 = SETTING_NAME_LIST.len() as i64;
 
 pub fn default_config(default_data_dir: &str) -> UserConfig {

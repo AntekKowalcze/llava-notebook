@@ -124,7 +124,12 @@ pub async fn login_command(
         if timeout > 0 {
             return Err(llava_core::Error::AccountLocked(0));
         }
-        crate::commands::handlers::local_auth::login(username.clone(), password, paths, &mut users_db)?
+        crate::commands::handlers::local_auth::login(
+            username.clone(),
+            password,
+            paths,
+            &mut users_db,
+        )?
     };
 
     let id = {

@@ -1,7 +1,7 @@
 use encoding_rs::{CoderResult, UTF_8};
 use futures_util::StreamExt;
-use llava_core::AppState;
 use llava_core::online_auth::AccessToken;
+use llava_core::AppState;
 use tauri::ipc::Channel;
 
 #[tauri::command]
@@ -22,7 +22,8 @@ pub async fn ai_request(
             .ok_or(llava_core::Error::NotLoggedIn)?
             .clone()
     };
-    let res = llava_core::ai::send_ai_request(client.clone(), prompt_context.clone(), access_token).await;
+    let res =
+        llava_core::ai::send_ai_request(client.clone(), prompt_context.clone(), access_token).await;
     match res {
         Err(llava_core::Error::OnlineSessionExpired) => {
             let online_id: String = {
@@ -30,14 +31,13 @@ pub async fn ai_request(
                     .online_user_id
                     .lock()
                     .map_err(|_| llava_core::Error::LockError)?;
-                guard
-                    .as_ref()
-                    .ok_or(llava_core::Error::LockError)?
-                    .clone()
+                guard.as_ref().ok_or(llava_core::Error::LockError)?.clone()
             };
             let new_token: AccessToken =
-                crate::commands::sync::sync::refresh_access_token(&state, &client, &online_id).await?;
-            let res = llava_core::ai::send_ai_request(client.clone(), prompt_context, new_token).await?;
+                crate::commands::sync::sync::refresh_access_token(&state, &client, &online_id)
+                    .await?;
+            let res =
+                llava_core::ai::send_ai_request(client.clone(), prompt_context, new_token).await?;
             handle_response(res, channel).await?;
             Ok(())
         }

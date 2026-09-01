@@ -124,7 +124,7 @@ pub struct NoteForUpload {
     pub owner_id: String,
     pub title: String,
     pub summary: String,
-    pub content_path: Option<String>, 
+    pub content_path: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
     pub deleted_at: Option<i64>,
@@ -135,7 +135,7 @@ pub struct NoteForUpload {
     pub encrypted: bool,
     pub hard_deleted: bool,
     pub crypto_meta: Option<String>,
-    pub content: String
+    pub content: String,
 }
 
 #[derive(Debug)]
@@ -154,6 +154,5 @@ pub struct AttachmentForUpload {
     pub created_at: i64,
     pub updated_at: i64,
     pub note_cloud_id: String,
-    pub content: Vec<u8>
+    pub content: Vec<u8>,
 }
-

@@ -72,11 +72,11 @@ pub mod online_auth {
     pub use crate::models::online_account::AccessToken;
     pub use crate::services::online_auth::login::check_if_logged_in_online;
     pub use crate::services::online_auth::login::login;
+    pub use crate::services::online_auth::logout::delete_synced_notes_on_logout;
     pub use crate::services::online_auth::logout::logout;
     pub use crate::services::online_auth::logout::set_account_to_offline_in_db;
     pub use crate::services::online_auth::register::change_email_in_database;
     pub use crate::services::online_auth::register::register;
-    pub use crate::services::online_auth::logout::delete_synced_notes_on_logout;
 }
 
 pub mod crypto_operations {
@@ -126,28 +126,27 @@ pub mod attachments {
 pub mod sync {
     pub use crate::models::sync::AttachmentForUpload;
     pub use crate::models::sync::CheckNoteSyncStatus;
+    pub use crate::models::sync::CheckSyncResponse;
     pub use crate::models::sync::NoteForUpload;
     pub use crate::models::sync::UploadAttachment;
-    pub use crate::models::sync::CheckSyncResponse;
     pub use crate::services::sync::DbOperation;
+    pub use crate::services::sync::download_attachment;
+    pub use crate::services::sync::execute_db_operations;
     pub use crate::services::sync::execute_server_operations;
     pub use crate::services::sync::get_all_notes_to_sync;
     pub use crate::services::sync::get_attachment_for_upload;
     pub use crate::services::sync::get_note_for_upload;
-    pub use crate::services::sync::sync;
     pub use crate::services::sync::handle_attachment_synced;
-    pub use crate::services::sync::handle_notes_synced;
     pub use crate::services::sync::handle_attachments_to_hard_delete;
+    pub use crate::services::sync::handle_notes_synced;
     pub use crate::services::sync::handle_notes_to_download;
     pub use crate::services::sync::handle_notes_to_hard_delete;
-    pub use crate::services::sync::execute_db_operations;
-    pub use crate::services::sync::upload_notes;
+    pub use crate::services::sync::sync;
     pub use crate::services::sync::upload_attachments;
-    pub use crate::services::sync::download_attachment;
+    pub use crate::services::sync::upload_notes;
 }
 
-
 pub mod ai {
-    pub use crate::services::ai::send_ai_request;
     pub use crate::services::ai::AiPromptContext;
+    pub use crate::services::ai::send_ai_request;
 }

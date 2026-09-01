@@ -59,7 +59,6 @@
 //! * [`crate::errors`] — Application-level errors such as invalid tag names,
 //!   duplicate tags, and database failures.
 
-
 use anyhow::Context;
 use rusqlite::OptionalExtension;
 use rusqlite::named_params;

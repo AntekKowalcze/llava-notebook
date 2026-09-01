@@ -154,10 +154,23 @@ pub fn set_account_to_offline_in_db(
     Ok(())
 }
 
-pub fn delete_synced_notes_on_logout(notes_db: &mut rusqlite::Connection, user_id: String) -> Result<(), crate::errors::Error> {
-    let tx = notes_db.transaction().context("failed to create transaction")?;
-    tx.execute("DELETE FROM notes WHERE owner_id = ?1 AND sync_state != 'LocalOnly' ", rusqlite::params![user_id]).context("Failed to delete notes")?;
-    tx.execute("DELETE FROM attachments WHERE sync_state != 'LocalOnly' ", [] ).context("Failed to delete synced attachments")?;
+pub fn delete_synced_notes_on_logout(
+    notes_db: &mut rusqlite::Connection,
+    user_id: String,
+) -> Result<(), crate::errors::Error> {
+    let tx = notes_db
+        .transaction()
+        .context("failed to create transaction")?;
+    tx.execute(
+        "DELETE FROM notes WHERE owner_id = ?1 AND sync_state != 'LocalOnly' ",
+        rusqlite::params![user_id],
+    )
+    .context("Failed to delete notes")?;
+    tx.execute(
+        "DELETE FROM attachments WHERE sync_state != 'LocalOnly' ",
+        [],
+    )
+    .context("Failed to delete synced attachments")?;
     tx.commit().context("failed to commit transaction")?;
     Ok(())
 }

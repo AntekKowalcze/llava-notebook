@@ -100,19 +100,19 @@
 //!   after successful online login.
 //! * [`crate::commands::utils`] — Provides connectivity checks before network
 //!   requests.
-use llava_core::settings::UserConfig;
-use llava_core::AppState;
-use tauri_plugin_clipboard_manager::ClipboardExt;
-use anyhow::Context;
 use crate::commands::local_auth::LoggedInOnline;
 use crate::commands::sync::sync::synchronize_all;
 use anyhow::anyhow;
+use anyhow::Context;
 use chacha20poly1305::aead::generic_array;
 use chacha20poly1305::aead::generic_array::GenericArray;
+use llava_core::settings::UserConfig;
+use llava_core::AppState;
 use subtle::ConstantTimeEq;
 use tauri::AppHandle;
 use tauri::Emitter;
 use tauri::Manager;
+use tauri_plugin_clipboard_manager::ClipboardExt;
 use zeroize::Zeroizing;
 #[tauri::command]
 pub async fn register_user_online(
@@ -123,7 +123,6 @@ pub async fn register_user_online(
     app_handle: AppHandle,
     current_settings: Option<UserConfig>,
 ) -> Result<(), llava_core::Error> {
-
     let (server_connected, internet_connected) = match llava_core::check_connection().await {
         Ok((server, internet)) => (server, internet),
         Err(_) => (false, false),
@@ -220,33 +219,39 @@ pub async fn register_user_online(
 // }
 
 #[tauri::command]
-pub async fn online_logout(app_handle: AppHandle, state: tauri::State<'_, AppState>, sync: bool) -> Result<(), llava_core::Error> {
+pub async fn online_logout(
+    app_handle: AppHandle,
+    state: tauri::State<'_, AppState>,
+    sync: bool,
+) -> Result<(), llava_core::Error> {
     crate::commands::utils::check_connection_before_request(state.clone())?;
     if sync {
-   let res = synchronize_all(state.clone(), app_handle).await;
+        let res = synchronize_all(state.clone(), app_handle).await;
 
-   if res.is_err() {
-    return Err(llava_core::Error::SyncFailed)
-   }
-   let mut notes_db_guard = state
-        .notes_db
-        .lock()
-        .map_err(|_| llava_core::Error::LockError)?;
-
-    let notes_db = notes_db_guard
-        .as_mut()
-        .ok_or(llava_core::Error::LockError)?;
-     let local_user_id: uuid::Uuid = {
-        let user_uuid_guard = state
-            .current_user
+        if res.is_err() {
+            return Err(llava_core::Error::SyncFailed);
+        }
+        let mut notes_db_guard = state
+            .notes_db
             .lock()
             .map_err(|_| llava_core::Error::LockError)?;
-        *user_uuid_guard
-            .as_ref()
-            .ok_or(llava_core::Error::LockError)?
-    };
-    llava_core::online_auth::delete_synced_notes_on_logout(notes_db, local_user_id.to_string())?;
 
+        let notes_db = notes_db_guard
+            .as_mut()
+            .ok_or(llava_core::Error::LockError)?;
+        let local_user_id: uuid::Uuid = {
+            let user_uuid_guard = state
+                .current_user
+                .lock()
+                .map_err(|_| llava_core::Error::LockError)?;
+            *user_uuid_guard
+                .as_ref()
+                .ok_or(llava_core::Error::LockError)?
+        };
+        llava_core::online_auth::delete_synced_notes_on_logout(
+            notes_db,
+            local_user_id.to_string(),
+        )?;
     }
     let user_id = {
         let guard = state
@@ -259,10 +264,6 @@ pub async fn online_logout(app_handle: AppHandle, state: tauri::State<'_, AppSta
             .clone()
     };
 
-   
-
-
-   
     let access_token = {
         let guard = state
             .access_token
@@ -361,11 +362,7 @@ pub async fn login_online(
             .as_ref()
             .ok_or(llava_core::Error::LockError)?;
 
-        if !llava_core::local_auth::autorization(
-            username,
-            &local_password,
-            users_db,
-        )? {
+        if !llava_core::local_auth::autorization(username, &local_password, users_db)? {
             tracing::warn!(
                 task = "online login",
                 status = "error",
@@ -390,21 +387,20 @@ pub async fn login_online(
         "checking server and internet connection"
     );
 
-    let (server_connected, internet_connected) =
-        match llava_core::check_connection().await {
-            Ok((server, internet)) => (server, internet),
-            Err(e) => {
-                tracing::warn!(
-                    task = "online login",
-                    status = "error",
-                    step = "connection_check",
-                    error = ?e,
-                    "connection check failed"
-                );
+    let (server_connected, internet_connected) = match llava_core::check_connection().await {
+        Ok((server, internet)) => (server, internet),
+        Err(e) => {
+            tracing::warn!(
+                task = "online login",
+                status = "error",
+                step = "connection_check",
+                error = ?e,
+                "connection check failed"
+            );
 
-                (false, false)
-            }
-        };
+            (false, false)
+        }
+    };
 
     if let Ok(mut lock) = state.server_connection.lock() {
         *lock = server_connected;
@@ -432,9 +428,7 @@ pub async fn login_online(
             .lock()
             .map_err(|_| llava_core::Error::LockError)?;
 
-        *guard
-            .as_ref()
-            .ok_or(llava_core::Error::LockError)?
+        *guard.as_ref().ok_or(llava_core::Error::LockError)?
     };
 
     tracing::debug!(
@@ -444,13 +438,8 @@ pub async fn login_online(
     );
 
     let (access_token, online_user_id, new_notes_key) =
-        llava_core::online_auth::login(
-            email.clone(),
-            Zeroizing::new(password),
-            client,
-            &device_id,
-        )
-        .await?;
+        llava_core::online_auth::login(email.clone(), Zeroizing::new(password), client, &device_id)
+            .await?;
 
     tracing::info!(
         task = "online login",
@@ -466,9 +455,7 @@ pub async fn login_online(
             .lock()
             .map_err(|_| llava_core::Error::LockError)?;
 
-        *guard
-            .as_ref()
-            .ok_or(llava_core::Error::LockError)?
+        *guard.as_ref().ok_or(llava_core::Error::LockError)?
     };
 
     let user_id = {
@@ -477,9 +464,7 @@ pub async fn login_online(
             .lock()
             .map_err(|_| llava_core::Error::LockError)?;
 
-        *guard
-            .as_ref()
-            .ok_or(llava_core::Error::LockError)?
+        *guard.as_ref().ok_or(llava_core::Error::LockError)?
     };
 
     let keys_match: bool = new_notes_key
@@ -512,10 +497,7 @@ pub async fn login_online(
                 "online notes key matches local notes key; rotating local session"
             );
 
-            llava_core::local_auth::invalidate_session_for_user(
-                &user_id.to_string(),
-                users_db,
-            )?;
+            llava_core::local_auth::invalidate_session_for_user(&user_id.to_string(), users_db)?;
 
             tracing::debug!(
                 task = "online login",
@@ -523,11 +505,7 @@ pub async fn login_online(
                 "previous sessions invalidated"
             );
 
-            llava_core::local_auth::session_operations(
-                users_db,
-                user_id,
-                &state_notes_key,
-            )?;
+            llava_core::local_auth::session_operations(users_db, user_id, &state_notes_key)?;
 
             tracing::info!(
                 task = "online login",
@@ -572,11 +550,7 @@ pub async fn login_online(
                     "starting database re-encryption"
                 );
 
-                llava_core::crypto_operations::reencrypt_db(
-                    notes_db,
-                    &old_key,
-                    &new_key,
-                )?;
+                llava_core::crypto_operations::reencrypt_db(notes_db, &old_key, &new_key)?;
 
                 tracing::info!(
                     task = "online login",
@@ -612,10 +586,7 @@ pub async fn login_online(
                 "invalidating previous recovery codes"
             );
 
-            llava_core::local_auth::invalidate_recovery_keys(
-                users_db,
-                &user_id.to_string(),
-            )?;
+            llava_core::local_auth::invalidate_recovery_keys(users_db, &user_id.to_string())?;
 
             tracing::debug!(
                 task = "online login",
@@ -623,12 +594,11 @@ pub async fn login_online(
                 "generating new recovery codes"
             );
 
-            let new_codes =
-                llava_core::local_auth::generate_recovery_codes_with_new_key(
-                    &new_key,
-                    users_db,
-                    &user_id.to_string(),
-                )?;
+            let new_codes = llava_core::local_auth::generate_recovery_codes_with_new_key(
+                &new_key,
+                users_db,
+                &user_id.to_string(),
+            )?;
 
             tracing::info!(
                 task = "online login",
@@ -644,16 +614,9 @@ pub async fn login_online(
                 "invalidating previous local sessions"
             );
 
-            llava_core::local_auth::invalidate_session_for_user(
-                &user_id.to_string(),
-                users_db,
-            )?;
+            llava_core::local_auth::invalidate_session_for_user(&user_id.to_string(), users_db)?;
 
-            llava_core::local_auth::session_operations(
-                users_db,
-                user_id,
-                &new_key,
-            )?;
+            llava_core::local_auth::session_operations(users_db, user_id, &new_key)?;
 
             tracing::info!(
                 task = "online login",
@@ -721,10 +684,7 @@ pub async fn login_online(
             .as_ref()
             .ok_or(llava_core::Error::LockError)?;
 
-        llava_core::change_account_link_status(
-            users_data,
-            &user_id,
-        )?;
+        llava_core::change_account_link_status(users_data, &user_id)?;
 
         tracing::debug!(
             task = "online login",
@@ -755,25 +715,17 @@ pub async fn login_online(
                     .lock()
                     .map_err(|_| llava_core::Error::LockError)?;
 
-                guard
-                    .as_ref()
-                    .ok_or(llava_core::Error::LockError)?
-                    .clone()
+                guard.as_ref().ok_or(llava_core::Error::LockError)?.clone()
             };
 
-            let (settings, _created_default) =
-                llava_core::settings::get_config(&paths)?;
+            let (settings, _created_default) = llava_core::settings::get_config(&paths)?;
 
             settings
         }
     };
 
-    after_login(
-        &current_settings,
-        &state,
-        &app_handle,
-    )?;
-    let _ =  synchronize_all(state, app_handle);
+    after_login(&current_settings, &state, &app_handle)?;
+    let _ = synchronize_all(state, app_handle);
     tracing::info!(
         task = "online login",
         status = "success",

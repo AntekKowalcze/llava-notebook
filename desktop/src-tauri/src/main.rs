@@ -84,19 +84,16 @@ pub fn main() {
                 let handle = app.handle().clone();
 
                 crate::commands::utils::start_connection_monitor(handle.clone());
-                    let handle = app.handle().clone();
-                    tauri::async_runtime::spawn(async move {
-                        crate::commands::sync::sync::run_sync_loop(handle).await;
-                    });
-
-
-
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    crate::commands::sync::sync::run_sync_loop(handle).await;
+                });
             }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::local_auth::register_command, 
-            commands::local_auth::login_command,   
+            commands::local_auth::register_command,
+            commands::local_auth::login_command,
             commands::local_auth::check_if_user_exists,
             commands::local_auth::check_timeout_before_submit,
             commands::local_auth::change_password,

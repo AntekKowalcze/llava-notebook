@@ -1,3 +1,4 @@
+pub mod ai;
 pub mod attachments;
 mod command_helpers;
 pub mod dashboard;
@@ -8,7 +9,6 @@ pub mod notes;
 pub mod online_auth;
 pub mod settings;
 pub mod sliding_panel;
+pub mod sync;
 pub mod tags;
 pub mod utils;
-pub mod sync;
-pub mod ai;

@@ -1,4 +1,5 @@
 //! Module with backend services for taurii aplication
+pub mod ai;
 pub mod attachment;
 pub mod cleaner;
 pub mod local_auth;
@@ -8,4 +9,3 @@ pub mod storage;
 pub mod sync;
 pub mod user_settings;
 pub mod user_stats;
-pub mod ai;

@@ -124,29 +124,20 @@
 //!   used to authenticate cloud synchronization requests.
 
 use crate::constants::{NOTE_EXTENSION, SERVER_ADDRESS};
-use crate::models::sync::{
-    AttachmentForUpload,
-    AttachmentSyncCheck,
-    CheckNoteSyncStatus,
-    CheckSyncRequest,
-    CheckSyncResponse,
-    DownloadAttachment,
-    DownloadNote,
-    NoteForUpload,
-};
-use crate::{
-    services::attachment::AttachmentCryptoMetadata,
-    storage::SyncState,
-};
 use crate::models::online_account::AccessToken;
+use crate::models::sync::{
+    AttachmentForUpload, AttachmentSyncCheck, CheckNoteSyncStatus, CheckSyncRequest,
+    CheckSyncResponse, DownloadAttachment, DownloadNote, NoteForUpload,
+};
+use crate::{services::attachment::AttachmentCryptoMetadata, storage::SyncState};
 
 use anyhow::Context;
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use reqwest::{
-    header::{HeaderMap, HeaderValue},
     Client,
+    header::{HeaderMap, HeaderValue},
 };
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, params};
 use serde::Deserialize;
 use std::path;
 use std::str::FromStr;
@@ -196,20 +187,15 @@ pub async fn sync(
         return Err(crate::errors::Error::SyncFailed);
     }
 
-    response
-        .json::<CheckSyncResponse>()
-        .await
-        .map_err(|e| {
-            tracing::error!(
-                task = "sync",
-                error = ?e,
-                "failed to decode sync response"
-            );
+    response.json::<CheckSyncResponse>().await.map_err(|e| {
+        tracing::error!(
+            task = "sync",
+            error = ?e,
+            "failed to decode sync response"
+        );
 
-            crate::errors::Error::InternalError(
-                "Failed to decode response".to_string(),
-            )
-        })
+        crate::errors::Error::InternalError("Failed to decode response".to_string())
+    })
 }
 
 pub fn get_all_notes_to_sync(
@@ -256,55 +242,40 @@ pub fn get_all_notes_to_sync(
         ),
     >::new();
 
-    let mut rows = stmt
-        .query([])
-        .context("failed to query notes to sync")?;
+    let mut rows = stmt.query([]).context("failed to query notes to sync")?;
 
     while let Some(row) = rows.next().context("failed to read row")? {
-        let local_id: String =
-            row.get(0).context("failed to get local_id")?;
+        let local_id: String = row.get(0).context("failed to get local_id")?;
 
-        let cloud_id: Option<String> =
-            row.get(1).context("failed to get mongo_id")?;
+        let cloud_id: Option<String> = row.get(1).context("failed to get mongo_id")?;
 
-        let sync_state: SyncState =
-            row.get(2).context("failed to get sync_state")?;
+        let sync_state: SyncState = row.get(2).context("failed to get sync_state")?;
 
-        let cloud_version: Option<i64> =
-            row.get(3).context("failed to get cloud_version")?;
+        let cloud_version: Option<i64> = row.get(3).context("failed to get cloud_version")?;
 
-        let attachment_id: Option<String> =
-            row.get(4).context("failed to get attachment_id")?;
+        let attachment_id: Option<String> = row.get(4).context("failed to get attachment_id")?;
 
         let checksum_encrypted: Option<String> =
             row.get(5).context("failed to get checksum_encrypted")?;
 
-        let size_bytes: Option<i64> =
-            row.get(6).context("failed to get size_bytes")?;
+        let size_bytes: Option<i64> = row.get(6).context("failed to get size_bytes")?;
 
-        let encrypted: Option<bool> =
-            row.get(7).context("failed to get encrypted")?;
+        let encrypted: Option<bool> = row.get(7).context("failed to get encrypted")?;
 
-        let file_name: Option<String> =
-            row.get(8).context("failed to get filename")?;
+        let file_name: Option<String> = row.get(8).context("failed to get filename")?;
 
-        let mime_type: Option<String> =
-            row.get(9).context("failed to get mime_type")?;
+        let mime_type: Option<String> = row.get(9).context("failed to get mime_type")?;
 
-        let created_at: Option<i64> =
-            row.get(10).context("failed to get created_at")?;
+        let created_at: Option<i64> = row.get(10).context("failed to get created_at")?;
 
-        let updated_at: Option<i64> =
-            row.get(11).context("failed to get updated_at")?;
+        let updated_at: Option<i64> = row.get(11).context("failed to get updated_at")?;
 
-        let crypto_metadata: Option<String> =
-            row.get(12).context("failed to get crypto_meta")?;
+        let crypto_metadata: Option<String> = row.get(12).context("failed to get crypto_meta")?;
 
         let attachment_sync_state: Option<SyncState> =
             row.get(13).context("failed to get attachment sync_state")?;
 
-        let note_hard_deleted =
-            sync_state == SyncState::WaitingForTombstone;
+        let note_hard_deleted = sync_state == SyncState::WaitingForTombstone;
 
         let entry = notes.entry(local_id.clone()).or_insert_with(|| {
             (
@@ -330,46 +301,42 @@ pub fn get_all_notes_to_sync(
         }
 
         let metadata = match crypto_metadata {
-            Some(value) => {
-                match serde_json::from_str::<AttachmentCryptoMetadata>(&value) {
-                    Ok(meta) => Some(meta),
-                    Err(err) => {
-                        tracing::error!(
-                            task = "sync",
-                            local_id = %local_id,
-                            error = ?err,
-                            "failed to parse attachment crypto metadata"
-                        );
-
-                        continue;
-                    }
-                }
-            }
-            None => None,
-        };
-
-        let attachment_id =
-            match uuid::Uuid::from_str(&attachment_id.unwrap()) {
-                Ok(id) => id,
+            Some(value) => match serde_json::from_str::<AttachmentCryptoMetadata>(&value) {
+                Ok(meta) => Some(meta),
                 Err(err) => {
                     tracing::error!(
                         task = "sync",
                         local_id = %local_id,
                         error = ?err,
-                        "invalid attachment UUID"
+                        "failed to parse attachment crypto metadata"
                     );
 
                     continue;
                 }
-            };
+            },
+            None => None,
+        };
+
+        let attachment_id = match uuid::Uuid::from_str(&attachment_id.unwrap()) {
+            Ok(id) => id,
+            Err(err) => {
+                tracing::error!(
+                    task = "sync",
+                    local_id = %local_id,
+                    error = ?err,
+                    "invalid attachment UUID"
+                );
+
+                continue;
+            }
+        };
 
         entry.4.push(AttachmentSyncCheck {
             attachment_id,
             checksum_encrypted: checksum_encrypted.unwrap(),
             size_bytes: size_bytes.unwrap(),
             is_encrypted: encrypted.unwrap(),
-            hard_deleted: attachment_sync_state.unwrap()
-                == SyncState::WaitingForTombstone,
+            hard_deleted: attachment_sync_state.unwrap() == SyncState::WaitingForTombstone,
             file_name: file_name.unwrap(),
             mime_type: mime_type.unwrap(),
             created_at: created_at.unwrap(),
@@ -381,24 +348,16 @@ pub fn get_all_notes_to_sync(
     Ok(notes
         .into_values()
         .map(
-            |(
+            |(local_id, cloud_id, hard_deleted, cloud_version, attachments)| CheckNoteSyncStatus {
                 local_id,
                 cloud_id,
                 hard_deleted,
                 cloud_version,
-                attachments,
-            )| {
-                CheckNoteSyncStatus {
-                    local_id,
-                    cloud_id,
-                    hard_deleted,
-                    cloud_version,
-                    attachments: if attachments.is_empty() {
-                        None
-                    } else {
-                        Some(attachments)
-                    },
-                }
+                attachments: if attachments.is_empty() {
+                    None
+                } else {
+                    Some(attachments)
+                },
             },
         )
         .collect())
@@ -438,22 +397,17 @@ pub fn get_note_for_upload(
         .context("failed to query note")?;
 
     if let Some(row) = rows.next().context("failed to read note")? {
-        let note_path: String =
-            row.get(5).context("failed to get content path")?;
+        let note_path: String = row.get(5).context("failed to get content path")?;
 
-        let encrypted: bool =
-            row.get(13).context("failed to get encrypted")?;
+        let encrypted: bool = row.get(13).context("failed to get encrypted")?;
 
         let content = if encrypted {
             std::fs::read_to_string(&note_path)?
         } else {
             BASE64.encode(std::fs::read(&note_path)?)
         };
-        let ss: SyncState =  row
-                .get(11)
-                .context("failed to get sync_state")?;
-        let is_hard_deleted = ss== SyncState::WaitingForTombstone;
-        
+        let ss: SyncState = row.get(11).context("failed to get sync_state")?;
+        let is_hard_deleted = ss == SyncState::WaitingForTombstone;
 
         Ok(NoteForUpload {
             local_id: row.get(0).context("failed to get local_id")?,
@@ -466,20 +420,12 @@ pub fn get_note_for_upload(
             updated_at: row.get(7).context("failed to get updated_at")?,
             deleted_at: row.get(8).context("failed to get deleted_at")?,
             version: row.get(9).context("failed to get version")?,
-            cloud_version: row
-                .get(10)
-                .context("failed to get cloud_version")?,
-            sync_state: row
-                .get(11)
-                .context("failed to get sync_state")?,
+            cloud_version: row.get(10).context("failed to get cloud_version")?,
+            sync_state: row.get(11).context("failed to get sync_state")?,
             hard_deleted: is_hard_deleted,
-            is_deleted: row
-                .get(12)
-                .context("failed to get is_deleted")?,
+            is_deleted: row.get(12).context("failed to get is_deleted")?,
             encrypted,
-            crypto_meta: row
-                .get(14)
-                .context("failed to get crypto_meta")?,
+            crypto_meta: row.get(14).context("failed to get crypto_meta")?,
             content,
         })
     } else {
@@ -522,8 +468,7 @@ pub fn get_attachment_for_upload(
         .context("failed to query attachment")?;
 
     if let Some(row) = rows.next().context("failed to read attachment")? {
-        let attachment_path: String =
-            row.get(5).context("failed to get attachment path")?;
+        let attachment_path: String = row.get(5).context("failed to get attachment path")?;
 
         let content = std::fs::read(&attachment_path)?;
 
@@ -535,21 +480,13 @@ pub fn get_attachment_for_upload(
             size_bytes: row.get(4).context("failed to get size_bytes")?,
             local_path: None,
             cloud_key: row.get(6).context("failed to get cloud_key")?,
-            checksum_encrypted: row
-                .get(7)
-                .context("failed to get checksum_encrypted")?,
+            checksum_encrypted: row.get(7).context("failed to get checksum_encrypted")?,
             encrypted: row.get(8).context("failed to get encrypted")?,
-            crypto_meta: row
-                .get(9)
-                .context("failed to get crypto_meta")?,
-            sync_state: row
-                .get(10)
-                .context("failed to get sync_state")?,
+            crypto_meta: row.get(9).context("failed to get crypto_meta")?,
+            sync_state: row.get(10).context("failed to get sync_state")?,
             created_at: row.get(11).context("failed to get created_at")?,
             updated_at: row.get(12).context("failed to get updated_at")?,
-            note_cloud_id: row
-                .get(13)
-                .context("failed to get note_cloud_id")?,
+            note_cloud_id: row.get(13).context("failed to get note_cloud_id")?,
             content,
         })
     } else {
@@ -867,10 +804,7 @@ pub fn execute_db_operation(
             .context("failed to delete attachment")?;
         }
 
-        DbOperation::SetOnlineId {
-            local_id,
-            mongo_id,
-        } => {
+        DbOperation::SetOnlineId { local_id, mongo_id } => {
             tx.execute(
                 r#"
                 UPDATE notes
@@ -890,16 +824,13 @@ pub fn execute_db_operations(
     conn: &mut Connection,
     operations: Vec<DbOperation>,
 ) -> Result<(), crate::errors::Error> {
-    let tx = conn
-        .transaction()
-        .context("failed to create transaction")?;
+    let tx = conn.transaction().context("failed to create transaction")?;
 
     for operation in operations {
         execute_db_operation(&tx, operation)?;
     }
 
-    tx.commit()
-        .context("failed to commit transaction")?;
+    tx.commit().context("failed to commit transaction")?;
 
     Ok(())
 }
@@ -1011,16 +942,8 @@ pub async fn execute_server_operations(
 ) -> Result<Vec<DbOperation>, crate::errors::Error> {
     let mut db_operations = Vec::new();
 
-    let (
-        upload_notes_result,
-        upload_attachments_result,
-        download_attachments_result,
-    ) = tokio::join!(
-        upload_notes(
-            client.clone(),
-            note_upload_data,
-            access_token.clone(),
-        ),
+    let (upload_notes_result, upload_attachments_result, download_attachments_result) = tokio::join!(
+        upload_notes(client.clone(), note_upload_data, access_token.clone(),),
         upload_attachments(
             client.clone(),
             attachments_upload_data,
@@ -1093,10 +1016,7 @@ pub async fn upload_notes(
         let local_id = note.local_id.clone();
 
         let request = if is_new_note {
-            client.post(format!(
-                "{}sync/upload-note",
-                SERVER_ADDRESS
-            ))
+            client.post(format!("{}sync/upload-note", SERVER_ADDRESS))
         } else {
             client.put(format!(
                 "{}sync/update-note/{}",
@@ -1128,9 +1048,7 @@ pub async fn upload_notes(
         let status = response.status();
 
         if status == reqwest::StatusCode::UNAUTHORIZED {
-            return Err(
-                crate::errors::Error::OnlineSessionExpired
-            );
+            return Err(crate::errors::Error::OnlineSessionExpired);
         }
 
         if !status.is_success() {
@@ -1145,70 +1063,54 @@ pub async fn upload_notes(
         }
 
         if is_new_note {
-            let result: UploadNoteResponse =
-                match response.json().await {
-                    Ok(result) => result,
+            let result: UploadNoteResponse = match response.json().await {
+                Ok(result) => result,
 
-                    Err(err) => {
-                        tracing::error!(
-                            task = "sync",
-                            local_id = %local_id,
-                            error = ?err,
-                            "failed to parse upload response"
-                        );
+                Err(err) => {
+                    tracing::error!(
+                        task = "sync",
+                        local_id = %local_id,
+                        error = ?err,
+                        "failed to parse upload response"
+                    );
 
-                        continue;
-                    }
-                };
+                    continue;
+                }
+            };
 
-            operations.push(
-                DbOperation::SetOnlineId {
-                    local_id: local_id.clone(),
-                    mongo_id: result.mongo_id,
-                },
-            );
+            operations.push(DbOperation::SetOnlineId {
+                local_id: local_id.clone(),
+                mongo_id: result.mongo_id,
+            });
 
-            operations.push(
-                DbOperation::SetCloudVersion {
-                    local_id: local_id.clone(),
-                    cloud_version: result.cloud_version,
-                },
-            );
+            operations.push(DbOperation::SetCloudVersion {
+                local_id: local_id.clone(),
+                cloud_version: result.cloud_version,
+            });
 
-            operations.push(
-                DbOperation::MarkNoteSynced {
-                    local_id,
-                },
-            );
+            operations.push(DbOperation::MarkNoteSynced { local_id });
         } else {
-            let result: UpdateNoteResponse =
-                match response.json().await {
-                    Ok(result) => result,
+            let result: UpdateNoteResponse = match response.json().await {
+                Ok(result) => result,
 
-                    Err(err) => {
-                        tracing::error!(
-                            task = "sync",
-                            local_id = %local_id,
-                            error = ?err,
-                            "failed to parse update response"
-                        );
+                Err(err) => {
+                    tracing::error!(
+                        task = "sync",
+                        local_id = %local_id,
+                        error = ?err,
+                        "failed to parse update response"
+                    );
 
-                        continue;
-                    }
-                };
+                    continue;
+                }
+            };
 
-            operations.push(
-                DbOperation::SetCloudVersion {
-                    local_id: local_id.clone(),
-                    cloud_version: result.cloud_version,
-                },
-            );
+            operations.push(DbOperation::SetCloudVersion {
+                local_id: local_id.clone(),
+                cloud_version: result.cloud_version,
+            });
 
-            operations.push(
-                DbOperation::MarkNoteSynced {
-                    local_id,
-                },
-            );
+            operations.push(DbOperation::MarkNoteSynced { local_id });
         }
     }
 
@@ -1219,7 +1121,7 @@ pub async fn upload_attachments(
     client: Client,
     attachments_upload_data: Vec<(AttachmentForUpload, String)>,
     online_user_id: String,
-    token: AccessToken
+    token: AccessToken,
 ) -> Result<Vec<DbOperation>, crate::errors::Error> {
     let mut operations = Vec::new();
 
@@ -1238,42 +1140,18 @@ pub async fn upload_attachments(
         let mut headers = HeaderMap::new();
 
         let values = [
-            (
-                "x-amz-meta-checksum",
-                attachment.checksum_encrypted.clone(),
-            ),
-            (
-                "x-amz-meta-size_bytes",
-                attachment.size_bytes.to_string(),
-            ),
-            (
-                "x-amz-meta-is_encrypted",
-                attachment.encrypted.to_string(),
-            ),
-            (
-                "x-amz-meta-file_name",
-                attachment.filename.clone(),
-            ),
-            (
-                "x-amz-meta-mime_type",
-                attachment.mime_type.clone(),
-            ),
+            ("x-amz-meta-checksum", attachment.checksum_encrypted.clone()),
+            ("x-amz-meta-size_bytes", attachment.size_bytes.to_string()),
+            ("x-amz-meta-is_encrypted", attachment.encrypted.to_string()),
+            ("x-amz-meta-file_name", attachment.filename.clone()),
+            ("x-amz-meta-mime_type", attachment.mime_type.clone()),
             (
                 "x-amz-meta-crypto_meta",
                 attachment.crypto_meta.clone().unwrap_or_default(),
             ),
-            (
-                "x-amz-meta-note_cloud_id",
-                attachment.note_cloud_id.clone(),
-            ),
-            (
-                "x-amz-meta-created_at",
-                attachment.created_at.to_string(),
-            ),
-            (
-                "x-amz-meta-updated_at",
-                attachment.updated_at.to_string(),
-            ),
+            ("x-amz-meta-note_cloud_id", attachment.note_cloud_id.clone()),
+            ("x-amz-meta-created_at", attachment.created_at.to_string()),
+            ("x-amz-meta-updated_at", attachment.updated_at.to_string()),
         ];
 
         let mut invalid_header = false;
@@ -1303,8 +1181,7 @@ pub async fn upload_attachments(
             continue;
         }
 
-        let attachment_id =
-            attachment.attachment_id.clone();
+        let attachment_id = attachment.attachment_id.clone();
 
         let response = match client
             .put(url)
@@ -1329,39 +1206,29 @@ pub async fn upload_attachments(
 
         let status = response.status();
 
-if !status.is_success() {
-    let body = response
-        .text()
-        .await
-        .unwrap_or_else(|_| "<failed to read response body>".to_string());
+        if !status.is_success() {
+            let body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "<failed to read response body>".to_string());
 
-    tracing::error!(
-        task = "sync",
-        attachment_id = %attachment_id,
-        http_status = status.as_u16(),
-        response_body = %body,
-        "attachment upload rejected"
-    );
+            tracing::error!(
+                task = "sync",
+                attachment_id = %attachment_id,
+                http_status = status.as_u16(),
+                response_body = %body,
+                "attachment upload rejected"
+            );
 
+            continue;
+        }
+        let _ = complete_attachment_upload(&client, token.clone(), &attachment_id).await;
 
-    continue;
-}
-let _ = complete_attachment_upload(&client , token.clone(), &attachment_id).await;
-
-        operations.push(
-            DbOperation::MarkAttachmentSynced {
-                attachment_id: attachment_id.clone(),
-                cloud_key: format!(
-                    "{}/attachments/{}",
-                    online_user_id,
-                    attachment_id
-                ),
-            },
-        );
+        operations.push(DbOperation::MarkAttachmentSynced {
+            attachment_id: attachment_id.clone(),
+            cloud_key: format!("{}/attachments/{}", online_user_id, attachment_id),
+        });
     }
-
-
-
 
     Ok(operations)
 }
@@ -1376,11 +1243,7 @@ pub async fn download_attachment(
     for attachment in attachments_to_download {
         let attachment_id = attachment.attachment_id;
 
-        let response = match client
-            .get(&attachment.download_url)
-            .send()
-            .await
-        {
+        let response = match client.get(&attachment.download_url).send().await {
             Ok(response) => response,
 
             Err(err) => {
@@ -1398,9 +1261,7 @@ pub async fn download_attachment(
         let status = response.status();
 
         if status == reqwest::StatusCode::UNAUTHORIZED {
-            return Err(
-                crate::errors::Error::OnlineSessionExpired
-            );
+            return Err(crate::errors::Error::OnlineSessionExpired);
         }
 
         if !status.is_success() {
@@ -1419,32 +1280,26 @@ pub async fn download_attachment(
             .and_then(|extension| extension.to_str());
 
         let local_path = match extension {
-            Some(extension) => attachments_path.join(
-                format!("{}.{}", attachment_id, extension),
-            ),
+            Some(extension) => attachments_path.join(format!("{}.{}", attachment_id, extension)),
 
-            None => attachments_path.join(
-                attachment_id.to_string(),
-            ),
+            None => attachments_path.join(attachment_id.to_string()),
         };
 
         let crypto_meta = match attachment.crypto_meta {
-            Some(metadata) => {
-                match serde_json::to_string(&metadata) {
-                    Ok(value) => Some(value),
+            Some(metadata) => match serde_json::to_string(&metadata) {
+                Ok(value) => Some(value),
 
-                    Err(err) => {
-                        tracing::error!(
-                            task = "sync",
-                            attachment_id = %attachment_id,
-                            error = ?err,
-                            "failed to serialize attachment crypto metadata"
-                        );
+                Err(err) => {
+                    tracing::error!(
+                        task = "sync",
+                        attachment_id = %attachment_id,
+                        error = ?err,
+                        "failed to serialize attachment crypto metadata"
+                    );
 
-                        continue;
-                    }
+                    continue;
                 }
-            }
+            },
 
             None => None,
         };
@@ -1476,9 +1331,7 @@ pub async fn download_attachment(
             continue;
         }
 
-        let checksum = blake3::hash(&content)
-            .to_hex()
-            .to_string();
+        let checksum = blake3::hash(&content).to_hex().to_string();
 
         if checksum != attachment.checksum_encrypted {
             tracing::error!(
@@ -1492,9 +1345,7 @@ pub async fn download_attachment(
             continue;
         }
 
-        if let Err(err) =
-            tokio::fs::write(&local_path, &content).await
-        {
+        if let Err(err) = tokio::fs::write(&local_path, &content).await {
             tracing::error!(
                 task = "sync",
                 attachment_id = %attachment_id,
@@ -1506,26 +1357,21 @@ pub async fn download_attachment(
             continue;
         }
 
-        operations.push(
-            DbOperation::InsertAttachment {
-                attachment_id: attachment_id.to_string(),
-                note_cloud_id: attachment.note_cloud_id,
-                filename: attachment.file_name,
-                mime_type: attachment.mime_type,
-                size_bytes: attachment.size_bytes,
-                local_path: Some(
-                    local_path.to_string_lossy().to_string(),
-                ),
-                cloud_key: Some(attachment.cloud_key),
-                checksum_encrypted:
-                    attachment.checksum_encrypted,
-                encrypted: attachment.is_encrypted,
-                crypto_meta,
-                sync_state: "Synced".to_string(),
-                created_at: attachment.created_at,
-                updated_at: attachment.updated_at,
-            },
-        );
+        operations.push(DbOperation::InsertAttachment {
+            attachment_id: attachment_id.to_string(),
+            note_cloud_id: attachment.note_cloud_id,
+            filename: attachment.file_name,
+            mime_type: attachment.mime_type,
+            size_bytes: attachment.size_bytes,
+            local_path: Some(local_path.to_string_lossy().to_string()),
+            cloud_key: Some(attachment.cloud_key),
+            checksum_encrypted: attachment.checksum_encrypted,
+            encrypted: attachment.is_encrypted,
+            crypto_meta,
+            sync_state: "Synced".to_string(),
+            created_at: attachment.created_at,
+            updated_at: attachment.updated_at,
+        });
     }
 
     Ok(operations)
@@ -1560,9 +1406,7 @@ pub fn handle_attachments_to_hard_delete(
             })?;
 
         if let Some(local_path) = local_path {
-            if let Err(err) =
-                std::fs::remove_file(&local_path)
-            {
+            if let Err(err) = std::fs::remove_file(&local_path) {
                 if err.kind() != std::io::ErrorKind::NotFound {
                     tracing::error!(
                         task = "sync",
@@ -1577,11 +1421,7 @@ pub fn handle_attachments_to_hard_delete(
             }
         }
 
-        operations.push(
-            DbOperation::DeleteAttachment {
-                attachment_id,
-            },
-        );
+        operations.push(DbOperation::DeleteAttachment { attachment_id });
     }
 
     Ok(operations)
@@ -1594,24 +1434,16 @@ pub fn handle_attachment_synced(
     attachment_ids
         .into_iter()
         .map(|id| DbOperation::MarkAttachmentSynced {
-            cloud_key: format!(
-                "{}/attachments/{}",
-                online_user_id,
-                id
-            ),
+            cloud_key: format!("{}/attachments/{}", online_user_id, id),
             attachment_id: id,
         })
         .collect()
 }
 
-pub fn handle_notes_synced(
-    note_ids: Vec<String>,
-) -> Vec<DbOperation> {
+pub fn handle_notes_synced(note_ids: Vec<String>) -> Vec<DbOperation> {
     note_ids
         .into_iter()
-        .map(|local_id| DbOperation::MarkNoteSynced {
-            local_id,
-        })
+        .map(|local_id| DbOperation::MarkNoteSynced { local_id })
         .collect()
 }
 
@@ -1643,9 +1475,7 @@ pub fn handle_notes_to_hard_delete(
                 crate::errors::Error::SyncFailed
             })?;
 
-        if let Err(err) =
-            std::fs::remove_file(&content_path)
-        {
+        if let Err(err) = std::fs::remove_file(&content_path) {
             if err.kind() != std::io::ErrorKind::NotFound {
                 tracing::error!(
                     task = "sync",
@@ -1659,11 +1489,7 @@ pub fn handle_notes_to_hard_delete(
             }
         }
 
-        operations.push(
-            DbOperation::DeleteNote {
-                local_id,
-            },
-        );
+        operations.push(DbOperation::DeleteNote { local_id });
     }
 
     Ok(operations)
@@ -1675,11 +1501,9 @@ pub fn handle_notes_to_download(
     notes_path: &std::path::Path,
     user_id: String,
 ) -> Result<Vec<DbOperation>, crate::errors::Error> {
-    let mut operations =
-        Vec::with_capacity(notes_to_download.len());
+    let mut operations = Vec::with_capacity(notes_to_download.len());
 
-    let mut added_files =
-        Vec::with_capacity(notes_to_download.len());
+    let mut added_files = Vec::with_capacity(notes_to_download.len());
 
     for note in notes_to_download {
         let mongo_id = note.cloud_id.clone();
@@ -1707,11 +1531,7 @@ pub fn handle_notes_to_download(
             NOTE_EXTENSION
         };
 
-        let file_path = notes_path.join(format!(
-            "{}.{}",
-            local_id,
-            extension
-        ));
+        let file_path = notes_path.join(format!("{}.{}", local_id, extension));
 
         let bytes_to_write = if note.is_encrypted {
             note.content.into_bytes()
@@ -1721,9 +1541,7 @@ pub fn handle_notes_to_download(
                 .context("failed to decode note content")?
         };
 
-        if let Err(err) =
-            std::fs::write(&file_path, &bytes_to_write)
-        {
+        if let Err(err) = std::fs::write(&file_path, &bytes_to_write) {
             rollback_files(&added_files);
             return Err(err.into());
         }
@@ -1732,10 +1550,7 @@ pub fn handle_notes_to_download(
 
         let crypto_meta = match note.crypto_meta {
             Some(meta) => Some(
-                serde_json::to_string(&meta)
-                    .context(
-                        "failed to serialize note crypto metadata",
-                    )?,
+                serde_json::to_string(&meta).context("failed to serialize note crypto metadata")?,
             ),
 
             None => None,
@@ -1743,49 +1558,41 @@ pub fn handle_notes_to_download(
 
         match existing_local_id {
             Some(local_id) => {
-                operations.push(
-                    DbOperation::UpdateNoteFromCloud {
-                        local_id,
-                        mongo_id,
-                        owner_id: user_id.clone(),
-                        cloud_version: note.cloud_version,
-                        title: note.title,
-                        summary: note.summary,
-                        content_path: file_path
-                            .to_string_lossy()
-                            .into_owned(),
-                        created_at: note.created_at,
-                        updated_at: note.updated_at,
-                        is_deleted: note.is_deleted,
-                        deleted_at: note.deleted_at,
-                        encrypted: note.is_encrypted,
-                        crypto_meta,
-                    },
-                );
+                operations.push(DbOperation::UpdateNoteFromCloud {
+                    local_id,
+                    mongo_id,
+                    owner_id: user_id.clone(),
+                    cloud_version: note.cloud_version,
+                    title: note.title,
+                    summary: note.summary,
+                    content_path: file_path.to_string_lossy().into_owned(),
+                    created_at: note.created_at,
+                    updated_at: note.updated_at,
+                    is_deleted: note.is_deleted,
+                    deleted_at: note.deleted_at,
+                    encrypted: note.is_encrypted,
+                    crypto_meta,
+                });
             }
 
             None => {
-                operations.push(
-                    DbOperation::InsertNote {
-                        local_id,
-                        mongo_id,
-                        owner_id: user_id.clone(),
-                        title: note.title,
-                        summary: note.summary,
-                        content_path: file_path
-                            .to_string_lossy()
-                            .into_owned(),
-                        created_at: note.created_at,
-                        updated_at: note.updated_at,
-                        deleted_at: note.deleted_at,
-                        version: 0,
-                        cloud_version: note.cloud_version,
-                        sync_state: "Synced".to_string(),
-                        is_deleted: note.is_deleted,
-                        encrypted: note.is_encrypted,
-                        crypto_meta,
-                    },
-                );
+                operations.push(DbOperation::InsertNote {
+                    local_id,
+                    mongo_id,
+                    owner_id: user_id.clone(),
+                    title: note.title,
+                    summary: note.summary,
+                    content_path: file_path.to_string_lossy().into_owned(),
+                    created_at: note.created_at,
+                    updated_at: note.updated_at,
+                    deleted_at: note.deleted_at,
+                    version: 0,
+                    cloud_version: note.cloud_version,
+                    sync_state: "Synced".to_string(),
+                    is_deleted: note.is_deleted,
+                    encrypted: note.is_encrypted,
+                    crypto_meta,
+                });
             }
         }
     }
@@ -1799,26 +1606,16 @@ fn rollback_files(files: &[std::path::PathBuf]) {
     }
 }
 
-
 pub async fn complete_attachment_upload(
     client: &reqwest::Client,
     token: AccessToken,
     attachment_id: &str,
 ) -> Result<(), reqwest::Error> {
-    let url = format!(
-        "{}sync/upload-compleated/{}",
-        SERVER_ADDRESS, attachment_id
-    );
+    let url = format!("{}sync/upload-compleated/{}", SERVER_ADDRESS, attachment_id);
 
-    let response = client
-        .post(url)
-        .bearer_auth(token.0)
-        .send()
-        .await?;
+    let response = client.post(url).bearer_auth(token.0).send().await?;
 
     response.error_for_status()?;
 
     Ok(())
 }
-
-

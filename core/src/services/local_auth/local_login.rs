@@ -39,9 +39,9 @@
 //! - `uuid` — UUIDv4 generation for session tokens and user identification
 
 use crate::constants::SERVER_ADDRESS;
-use crate::services::online_auth::login::RefreshRequest;
 use crate::models::online_account::ArgonParams;
 use crate::models::online_account::{AccessToken, RefreshResponse};
+use crate::services::online_auth::login::RefreshRequest;
 use crate::{ProgramFiles, errors, utils};
 use anyhow::Context;
 use argon2::{Argon2, PasswordHash, PasswordVerifier};

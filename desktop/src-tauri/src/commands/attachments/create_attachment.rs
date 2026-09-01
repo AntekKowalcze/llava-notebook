@@ -7,10 +7,9 @@ pub async fn create_attachment(
     mime_type: String,
     state: tauri::State<'_, AppState>,
 ) -> Result<String, llava_core::Error> {
-
-   if !is_allowed_mime_type(&mime_type){
-    return Err(llava_core::Error::InvalidMimeType)
-   }
+    if !is_allowed_mime_type(&mime_type) {
+        return Err(llava_core::Error::InvalidMimeType);
+    }
 
     let notes_key = {
         let notes_key_guard = state
@@ -67,12 +66,8 @@ pub async fn create_attachment(
 }
 
 fn is_allowed_mime_type(mime_type: &str) -> bool {
-   return matches!(
+    return matches!(
         mime_type,
-        "image/png"
-            | "image/jpeg"
-            | "image/webp"
-            | "application/pdf"
-            | "text/plain"
+        "image/png" | "image/jpeg" | "image/webp" | "application/pdf" | "text/plain"
     )
 }

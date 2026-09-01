@@ -109,7 +109,7 @@ pub enum Error {
 
     #[error("Ai request erorr")]
     AiError,
-    
+
     #[error("Request error")]
     RequestError((u16, String)),
 
