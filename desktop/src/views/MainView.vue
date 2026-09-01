@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import LeftSlidingPanel from '../components/LeftSlidingPanel.vue';
 import BottomBar from '../components/main/BottomBar.vue';
-import TitleBar from '../components/TitleBar.vue';
 import { useLayoutStore } from '../stores/layoutStore.ts';
 const layout = useLayoutStore();
 </script>

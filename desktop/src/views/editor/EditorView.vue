@@ -46,8 +46,6 @@ let safeSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 let debounceTimeout: ReturnType<typeof setTimeout> | null = null;
 let encryptionChangedTo: boolean | null = null;
 
-const showTagEditor = ref(false);
-
 async function forceQuit() {
   await getCurrentWindow().destroy();
 }

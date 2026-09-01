@@ -13,7 +13,6 @@ import { useCurrentNoteStore } from '../stores/currentNoteStore.ts';
 import { useRouter } from 'vue-router';
 import { useUserConfigStore } from '../stores/userConfig.ts';
 import DisabledSwitch from '../components/settings/DisabledSwitch.vue';
-import TestButton from '../components/tests/TestButton.vue';
 import { emit } from '@tauri-apps/api/event';
 const router = useRouter();
 const toast = useToast();
@@ -21,7 +20,6 @@ const userSettings = useUserConfigStore();
 const syncStatus = computed(() => {
   const {
     'online.sync': onlineSync,
-    'local.sync': localSync,
     'local.mode': localMode,
   } = userSettings.config;
 

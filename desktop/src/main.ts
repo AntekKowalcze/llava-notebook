@@ -17,19 +17,22 @@ const app = createApp(App);
 app.use(PrimeVue);
 app.use(createPinia());
 app.use(router);
-const userConfigStore = useUserConfigStore();
-void (await userConfigStore.init());
-useOnlineAuthStore();
-useAuthStore();
-useMetaStore();
-app.use(Toast as any, {
-  transition: 'Vue-Toastification__bounce',
-  maxToasts: 20,
-  newestOnTop: true,
-  position: 'bottom-center',
-  toastClassName: 'my-toast',
-  icon: false,
-});
+(async () => {
+  const userConfigStore = useUserConfigStore();
+  await userConfigStore.init();
 
-app.mount('#app');
-console.log('mounted');
+  useOnlineAuthStore();
+  useAuthStore();
+  useMetaStore();
+
+  app.use(Toast as any, {
+    transition: 'Vue-Toastification__bounce',
+    maxToasts: 20,
+    newestOnTop: true,
+    position: 'bottom-center',
+    toastClassName: 'my-toast',
+    icon: false,
+  });
+
+  app.mount('#app');
+})();

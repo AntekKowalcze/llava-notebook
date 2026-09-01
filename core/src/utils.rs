@@ -198,10 +198,12 @@ pub fn change_account_link_status(
 pub async fn is_device_connected_to_server() -> bool {
     tokio::time::timeout(
         Duration::from_secs(3),
-        tokio::net::TcpStream::connect(crate::constants::SERVER_ADDRESS_TO_PING),
+        reqwest::get(crate::constants::SERVER_ADDRESS_TO_PING),
     )
     .await
-    .map(|res| res.is_ok())
+    .ok()
+    .and_then(Result::ok)
+    .map(|response| response.status().is_success())
     .unwrap_or(false)
 }
 
