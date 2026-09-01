@@ -5,6 +5,7 @@
 </template>
 
 <script setup lang="ts">
+import { convertFileSrc } from '@tauri-apps/api/core';
 import { Milkdown, useEditor } from '@milkdown/vue';
 import { Crepe } from '@milkdown/crepe';
 
@@ -69,7 +70,9 @@ useEditor((root) => {
             fileName: file.name,
             mimeType: file.type,
           });
-            return `attachment://${encodeURIComponent(attachmentId)}`;
+
+              const src: string = convertFileSrc(attachmentId, 'attachment');
+            return src;
 
           }catch(err: any){
             if (err.InvalidMimeType){
