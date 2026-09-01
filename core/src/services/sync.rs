@@ -1,3 +1,128 @@
+//! # Cloud synchronization module
+//!
+//! **Purpose**: This module coordinates synchronization between the local
+//! SQLite database and the remote cloud service.
+//!
+//! It prepares local notes and attachments for synchronization, communicates
+//! with the synchronization API, uploads and downloads attachment data,
+//! applies synchronization results to the local database, and maintains
+//! transactional database state through queued operations.
+//!
+//! ## Exports
+//!
+//! * [`sync`] — Sends the local synchronization state to the server and
+//!   retrieves the operations required to bring the client up to date.
+//! * [`get_all_notes_to_sync`] — Collects all locally stored notes and their
+//!   attachment metadata that need to participate in synchronization.
+//! * [`get_note_for_upload`] — Loads a note and its content from local storage
+//!   in the representation required by the server.
+//! * [`get_attachment_for_upload`] — Loads an attachment and its metadata from
+//!   local storage for upload.
+//! * [`execute_db_operation`] — Applies one queued synchronization database
+//!   operation to an existing SQLite transaction.
+//! * [`execute_db_operations`] — Applies a sequence of synchronization
+//!   operations atomically in a single SQLite transaction.
+//! * [`DbOperation`] — Represents a database mutation produced by a
+//!   synchronization operation.
+//! * [`execute_server_operations`] — Executes pending note and attachment
+//!   uploads/downloads and returns the database operations required to record
+//!   their results locally.
+//! * [`upload_notes`] — Uploads new or modified notes and creates the database
+//!   operations required to store their cloud identifiers and versions.
+//! * [`upload_attachments`] — Uploads attachment contents to S3 using
+//!   presigned URLs and prepares the corresponding local synchronization
+//!   operations.
+//! * [`download_attachment`] — Downloads attachments from their presigned
+//!   URLs, verifies their integrity, stores them locally, and creates the
+//!   corresponding database operations.
+//! * [`handle_attachments_to_hard_delete`] — Removes locally stored attachment
+//!   files and creates database operations for their permanent deletion.
+//! * [`handle_attachment_synced`] — Creates database operations marking a set
+//!   of attachments as synchronized.
+//! * [`handle_notes_synced`] — Creates database operations marking a set of
+//!   notes as synchronized.
+//! * [`handle_notes_to_hard_delete`] — Removes local note content files and
+//!   creates database operations for their permanent deletion.
+//! * [`handle_notes_to_download`] — Stores notes received from the cloud on
+//!   local disk and creates database operations for inserting or updating
+//!   their local records.
+//! * [`complete_attachment_upload`] — Notifies the server that an attachment
+//!   uploaded through a presigned URL has completed.
+//!
+//! ## Key design decisions
+//!
+//! Synchronization is split into two stages. The server first determines the
+//! required synchronization actions through [`sync`], after which the client
+//! executes those actions and converts their results into [`DbOperation`]
+//! values. Local database changes are then applied atomically through
+//! [`execute_db_operations`].
+//!
+//! Local synchronization state is represented explicitly through [`SyncState`]
+//! and is used to distinguish synchronized data, pending changes, and
+//! tombstones that require permanent deletion.
+//!
+//! Cloud note versions are used as optimistic concurrency metadata. The local
+//! database stores the server-provided cloud version and uses it when
+//! constructing subsequent synchronization requests, preventing stale local
+//! state from silently overwriting newer cloud data.
+//!
+//! Note content and attachment data are handled separately from their SQLite
+//! metadata. File contents are read from or written to the filesystem while
+//! SQLite stores their paths and synchronization metadata.
+//!
+//! Encrypted content is treated as opaque synchronization data by this
+//! module. Encrypted note content is sent and stored without attempting to
+//! decrypt it, while cryptographic metadata is serialized alongside the
+//! corresponding object.
+//!
+//! Attachment uploads use presigned S3 URLs. The synchronization service
+//! therefore transfers attachment bytes directly between the client and S3
+//! rather than routing file contents through the application server.
+//!
+//! Downloaded attachments are verified before being committed locally. The
+//! reported size must match the received content and the BLAKE3 checksum of
+//! the downloaded bytes must match the checksum provided by the server.
+//!
+//! Database mutations are represented as [`DbOperation`] values and committed
+//! in a single SQLite transaction. This prevents partial synchronization state
+//! from being persisted when one operation in a synchronization batch fails.
+//!
+//! Files created while processing a batch of downloaded notes are tracked so
+//! that filesystem changes can be rolled back when a later step fails before
+//! the database transaction is committed.
+//!
+//! Network operations use [`reqwest`] and map authentication failures to the
+//! application's online-session error so that an expired access token can be
+//! handled differently from other synchronization failures.
+//!
+//! ## Dependencies
+//!
+//! * [`reqwest`] — HTTP communication with the synchronization API and
+//!   downloads from presigned URLs.
+//! * [`rusqlite`] — Local SQLite queries, transactions, and synchronization
+//!   state persistence.
+//! * [`serde`] — Serialization and deserialization of synchronization payloads
+//!   and cryptographic metadata.
+//! * [`serde_json`] — Serialization and deserialization of cryptographic
+//!   metadata stored with notes and attachments.
+//! * [`base64`] — Encoding and decoding unencrypted note content.
+//! * [`blake3`] — Integrity verification of downloaded attachment data.
+//! * [`uuid`] — UUID generation and parsing for local and attachment
+//!   identifiers.
+//! * [`tokio`] — Asynchronous filesystem and network operations.
+//! * [`anyhow`] — Adds contextual information to database, filesystem, and
+//!   serialization failures.
+//! * [`crate::constants`] — Provides server and note-storage configuration.
+//! * [`crate::models::sync`] — Defines synchronization request, response, note,
+//!   and attachment data structures.
+//! * [`crate::services::attachment`] — Provides attachment cryptographic
+//!   metadata structures.
+//! * [`crate::storage`] — Provides local synchronization state definitions.
+//! * [`crate::errors`] — Application-level synchronization and authentication
+//!   errors.
+//! * [`crate::models::online_account::AccessToken`] — Provides the access token
+//!   used to authenticate cloud synchronization requests.
+
 use crate::constants::{NOTE_EXTENSION, SERVER_ADDRESS};
 use crate::models::sync::{
     AttachmentForUpload,
@@ -10,12 +135,10 @@ use crate::models::sync::{
     NoteForUpload,
 };
 use crate::{
-    services::{
-        attachment::AttachmentCryptoMetadata,
-        online_auth::models::online_account::AccessToken,
-    },
+    services::attachment::AttachmentCryptoMetadata,
     storage::SyncState,
 };
+use crate::models::online_account::AccessToken;
 
 use anyhow::Context;
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};

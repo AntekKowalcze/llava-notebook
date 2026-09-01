@@ -14,7 +14,6 @@ export const useOnlineAuthStore = defineStore('onlineAuth', () => {
         onlineId: loggedInId.value,
       });
     } catch (err) {
-      console.log('failed to get email from user ID');
     }
   }
   listen<void>('online_session_expired', () => {

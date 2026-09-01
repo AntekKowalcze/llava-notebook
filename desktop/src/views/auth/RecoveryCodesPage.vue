@@ -14,13 +14,11 @@ let keys = ref<string[]>([]);
 let areCodesShown = ref<boolean>(false);
 onMounted(async () => {
   if (!authStore.recoveryKeys) {
-    console.log('NO RECOVERY CODES');
     router.replace({ name: 'register' }); // redirect if no codes
     return;
   }
   try {
     keys.value = authStore.recoveryKeys;
-    console.log(keys);
     authStore.$patch({ recoveryKeys: null });
     keys.value = formatKeys(keys.value);
   } catch (err) {

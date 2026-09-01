@@ -19,7 +19,6 @@ import { computed } from 'vue';
 import { useUserConfigStore } from '../../stores/userConfig';
 const userConfig = useUserConfigStore();
 const aiFeaturesOn = computed(()=> {
-  console.log(userConfig.config["online.aiFeatures"])
  return  userConfig.config["online.aiFeatures"] == "on"
 
 })

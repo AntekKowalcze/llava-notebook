@@ -8,6 +8,7 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"time"
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -56,6 +57,11 @@ func main() {
 		os.Getenv("S3_BUCKET"),
 		s3.NewPresignClient(s3Client),
 	)
+	indexCtx, cancelIndexes := context.WithTimeout(ctx, 10*time.Second)
+	defer cancelIndexes()
+	if err := syncHandler.EnsureIndexes(indexCtx); err != nil {
+		log.Fatal("Failed to create sync indexes", err)
+	}
 
 	apiKey := os.Getenv("GEMINI_API_KEY")
 

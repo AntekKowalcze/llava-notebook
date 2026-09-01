@@ -585,7 +585,6 @@ function closeTagEditor() {
 }
 
 function redirect() {
-  console.log('redirecing');
   router.replace({ name: 'create' });
 }
 

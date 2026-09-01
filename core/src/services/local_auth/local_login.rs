@@ -40,8 +40,8 @@
 
 use crate::constants::SERVER_ADDRESS;
 use crate::services::online_auth::login::RefreshRequest;
-use crate::services::online_auth::models::online_account::ArgonParams;
-use crate::services::online_auth::models::online_account::{AccessToken, RefreshResponse};
+use crate::models::online_account::ArgonParams;
+use crate::models::online_account::{AccessToken, RefreshResponse};
 use crate::{ProgramFiles, errors, utils};
 use anyhow::Context;
 use argon2::{Argon2, PasswordHash, PasswordVerifier};

@@ -45,13 +45,11 @@ async function checkCode() {
       loggedInUserId: userId,
       pendingCode: code.value,
     });
-    console.log(authStore.pendingCode);
     toast.success('Code correct, logged in successfully');
     router.replace({ path: '/changePassword' });
     loading.value = false;
   } catch (err: any) {
     loading.value = false;
-    console.log(err);
     const errorKey =
       typeof err === 'string'
         ? err

@@ -256,7 +256,7 @@ fn format_time_ago(milliseconds: i64) -> String {
         60_000..=3_599_999 => {
             let minutes = milliseconds / 60_000;
 
-            format!(
+            return format!(
                 "{} minute{} ago",
                 minutes,
                 if minutes == 1 { "" } else { "s" }
@@ -266,25 +266,25 @@ fn format_time_ago(milliseconds: i64) -> String {
         3_600_000..=86_399_999 => {
             let hours = milliseconds / 3_600_000;
 
-            format!("{} hour{} ago", hours, if hours == 1 { "" } else { "s" })
+            return format!("{} hour{} ago", hours, if hours == 1 { "" } else { "s" })
         }
 
         86_400_000..=2_591_999_999 => {
             let days = milliseconds / 86_400_000;
 
-            format!("{} day{} ago", days, if days == 1 { "" } else { "s" })
+           return format!("{} day{} ago", days, if days == 1 { "" } else { "s" })
         }
 
         2_592_000_000..=31_535_999_999 => {
             let weeks = milliseconds / 604_800_000;
 
-            format!("{} week{} ago", weeks, if weeks == 1 { "" } else { "s" })
+           return format!("{} week{} ago", weeks, if weeks == 1 { "" } else { "s" })
         }
 
         _ => {
             let months = milliseconds / 2_592_000_000;
 
-            format!("{} month{} ago", months, if months == 1 { "" } else { "s" })
+           return format!("{} month{} ago", months, if months == 1 { "" } else { "s" })
         }
     }
 }

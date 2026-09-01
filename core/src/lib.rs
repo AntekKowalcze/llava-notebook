@@ -12,8 +12,8 @@ mod utils;
 
 pub mod local_auth {
     pub use crate::services::local_auth::database_creation::connect_or_create_local_login_db;
-    pub use crate::services::local_auth::logging::SessionState;
-    pub use crate::services::local_auth::logging::{
+    pub use crate::services::local_auth::local_login::SessionState;
+    pub use crate::services::local_auth::local_login::{
         autorization, change_last_login, check_error_count, check_if_user_logged_in,
         check_online_login, get_optional_online_id, get_timeout, invalidate_recovery_keys,
         invalidate_session_for_user, local_log_in, local_logout, log_with_code, session_operations,
@@ -69,7 +69,7 @@ pub mod stats {
 }
 
 pub mod online_auth {
-    pub use crate::services::online_auth::models::online_account::AccessToken;
+    pub use crate::models::online_account::AccessToken;
     pub use crate::services::online_auth::login::check_if_logged_in_online;
     pub use crate::services::online_auth::login::login;
     pub use crate::services::online_auth::logout::logout;

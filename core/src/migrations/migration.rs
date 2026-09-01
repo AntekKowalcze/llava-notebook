@@ -1,3 +1,71 @@
+//! # SQLite database migration module
+//!
+//! **Purpose**: This module manages schema migrations for the local users and
+//! notes SQLite databases.
+//!
+//! It detects the current database schema version, applies all required
+//! migrations in order, rebuilds tables when SQLite cannot perform a required
+//! schema change directly, and updates the database version after successful
+//! migration.
+//!
+//! ## Exports
+//!
+//! * [`run_users_migration`] — Migrates the users database through all required
+//!   schema versions.
+//! * [`run_notes_migration`] — Migrates the notes database through all required
+//!   schema versions and rebuilds the notes table when necessary.
+//!
+//! ## Key design decisions
+//!
+//! SQLite's `PRAGMA user_version` is used as the schema version for both
+//! databases. Migrations are applied incrementally so an existing database can
+//! be upgraded from an older version without recreating user data.
+//!
+//! Each individual migration is executed inside a SQLite transaction whenever
+//! the migration performs multiple schema or data changes. The database
+//! version is updated only after the migration succeeds, preventing a failed
+//! migration from being reported as completed.
+//!
+//! SQLite does not support every schema modification directly. When an
+//! existing `notes` table contains a schema element that cannot be removed
+//! safely with `ALTER TABLE`, the table is rebuilt into a new table with the
+//! desired schema, existing data is copied into it, and the replacement table
+//! is renamed back to `notes`.
+//!
+//! Foreign-key enforcement is temporarily disabled during notes table rebuilds
+//! because the operation replaces the referenced table. It is re-enabled after
+//! the migration and a foreign-key integrity check is performed to detect any
+//! dangling references introduced by the rebuild.
+//!
+//! The [`column_exists`] helper inspects SQLite's `PRAGMA table_info` output
+//! before applying column-specific migrations. This makes migrations tolerant
+//! of databases that may already contain a column due to an earlier partial or
+//! alternative schema state.
+//!
+//! Existing note data is preserved during table rebuilds. Where the new schema
+//! requires non-null values, migration logic supplies safe defaults for legacy
+//! rows rather than discarding them.
+//!
+//! Synchronization states are constrained at the SQLite schema level through a
+//! `CHECK` constraint. New migration versions extend that constraint when a new
+//! synchronization state, such as `WaitingForTombstone`, becomes part of the
+//! application state machine.
+//!
+//! ## Dependencies
+//!
+//! * [`rusqlite`] — SQLite connections, transactions, schema inspection,
+//!   queries, and schema modification.
+//! * [`anyhow`] — Adds contextual information to migration and SQLite errors.
+//! * [`tracing`] — Logs migration failures with the affected database version.
+//! * [`crate::constants`] — Provides the target notes database schema version.
+//! * [`crate::errors`] — Application-level error type returned when migration
+//!   operations fail.
+//! * SQLite `PRAGMA user_version` — Stores the schema version used to determine
+//!   which migrations must be executed.
+//! * SQLite `PRAGMA table_info` — Inspects existing table columns before
+//!   applying column-specific migrations.
+//! * SQLite `PRAGMA foreign_key_check` — Verifies foreign-key integrity after
+//!   rebuilding the notes table.
 use anyhow::Context;
 
 fn column_exists(

@@ -74,7 +74,6 @@ async function submit() {
     onlineAuthStore.setSessionExpired(false);
     clearFields();
   } catch (err: unknown) {
-    console.log(err);
     const message = getErrorText(err).toLowerCase();
     if (message.includes('wrong password')) {
       toast.warning('Wrong Password');

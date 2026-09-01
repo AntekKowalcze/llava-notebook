@@ -121,7 +121,6 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const [sessionState, loggedInOnline] =
         await invoke<[SessionStatusPayload, SessionStatusPayload]>('check_login_on_start');
-      console.log(loggedInOnline, sessionState);
 
       if (sessionState.status === 'logged_in') {
         loggedInUserId.value = sessionState.user_id ?? null;
@@ -134,7 +133,6 @@ export const useAuthStore = defineStore('auth', () => {
           loggedInUsername.value = null;
         }
         loggedIn.value = true;
-        console.log(loggedIn, loggedInUserId, loggedInUsername);
       } else {
         loggedIn.value = false;
       }

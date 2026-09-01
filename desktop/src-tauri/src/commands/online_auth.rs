@@ -1,3 +1,105 @@
+//! # Online authentication command module
+//!
+//! **Purpose**: This module provides Tauri commands that connect the
+//! application's frontend authentication flow with the local authentication,
+//! online authentication, synchronization, encryption, and application-state
+//! layers.
+//!
+//! It manages online registration, online login and logout, session restoration,
+//! account linking, notes-key rotation, local database re-encryption, recovery
+//! code rotation, and automatic refresh of an authenticated online session.
+//!
+//! ## Exports
+//!
+//! * [`register_user_online`] — Registers the current local user with the
+//!   online service, stores the resulting online session in application state,
+//!   links the online account to the local account, and completes post-login
+//!   configuration.
+//! * [`online_logout`] — Optionally synchronizes local data, removes synced
+//!   notes when requested, logs out the current device online, and clears the
+//!   local online authentication state.
+//! * [`get_email_from_id`] — Retrieves the email address associated with an
+//!   online account identifier from the local users database.
+//! * [`login_online`] — Performs local authorization followed by online
+//!   authentication and reconciles the remote notes key with the local notes
+//!   key.
+//! * [`try_login_if_connected_with_server`] — Checks whether the current local
+//!   user has an associated online account and attempts to restore its online
+//!   session when connectivity is available.
+//! * [`try_refresh_if_logged_in`] — Performs an asynchronous online session
+//!   check and updates the application authentication state when the stored
+//!   online session is still valid.
+//!
+//! ## Key design decisions
+//!
+//! Online authentication is layered on top of local authentication. Before an
+//! online login is attempted, the user's local password is verified against the
+//! local users database. This prevents an online account from being activated
+//! through the online login flow without first proving access to the local
+//! account and its local cryptographic state.
+//!
+//! The local notes encryption key is treated as the authority for local
+//! encrypted data. After successful online authentication, the remotely
+//! derived notes key is compared with the current local key using a
+//! constant-time comparison.
+//!
+//! When the online and local notes keys match, the module only rotates the
+//! local authentication session. When they differ, the module performs a key
+//! rotation flow that re-encrypts the local notes database, re-wraps the new
+//! notes key using the local password, invalidates previous recovery codes,
+//! generates replacement recovery codes, and creates a new local session for
+//! the new key.
+//!
+//! Database re-encryption is performed before replacing the notes key stored in
+//! application state. This ordering ensures that the state key is not advanced
+//! before the persistent encrypted data has been successfully migrated.
+//!
+//! Recovery codes are regenerated whenever the notes key changes because they
+//! are cryptographically tied to the key material used by the local
+//! authentication layer.
+//!
+//! Online authentication state is stored in [`AppState`] only after the
+//! corresponding online operation succeeds. Access tokens and online account
+//! identifiers are therefore not treated as authenticated state merely because
+//! a login operation has been started.
+//!
+//! Logout can optionally synchronize local changes before removing cloud-linked
+//! data. When synchronization is requested, failure aborts the logout flow
+//! before locally deleting synced notes.
+//!
+//! Automatic session restoration is deliberately non-blocking. The refresh
+//! helper spawns the remote session check asynchronously so application startup
+//! is not unnecessarily blocked by a network request.
+//!
+//! Connectivity is checked before network-dependent authentication operations.
+//! The result is also stored in application state so other parts of the
+//! application can distinguish a missing internet connection from an
+//! unavailable application server.
+//!
+//! Tauri events are used to communicate long-running authentication state
+//! changes, database re-encryption progress, and session expiration back to the
+//! frontend.
+//!
+//! ## Dependencies
+//!
+//! * [`tauri`] — Tauri commands, managed application state, application handles,
+//!   event emission, and asynchronous runtime integration.
+//! * [`llava_core`] — Provides online authentication, local authentication,
+//!   synchronization, encryption, settings, and database operations.
+//! * [`chacha20poly1305`] — Provides the notes encryption key representation
+//!   used during key rotation.
+//! * [`subtle`] — Provides constant-time comparison for notes encryption keys.
+//! * [`zeroize`] — Keeps passwords in zeroizing memory wrappers during
+//!   authentication operations.
+//! * [`tauri_plugin_clipboard_manager`] — Copies newly generated recovery
+//!   codes to the system clipboard.
+//! * [`anyhow`] — Adds context to clipboard and other command-layer failures.
+//! * [`crate::commands::local_auth`] — Provides frontend-facing online login
+//!   status values.
+//! * [`crate::commands::sync`] — Provides synchronization before logout and
+//!   after successful online login.
+//! * [`crate::commands::utils`] — Provides connectivity checks before network
+//!   requests.
 use llava_core::settings::UserConfig;
 use llava_core::AppState;
 use tauri_plugin_clipboard_manager::ClipboardExt;

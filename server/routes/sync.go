@@ -1,3 +1,91 @@
+// Package routes provides the server-side note synchronization and attachment
+// management logic for the application.
+//
+// Purpose:
+//
+// This package handles synchronization between clients and the cloud.
+// It coordinates MongoDB note state, S3 attachment storage, optimistic
+// concurrency, hard deletion through tombstones, and per-user storage quota
+// management.
+//
+// The synchronization flow determines which notes and attachments must be
+// uploaded, downloaded, deleted, or considered synchronized. Attachment
+// transfers use S3 presigned URLs so the application server does not have to
+// proxy file contents.
+//
+// Exports:
+//
+//   - [ErrQuotaExceeded] — Sentinel error returned when a user's storage quota
+//     cannot accommodate a new upload.
+//   - [ReservationStatus] — Type representing the lifecycle state of an
+//     attachment quota reservation.
+//   - [ReservationPending] — Indicates that quota has been reserved for an
+//     upload which has not yet been finalized.
+//   - [ReservationConsumed] — Indicates that the upload was finalized and the
+//     reserved quota was moved to used storage.
+//   - [NoteSyncResult] — Aggregated result of synchronization checks for one
+//     note, including note and attachment actions.
+//   - [NoteDocument] — MongoDB representation of a synchronized note.
+//   - [SyncCheck] — Evaluates the client's synchronization state and returns
+//     all required note and attachment operations.
+//   - [UploadNote] — Creates or retrieves a cloud note using the client's
+//     local note identifier.
+//   - [UpdateNote] — Updates a cloud note using optimistic concurrency or
+//     performs a hard delete when requested.
+//   - [StartReservationCleanupWorker] — Starts the background worker that
+//     periodically reconciles expired attachment quota reservations.
+//
+// Key design decisions:
+//
+// Note synchronization uses optimistic concurrency through the
+// `cloud_version` field. Updates and hard deletes are accepted only when the
+// client supplies the current server version, preventing stale clients from
+// overwriting newer cloud state.
+//
+// Hard deletion is represented by a tombstone document rather than immediate
+// removal of the MongoDB note. The tombstone preserves synchronization state
+// and allows other clients to learn that the note was permanently deleted.
+// Attachment objects are removed from S3 separately.
+//
+// Attachment uploads use quota reservations. Capacity is reserved before a
+// presigned upload URL is issued and is moved to used quota only after the
+// uploaded object's existence and size have been verified. MongoDB
+// transactions and status guards make reservation creation, consumption, and
+// release safe against concurrent requests.
+//
+// Attachment deletion removes the S3 object before releasing finalized quota.
+// Repeated cleanup operations are designed to be idempotent so retries do not
+// charge or release the same storage more than once.
+//
+// Synchronization checks for different notes and attachments are executed
+// concurrently with bounded contexts and `errgroup` coordination. The
+// reservation cleanup worker also limits concurrency to avoid overwhelming
+// MongoDB or S3.
+//
+// Attachment metadata is stored with each S3 object and is validated before
+// the object is used. The metadata contains integrity, ownership, encryption,
+// filename, MIME type, and synchronization information.
+//
+// Encrypted note and attachment contents are not encrypted by this package.
+// This package stores and synchronizes the associated encrypted payloads and
+// cryptographic metadata without handling plaintext encryption keys.
+//
+// Dependencies:
+//
+//   - `mongo-driver` — MongoDB persistence, optimistic concurrency,
+//     transactions, and quota reservation state.
+//   - `aws-sdk-go-v2/service/s3` — S3 object inspection, deletion, listing,
+//     and presigned upload/download operations.
+//   - `fiber/v3` — HTTP request handling and response generation.
+//   - `errgroup` — Structured concurrency for parallel synchronization and
+//     cleanup operations.
+//   - `uuid` — Parsing and handling attachment identifiers.
+//   - `smithy-go` — Identification of AWS API errors such as missing S3
+//     objects.
+//   - `middleware` — Application-level HTTP error responses.
+//   - `models` — Shared synchronization, note, attachment, and quota data
+//     structures.
+
 package routes
 
 import (
@@ -39,12 +127,10 @@ func (s *SyncHandler) SyncCheck(c fiber.Ctx) error {
 	syncCheckRequest := new(models.CheckSyncRequest)
 
 	if err := c.Bind().Body(syncCheckRequest); err != nil {
-		log.Errorw("sync check: failed to parse body", "user_id", userID, "error", err)
 		return middleware.BadRequest("Couldnt read body data")
 	}
 
 	if err := s.Validator.Struct(syncCheckRequest); err != nil {
-		log.Errorw("sync check: validation failed", "user_id", userID, "error", err)
 		return middleware.BadRequest("Wrong check sync struct was sent")
 	}
 
@@ -55,13 +141,6 @@ func (s *SyncHandler) SyncCheck(c fiber.Ctx) error {
 	defer cancel()
 
 	notesToCheck := syncCheckRequest.Notes
-
-	log.Debugw(
-		"sync check started",
-		"user_id", userID,
-		"notes_count", len(notesToCheck),
-		"full_sync", syncCheckRequest.FullSync,
-	)
 
 	notesToUpload := []string{}
 	notesToDownload := []models.DownloadNote{}
@@ -86,19 +165,11 @@ func (s *SyncHandler) SyncCheck(c fiber.Ctx) error {
 			userID,
 			syncCheckRequest.Notes,
 		)
-		// TODO add sync on events like singed in onlin etc, plus interval 30 seconds + ui bottom bar
 		if err != nil {
-			log.Debugw("Couldnt get notes that are on server but not on the client", "user_id", userID, "error", err)
+			log.Errorw("sync check: full sync scan failed", "user_id", userID, "error", err)
 		} else {
 			notesToDownload = arr
 			attachmentsToDownload = append(attachmentsToDownload, attArr...)
-
-			log.Debugw(
-				"full sync scan completed",
-				"user_id", userID,
-				"notes_missing_on_client", len(arr),
-				"attachments_missing_on_client", len(attArr),
-			)
 		}
 	}
 
@@ -114,12 +185,6 @@ func (s *SyncHandler) SyncCheck(c fiber.Ctx) error {
 			)
 
 			if err != nil {
-				log.Errorw(
-					"note sync failed, skipping note",
-					"local_id", note.LocalID,
-					"error", err,
-				)
-
 				results <- NoteSyncResult{
 					FailedNotes: []string{note.LocalID},
 				}
@@ -189,20 +254,12 @@ func (s *SyncHandler) SyncCheck(c fiber.Ctx) error {
 		)
 
 	}
-
-	log.Debugw(
-		"sync check completed",
-		"user_id", userID,
-		"notes_to_upload", notesToUpload,
-		"notes_to_download_count", len(notesToDownload),
-		"notes_synced_count", len(syncedNotes),
-		"notes_to_hard_delete_count", len(notesToHardDelete),
-		"notes_failed", notesFailed,
-		"attachments_to_upload_count", len(attachmentsToUpload),
-		"attachments_to_download_count", len(attachmentsToDownload),
-		"attachments_synced_count", len(syncedAttachments),
-		"attachments_to_hard_delete_count", len(attachmentsToHardDelete),
-	)
+	if len(notesFailed) > 0 {
+		log.Warnw("sync check completed with failed notes",
+			"user_id", userID,
+			"failed_notes_count", len(notesFailed),
+		)
+	}
 
 	response := models.CheckSyncResponse{
 		ToUpload:                notesToUpload,
@@ -252,25 +309,9 @@ func checkNoteSync(
 
 	cloudID := note.CloudID
 
-	cloudIDStr := "<none>"
-	if cloudID != nil {
-		cloudIDStr = cloudID.Hex()
-	}
-
-	log.Debugw(
-		"checking note sync status",
-		"local_id", note.LocalID,
-		"cloud_id", cloudIDStr,
-		"hard_deleted", note.HardDeleted,
-	)
-
 	if note.HardDeleted {
 		if cloudID == nil {
 			// **The note never existed in the cloud.**
-			log.Debugw(
-				"note hard deleted locally and never existed in cloud, nothing to do",
-				"local_id", note.LocalID,
-			)
 			return result, nil
 		}
 
@@ -304,11 +345,6 @@ func checkNoteSync(
 	}
 
 	if cloudID == nil {
-		log.Debugw(
-			"note has no cloud id yet, marking for upload",
-			"local_id", note.LocalID,
-		)
-
 		result.NotesToUpload = append(
 			result.NotesToUpload,
 			note.LocalID,
@@ -345,7 +381,6 @@ func checkNoteSync(
 			log.Errorw(
 				"lookup note in cloud failed",
 				"local_id", note.LocalID,
-				"cloud_id", cloudIDStr,
 				"user_id", userID,
 				"error", err,
 			)
@@ -357,13 +392,6 @@ func checkNoteSync(
 			)
 		}
 
-		log.Debugw(
-			"note has cloud id but no matching document found, marking for upload",
-			"local_id", note.LocalID,
-			"cloud_id", cloudIDStr,
-			"user_id", userID,
-		)
-
 		result.NotesToUpload = append(
 			result.NotesToUpload,
 			note.LocalID,
@@ -373,12 +401,6 @@ func checkNoteSync(
 	}
 
 	if foundNote.HardDeleted {
-		log.Debugw(
-			"cloud note is a tombstone, marking for hard delete on client",
-			"local_id", note.LocalID,
-			"cloud_id", cloudIDStr,
-		)
-
 		if err := cleanupDeletedNoteAttachments(
 			*foundNote,
 			ctx,
@@ -401,36 +423,16 @@ func checkNoteSync(
 	}
 
 	if foundNote.CloudVersion > *note.CloudVersion {
-		log.Debugw(
-			"cloud version is newer, marking for download",
-			"local_id", note.LocalID,
-			"cloud_version", foundNote.CloudVersion,
-			"client_version", *note.CloudVersion,
-		)
-
 		result.NotesToDownload = append(
 			result.NotesToDownload,
 			*foundNote,
 		)
 	} else if foundNote.CloudVersion < *note.CloudVersion {
-		log.Debugw(
-			"client version is newer, marking for upload",
-			"local_id", note.LocalID,
-			"cloud_version", foundNote.CloudVersion,
-			"client_version", *note.CloudVersion,
-		)
-
 		result.NotesToUpload = append(
 			result.NotesToUpload,
 			note.LocalID,
 		)
 	} else {
-		log.Debugw(
-			"note versions match, already synced",
-			"local_id", note.LocalID,
-			"version", foundNote.CloudVersion,
-		)
-
 		result.SyncedNotes = append(
 			result.SyncedNotes,
 			note.LocalID,
@@ -595,13 +597,6 @@ func hardDeleteNoteInCloud(
 	if replaceResult.MatchedCount == 0 {
 		// **The note may already have been hard deleted by another request,
 		// may not exist at all, or the client's cloud_version was stale.**
-		log.Debugw(
-			"hard delete: ReplaceOne matched 0 documents, checking why",
-			"cloud_id", cloudID.Hex(),
-			"owner_id", userID,
-			"client_cloud_version", clientCloudVersion,
-		)
-
 		foundNote := new(models.DownloadNote)
 
 		if err := s.acquireWorker(ctx); err != nil {
@@ -645,11 +640,6 @@ func hardDeleteNoteInCloud(
 		}
 
 		if foundNote.HardDeleted {
-			log.Debugw(
-				"hard delete: note was already a tombstone, treating as success",
-				"cloud_id", cloudID.Hex(),
-			)
-
 			return foundNote, nil
 		}
 
@@ -672,15 +662,11 @@ func hardDeleteNoteInCloud(
 		attachmentID := attachmentID
 
 		g.Go(func() error {
-			cloudKey := createObjectKey(
-				attachmentID,
-				userID,
-			)
-
-			if err := deleteAttachmentObject(
+			if err := deleteAttachmentAndReleaseQuota(
 				deleteCtx,
 				s,
-				cloudKey,
+				userID,
+				attachmentID,
 			); err != nil {
 				return fmt.Errorf(
 					"delete attachment %s: %w",
@@ -795,12 +781,6 @@ func listAttachmentIDsForNote(
 			s.releaseWorker()
 
 			if err != nil {
-				log.Errorw(
-					"list attachments for note: head object failed, skipping",
-					"key", *obj.Key,
-					"note_cloud_id", noteCloudIDHex,
-					"error", err,
-				)
 				continue
 			}
 
@@ -834,15 +814,11 @@ func cleanupDeletedNoteAttachments(
 		attachmentID := attachmentID
 
 		g.Go(func() error {
-			cloudKey := createObjectKey(
-				attachmentID,
-				userID,
-			)
-
-			if err := deleteAttachmentObject(
+			if err := deleteAttachmentAndReleaseQuota(
 				ctx,
 				s,
-				cloudKey,
+				userID,
+				attachmentID,
 			); err != nil {
 				return fmt.Errorf(
 					"delete attachment %s: %w",
@@ -892,6 +868,27 @@ func deleteAttachmentObject(
 	return nil
 }
 
+// deleteAttachmentAndReleaseQuota removes the object first, then releases all
+// finalized charges for that attachment. DeleteObject is idempotent, so a
+// transient database failure can safely be retried without double-releasing
+// quota.
+func deleteAttachmentAndReleaseQuota(
+	ctx context.Context,
+	s *SyncHandler,
+	userID string,
+	attachmentID string,
+) error {
+	if err := deleteAttachmentObject(ctx, s, createObjectKey(attachmentID, userID)); err != nil {
+		return err
+	}
+
+	if err := releaseAttachmentQuota(ctx, s, userID, attachmentID); err != nil {
+		return fmt.Errorf("release quota for attachment %s: %w", attachmentID, err)
+	}
+
+	return nil
+}
+
 func checkAttachment(
 	attachment models.AttachmentSyncCheck,
 	userID string,
@@ -905,25 +902,6 @@ func checkAttachment(
 	attachmentsToHardDelete := []string{}
 	quotaExceeded := false
 	if attachment.HardDeleted {
-		key := createObjectKey(
-			attachment.AttachmentID.String(),
-			userID,
-		)
-
-		if err := deleteBrokenAttachment(
-			key,
-			s.s3Client,
-			ctx,
-			s.s3Bucket,
-			s,
-		); err != nil {
-			return quotaExceeded, nil, nil, nil, nil, fmt.Errorf(
-				"delete hard-deleted attachment %q: %w",
-				key,
-				err,
-			)
-		}
-
 		cloudObjectID, err := bson.ObjectIDFromHex(cloudID)
 		if err != nil {
 			return quotaExceeded, nil, nil, nil, nil, fmt.Errorf(
@@ -971,6 +949,19 @@ func checkAttachment(
 			return quotaExceeded, nil, nil, nil, nil, fmt.Errorf(
 				"update deleted_attachments for note %s: %w",
 				cloudID,
+				err,
+			)
+		}
+
+		if err := deleteAttachmentAndReleaseQuota(
+			ctx,
+			s,
+			userID,
+			attachment.AttachmentID.String(),
+		); err != nil {
+			return quotaExceeded, nil, nil, nil, nil, fmt.Errorf(
+				"delete hard-deleted attachment %q: %w",
+				attachment.AttachmentID.String(),
 				err,
 			)
 		}
@@ -1064,20 +1055,6 @@ func checkAttachment(
 					err,
 				)
 			}
-			err = checkIfUploadPossible(s, attachment.SizeBytes, ctx, userID)
-
-			if err != nil {
-				if errors.Is(err, ErrQuotaExceeded) {
-					return true, nil, nil, nil, nil, nil
-				}
-
-				return quotaExceeded, nil, nil, nil, nil, fmt.Errorf(
-					"upload not possible for attachment %s: %w",
-					attachment.AttachmentID.String(),
-					err,
-				)
-			}
-
 			url, err := createUploadURL(
 				ctx,
 				s.presigner,
@@ -1088,6 +1065,10 @@ func checkAttachment(
 			)
 
 			if err != nil {
+				if errors.Is(err, ErrQuotaExceeded) {
+					return true, nil, nil, nil, nil, nil
+				}
+
 				return quotaExceeded, nil, nil, nil, nil, fmt.Errorf(
 					"create upload URL for attachment %s: %w",
 					attachment.AttachmentID.String(),
@@ -1119,20 +1100,11 @@ func checkAttachment(
 	)
 
 	if err != nil {
-		log.Debugw(
-			"Malformed attachment, deleting object",
-			"key",
-			cloudKey,
-			"error",
-			err,
-		)
-
-		if deleteErr := deleteBrokenAttachment(
-			cloudKey,
-			s.s3Client,
+		if deleteErr := deleteAttachmentAndReleaseQuota(
 			ctx,
-			s.s3Bucket,
 			s,
+			userID,
+			attachment.AttachmentID.String(),
 		); deleteErr != nil {
 			return quotaExceeded, nil, nil, nil, nil, fmt.Errorf(
 				"delete malformed attachment %q: %w",
@@ -1368,6 +1340,10 @@ func createUploadURL(
 	attachmentID string,
 	sizeBytes int64,
 ) (string, error) {
+	reservation, created, err := reserveUploadQuota(ctx, s, userID, attachmentID, sizeBytes)
+	if err != nil {
+		return "", err
+	}
 
 	request, err := presigner.PresignPutObject(
 		ctx,
@@ -1378,24 +1354,14 @@ func createUploadURL(
 		},
 		s3.WithPresignExpires(10*time.Minute),
 	)
-
 	if err != nil {
-		return "", err
-	}
-	rstruct := models.QuotaReservation{
-		UserID:       userID,
-		AttachmentID: attachmentID,
-		SizeBytes:    sizeBytes,
-		Status:       string(ReservationPending),
-		ExpiresAt:    time.Now().Add(10 * time.Minute),
-		CreatedAt:    time.Now(),
-	}
-	s.acquireWorker(ctx)
-	defer s.releaseWorker()
-	reservations := s.DB.Collection("reservations")
-	_, err = reservations.InsertOne(ctx, rstruct)
-
-	if err != nil {
+		// Do not leave a fresh reservation consuming quota when signing failed.
+		// An existing reservation belongs to an earlier request and must remain.
+		if created {
+			if releaseErr := releasePendingReservation(ctx, s, *reservation); releaseErr != nil {
+				return "", fmt.Errorf("presign upload: %w (also failed to release reservation: %v)", err, releaseErr)
+			}
+		}
 		return "", err
 	}
 
@@ -1495,11 +1461,6 @@ func checkNotesNotExistingOnClient(
 			log.Error("Bucket is empty")
 		}
 
-		log.Infow("Listing S3 attachments",
-			"bucket", s.s3Bucket,
-			"prefix", prefix,
-		)
-
 		paginator := s3.NewListObjectsV2Paginator(s.s3Client, &s3.ListObjectsV2Input{
 			Bucket: aws.String(s.s3Bucket),
 			Prefix: aws.String(prefix),
@@ -1535,8 +1496,6 @@ func checkNotesNotExistingOnClient(
 
 				metadata, err := parseAttachmentMetadata(headOut.Metadata, noteCloudID)
 				if err != nil {
-					log.Debugw("malformed attachment during full sync scan", "key", *obj.Key, "error", err)
-
 					if delErr := deleteBrokenAttachment(*obj.Key, s.s3Client, ctx, s.s3Bucket, s); delErr != nil {
 						log.Errorw("failed to delete malformed attachment", "key", *obj.Key, "error", delErr)
 					}
@@ -1559,7 +1518,6 @@ func checkNotesNotExistingOnClient(
 				attachmentIDStr := strings.TrimPrefix(*obj.Key, prefix)
 				attachmentUUID, err := uuid.Parse(attachmentIDStr)
 				if err != nil {
-					log.Debugw("invalid attachment key format", "key", *obj.Key, "error", err)
 					continue
 				}
 
@@ -1585,7 +1543,9 @@ func checkNotesNotExistingOnClient(
 }
 
 type NoteDocument struct {
+	ID           bson.ObjectID          `bson:"_id,omitempty"`
 	OwnerID      string                 `bson:"owner_id"`
+	LocalID      string                 `bson:"local_id"`
 	CloudVersion int64                  `bson:"cloud_version"`
 	Title        string                 `bson:"title"`
 	Summary      string                 `bson:"summary"`
@@ -1603,26 +1563,17 @@ func (s *SyncHandler) UploadNote(c fiber.Ctx) error {
 	req := new(models.NoteUploadRequest)
 
 	if err := c.Bind().Body(req); err != nil {
-		log.Errorw("upload note: failed to parse body", "error", err)
 		return middleware.BadRequest("Couldn't read body data")
 	}
 
 	if err := s.Validator.Struct(req); err != nil {
-		log.Errorw("upload note: validation failed", "error", err, "title", req.Title)
 		return middleware.BadRequest("Wrong upload note struct was sent")
+	}
+	if req.HardDeleted {
+		return middleware.BadRequest("Cannot upload a hard-deleted note")
 	}
 
 	ownerID := c.Locals("userID").(string)
-
-	log.Debugw(
-		"upload note request received",
-		"owner_id", ownerID,
-		"title", req.Title,
-		"is_encrypted", req.IsEncrypted,
-		"is_deleted", req.IsDeleted,
-		"created_at", req.CreatedAt,
-		"updated_at", req.UpdatedAt,
-	)
 
 	var crypto *models.NoteCryptoMeta
 	if req.CryptoMeta != nil {
@@ -1630,7 +1581,6 @@ func (s *SyncHandler) UploadNote(c fiber.Ctx) error {
 			log.Errorw(
 				"upload note: invalid crypto_meta",
 				"owner_id", ownerID,
-				"title", req.Title,
 				"error", err,
 			)
 			return middleware.BadRequest("Invalid crypto_meta")
@@ -1639,6 +1589,7 @@ func (s *SyncHandler) UploadNote(c fiber.Ctx) error {
 
 	doc := NoteDocument{
 		OwnerID:      ownerID,
+		LocalID:      req.LocalID,
 		CloudVersion: 1,
 		Title:        req.Title,
 		Summary:      req.Summary,
@@ -1655,38 +1606,25 @@ func (s *SyncHandler) UploadNote(c fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
 	defer cancel()
 
-	res, err := s.Coll.InsertOne(ctx, doc)
+	var stored NoteDocument
+	err := s.Coll.FindOneAndUpdate(
+		ctx,
+		bson.M{"owner_id": ownerID, "local_id": req.LocalID},
+		bson.M{"$setOnInsert": doc},
+		options.FindOneAndUpdate().SetUpsert(true).SetReturnDocument(options.After),
+	).Decode(&stored)
 	if err != nil {
 		log.Errorw(
-			"upload note: mongo insert failed",
+			"upload note: create or lookup failed",
 			"owner_id", ownerID,
-			"title", req.Title,
 			"error", err,
 		)
-		return middleware.Internal("Failed to add note to mongo db")
+		return middleware.Internal("Failed to create or lookup note")
 	}
-
-	insertedID, ok := res.InsertedID.(bson.ObjectID)
-	if !ok {
-		log.Errorw(
-			"upload note: inserted id was not an ObjectID",
-			"owner_id", ownerID,
-			"title", req.Title,
-			"inserted_id", res.InsertedID,
-		)
-		return middleware.Internal("Failed to read inserted note id")
-	}
-
-	log.Debugw(
-		"upload note: inserted successfully",
-		"owner_id", ownerID,
-		"mongo_id", insertedID.Hex(),
-		"title", req.Title,
-	)
 
 	return c.JSON(fiber.Map{
-		"mongo_id":      insertedID.Hex(),
-		"cloud_version": 1,
+		"mongo_id":      stored.ID.Hex(),
+		"cloud_version": stored.CloudVersion,
 	})
 }
 
@@ -1707,23 +1645,14 @@ func (s *SyncHandler) UpdateNote(c fiber.Ctx) error {
 	req := new(models.NoteUploadRequest)
 
 	if err := c.Bind().Body(req); err != nil {
-		log.Errorw(
-			"update note: failed to parse body",
-			"mongo_id", mongoID,
-			"error", err,
-		)
-
 		return middleware.BadRequest("Couldn't read body data")
 	}
 
 	if err := s.Validator.Struct(req); err != nil {
-		log.Errorw(
-			"update note: validation failed",
-			"mongo_id", mongoID,
-			"error", err,
-		)
-
 		return middleware.BadRequest("Wrong update note struct was sent")
+	}
+	if req.CloudVersion == nil {
+		return middleware.BadRequest("cloud_version is required when updating a note")
 	}
 
 	ownerID, ok := c.Locals("userID").(string)
@@ -1735,13 +1664,6 @@ func (s *SyncHandler) UpdateNote(c fiber.Ctx) error {
 
 		return middleware.Unauthorized("Missing authenticated user")
 	}
-
-	log.Debugw(
-		"update note request received",
-		"owner_id", ownerID,
-		"mongo_id", mongoID,
-		"title", req.Title,
-	)
 
 	var crypto *models.NoteCryptoMeta
 
@@ -1764,9 +1686,25 @@ func (s *SyncHandler) UpdateNote(c fiber.Ctx) error {
 	)
 	defer cancel()
 
+	if req.HardDeleted {
+		attachmentIDs, err := listAttachmentIDsForNote(ctx, s, ownerID, objectID.Hex())
+		if err != nil {
+			return middleware.Internal("Failed to list note attachments for deletion")
+		}
+		tombstone, err := hardDeleteNoteInCloud(
+			ctx, s, ownerID, objectID, *req.CloudVersion, attachmentIDs,
+		)
+		if err != nil {
+			return middleware.Conflict("Note was changed or deleted before hard delete")
+		}
+		return c.JSON(fiber.Map{"cloud_version": tombstone.CloudVersion})
+	}
+
 	filter := bson.M{
-		"_id":      objectID,
-		"owner_id": ownerID,
+		"_id":           objectID,
+		"owner_id":      ownerID,
+		"cloud_version": *req.CloudVersion,
+		"hard_deleted":  bson.M{"$ne": true},
 	}
 
 	update := bson.M{
@@ -1798,13 +1736,7 @@ func (s *SyncHandler) UpdateNote(c fiber.Ctx) error {
 
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			log.Debugw(
-				"update note: no matching note found for owner",
-				"owner_id", ownerID,
-				"mongo_id", mongoID,
-			)
-
-			return middleware.BadRequest("Note not found")
+			return middleware.Conflict("Note was changed, deleted, or not found")
 		}
 
 		log.Errorw(
@@ -1817,110 +1749,102 @@ func (s *SyncHandler) UpdateNote(c fiber.Ctx) error {
 		return middleware.Internal("Failed to update note in mongo db")
 	}
 
-	log.Debugw(
-		"update note: updated successfully",
-		"owner_id", ownerID,
-		"mongo_id", mongoID,
-		"cloud_version", updatedNote.CloudVersion,
-	)
-
 	return c.JSON(fiber.Map{
 		"cloud_version": updatedNote.CloudVersion,
 	})
 }
 
-func checkIfUploadPossible(s *SyncHandler, size int64, ctx context.Context, userID string) error {
+const quotaLimit int64 = 100 * 1024 * 1024
+
+// reserveUploadQuota atomically reserves capacity and records the pending
+// upload. Keeping quota_reserved_bytes on the user document makes concurrent
+// requests for one user serialize on that document, closing the check-then-
+// insert race.
+func reserveUploadQuota(sCtx context.Context, s *SyncHandler, userID, attachmentID string, size int64) (*models.QuotaReservation, bool, error) {
 	if size <= 0 {
-		return middleware.BadRequest("ATTACHMENT SIZE CAN NOT BE LESS THAN 0")
+		return nil, false, middleware.BadRequest("ATTACHMENT SIZE CAN NOT BE LESS THAN 0")
 	}
 
 	userObjectID, err := bson.ObjectIDFromHex(userID)
 	if err != nil {
-		return middleware.BadRequest("invalid user id")
+		return nil, false, middleware.BadRequest("invalid user id")
 	}
 
-	s.acquireWorker(ctx)
+	if err := s.acquireWorker(sCtx); err != nil {
+		return nil, false, err
+	}
 	defer s.releaseWorker()
 
-	usersDB := s.DB.Collection("users_data")
-
-	var result struct {
-		QuotaUsed int64 `bson:"quota_used_bytes"`
-	}
-
-	err = usersDB.FindOne(
-		ctx,
-		bson.M{
-			"_id": userObjectID,
-		},
-		options.FindOne().SetProjection(bson.M{
-			"quota_used_bytes": 1,
-			"_id":              0,
-		}),
-	).Decode(&result)
-
-	if err != nil {
-		log.Errorw("failed to check quota used", "error", err)
-		return err
-	}
-
 	reservations := s.DB.Collection("reservations")
-
-	pipeline := mongo.Pipeline{
-		{
-			{Key: "$match", Value: bson.M{
-				"user_id": userID,
-				"status":  string(ReservationPending),
-				"expires_at": bson.M{
-					"$gt": time.Now(),
-				},
-			}},
-		},
-		{
-			{Key: "$group", Value: bson.M{
-				"_id":        nil,
-				"total_size": bson.M{"$sum": "$size_bytes"},
-			}},
-		},
-	}
-
-	var reserved struct {
-		TotalSize int64 `bson:"total_size"`
-	}
-
-	cursor, err := reservations.Aggregate(ctx, pipeline)
+	users := s.DB.Collection("users_data")
+	session, err := s.DB.Client().StartSession()
 	if err != nil {
-		return err
+		return nil, false, fmt.Errorf("start quota reservation session: %w", err)
 	}
-	defer cursor.Close(ctx)
+	defer session.EndSession(sCtx)
 
-	if cursor.Next(ctx) {
-		if err := cursor.Decode(&reserved); err != nil {
-			return err
+	created := false
+	var createdReservation *models.QuotaReservation
+	_, err = session.WithTransaction(sCtx, func(sc context.Context) (any, error) {
+		var existing models.QuotaReservation
+		err := reservations.FindOne(sc, bson.M{
+			"user_id": userID, "attachment_id": attachmentID,
+			"status": string(ReservationPending), "expires_at": bson.M{"$gt": time.Now()},
+		}).Decode(&existing)
+		if err == nil {
+			if existing.SizeBytes != size {
+				return nil, fmt.Errorf("attachment %s already has a reservation with a different size", attachmentID)
+			}
+			return nil, nil
 		}
+		if !errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, err
+		}
+
+		result, err := users.UpdateOne(sc, bson.M{
+			"_id": userObjectID,
+			"$expr": bson.M{"$lte": bson.A{
+				bson.M{"$add": bson.A{
+					bson.M{"$ifNull": bson.A{"$quota_used_bytes", 0}},
+					bson.M{"$ifNull": bson.A{"$quota_reserved_bytes", 0}},
+					size,
+				}}, quotaLimit,
+			}},
+		}, bson.M{"$inc": bson.M{"quota_reserved_bytes": size}})
+		if err != nil {
+			return nil, err
+		}
+		if result.ModifiedCount != 1 {
+			return nil, ErrQuotaExceeded
+		}
+
+		reservation := &models.QuotaReservation{
+			ID: bson.NewObjectID(), UserID: userID, AttachmentID: attachmentID, SizeBytes: size,
+			Status: string(ReservationPending), ExpiresAt: time.Now().Add(10 * time.Minute), CreatedAt: time.Now(),
+		}
+		_, err = reservations.InsertOne(sc, reservation)
+		if err != nil {
+			return nil, err
+		}
+		created = true
+		createdReservation = reservation
+		return nil, nil
+	})
+	if err != nil {
+		return nil, false, err
 	}
-
-	if err := cursor.Err(); err != nil {
-		return err
-	}
-
-	const quotaLimit int64 = 100 * 1024 * 1024
-
-	if result.QuotaUsed+reserved.TotalSize+size > quotaLimit {
-		return ErrQuotaExceeded
-	}
-
-	return nil
+	return createdReservation, created, nil
 }
 func (s *SyncHandler) manageReservationAndQuota(c fiber.Ctx) error {
-	log.Debug("IN CONSUMING")
 	attachmentID := c.Params("attachment_id")
 	userID := c.Locals("userID").(string)
 
 	key := createObjectKey(attachmentID, userID)
 
 	// 1. Verify object exists in S3
-	s.acquireWorker(c)
+	if err := s.acquireWorker(c); err != nil {
+		return middleware.Internal("upload worker unavailable")
+	}
 
 	headOut, err := s.s3Client.HeadObject(c, &s3.HeadObjectInput{
 		Bucket: &s.s3Bucket,
@@ -1970,7 +1894,9 @@ func (s *SyncHandler) manageReservationAndQuota(c fiber.Ctx) error {
 	}
 
 	// 4. Mongo transaction
-	s.acquireWorker(c)
+	if err := s.acquireWorker(c); err != nil {
+		return middleware.Internal("upload worker unavailable")
+	}
 	defer s.releaseWorker()
 
 	session, err := s.DB.Client().StartSession()
@@ -2008,16 +1934,7 @@ func (s *SyncHandler) manageReservationAndQuota(c fiber.Ctx) error {
 			}
 
 			// 2. Increment user's tracked usage.
-			_, err = users.UpdateOne(
-				sc,
-				bson.M{"_id": userObjectID},
-				bson.M{
-					"$inc": bson.M{
-						"quota_used_bytes": actualSize,
-					},
-				},
-			)
-			if err != nil {
+			if err := moveReservedQuota(sc, users, userObjectID, reservation.SizeBytes, actualSize); err != nil {
 				return nil, err
 			}
 
@@ -2029,6 +1946,128 @@ func (s *SyncHandler) manageReservationAndQuota(c fiber.Ctx) error {
 	}
 
 	return c.SendStatus(fiber.StatusOK)
+}
+
+// moveReservedQuota transfers a pending reservation into used storage (or
+// simply releases it when usedIncrease is zero). The second update clamps the
+// reserved balance for reservations created before this field existed.
+func moveReservedQuota(ctx context.Context, users *mongo.Collection, userID bson.ObjectID, reservedDecrease, usedIncrease int64) error {
+	if _, err := users.UpdateOne(ctx, bson.M{"_id": userID}, bson.M{
+		"$inc": bson.M{
+			"quota_used_bytes":     usedIncrease,
+			"quota_reserved_bytes": -reservedDecrease,
+		},
+	}); err != nil {
+		return err
+	}
+	_, err := users.UpdateOne(ctx, bson.M{
+		"_id":                  userID,
+		"quota_reserved_bytes": bson.M{"$lt": 0},
+	}, bson.M{"$set": bson.M{"quota_reserved_bytes": 0}})
+	return err
+}
+
+// releasePendingReservation removes an unused reservation and returns its
+// capacity to the user's reserved balance. The status guard makes it safe if a
+// completion request wins the race.
+func releasePendingReservation(ctx context.Context, s *SyncHandler, res models.QuotaReservation) error {
+	userObjectID, err := bson.ObjectIDFromHex(res.UserID)
+	if err != nil {
+		return fmt.Errorf("invalid reservation user id: %w", err)
+	}
+	if err := s.acquireWorker(ctx); err != nil {
+		return err
+	}
+	defer s.releaseWorker()
+
+	reservations := s.DB.Collection("reservations")
+	users := s.DB.Collection("users_data")
+	session, err := s.DB.Client().StartSession()
+	if err != nil {
+		return fmt.Errorf("start reservation release session: %w", err)
+	}
+	defer session.EndSession(ctx)
+
+	_, err = session.WithTransaction(ctx, func(sc context.Context) (any, error) {
+		deleted, err := reservations.DeleteOne(sc, bson.M{
+			"_id": res.ID, "status": string(ReservationPending),
+		})
+		if err != nil {
+			return nil, err
+		}
+		if deleted.DeletedCount == 0 {
+			return nil, nil
+		}
+		return nil, moveReservedQuota(sc, users, userObjectID, res.SizeBytes, 0)
+	})
+	return err
+}
+
+// releaseAttachmentQuota releases every finalized charge for an attachment.
+// Removing the consumed reservation records in the same transaction makes a
+// repeated delete idempotent: only the first caller can lower quota usage.
+func releaseAttachmentQuota(ctx context.Context, s *SyncHandler, userID, attachmentID string) error {
+	userObjectID, err := bson.ObjectIDFromHex(userID)
+	if err != nil {
+		return fmt.Errorf("invalid user id: %w", err)
+	}
+	if err := s.acquireWorker(ctx); err != nil {
+		return err
+	}
+	defer s.releaseWorker()
+
+	reservations := s.DB.Collection("reservations")
+	users := s.DB.Collection("users_data")
+	session, err := s.DB.Client().StartSession()
+	if err != nil {
+		return fmt.Errorf("start attachment quota release session: %w", err)
+	}
+	defer session.EndSession(ctx)
+
+	_, err = session.WithTransaction(ctx, func(sc context.Context) (any, error) {
+		filter := bson.M{
+			"user_id": userID, "attachment_id": attachmentID,
+			"status": string(ReservationConsumed),
+		}
+		cursor, err := reservations.Find(sc, filter)
+		if err != nil {
+			return nil, err
+		}
+		var consumed []models.QuotaReservation
+		err = cursor.All(sc, &consumed)
+		closeErr := cursor.Close(sc)
+		if err != nil {
+			return nil, err
+		}
+		if closeErr != nil {
+			return nil, closeErr
+		}
+
+		var released int64
+		for _, reservation := range consumed {
+			released += reservation.SizeBytes
+		}
+		if released == 0 {
+			return nil, nil
+		}
+
+		consumedIDs := make([]bson.ObjectID, 0, len(consumed))
+		for _, reservation := range consumed {
+			consumedIDs = append(consumedIDs, reservation.ID)
+		}
+		deleted, err := reservations.DeleteMany(sc, bson.M{"_id": bson.M{"$in": consumedIDs}})
+		if err != nil {
+			return nil, err
+		}
+		if deleted.DeletedCount == 0 {
+			return nil, nil
+		}
+		_, err = users.UpdateOne(sc, bson.M{"_id": userObjectID}, bson.M{
+			"$inc": bson.M{"quota_used_bytes": -released},
+		})
+		return nil, err
+	})
+	return err
 }
 
 // StartReservationCleanupWorker starts a background goroutine that periodically
@@ -2162,12 +2201,9 @@ func (s *SyncHandler) reconcileSingleReservation(ctx context.Context, res models
 	if err != nil {
 		var apiErr smithy.APIError
 		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "NotFound" {
-			_, delErr := s.DB.Collection("reservations").DeleteOne(ctx, bson.M{"_id": res.ID})
-			if delErr != nil {
-				return fmt.Errorf("delete orphaned reservation %s: %w", res.AttachmentID, delErr)
+			if releaseErr := releasePendingReservation(ctx, s, res); releaseErr != nil {
+				return fmt.Errorf("release orphaned reservation %s: %w", res.AttachmentID, releaseErr)
 			}
-			log.Debugw("cleaned up orphaned reservation (S3 object missing)",
-				"attachment_id", res.AttachmentID)
 			return nil
 		}
 		return fmt.Errorf("head object %s: %w", key, err)
@@ -2175,8 +2211,12 @@ func (s *SyncHandler) reconcileSingleReservation(ctx context.Context, res models
 
 	if headOut.ContentLength == nil {
 		// Corrupted / incomplete metadata. Treat as garbage.
-		s.deleteS3ObjectSilent(ctx, key)
-		s.DB.Collection("reservations").DeleteOne(ctx, bson.M{"_id": res.ID})
+		if err := deleteAttachmentObject(ctx, s, key); err != nil {
+			return fmt.Errorf("delete corrupted object %s: %w", key, err)
+		}
+		if err := releasePendingReservation(ctx, s, res); err != nil {
+			return fmt.Errorf("release corrupted reservation %s: %w", res.AttachmentID, err)
+		}
 		return fmt.Errorf("head object %s missing content-length", key)
 	}
 
@@ -2190,8 +2230,12 @@ func (s *SyncHandler) reconcileSingleReservation(ctx context.Context, res models
 			"expected_size", res.SizeBytes,
 			"actual_size", actualSize)
 
-		s.deleteS3ObjectSilent(ctx, key)
-		s.DB.Collection("reservations").DeleteOne(ctx, bson.M{"_id": res.ID})
+		if err := deleteAttachmentObject(ctx, s, key); err != nil {
+			return fmt.Errorf("delete mismatched object %s: %w", key, err)
+		}
+		if err := releasePendingReservation(ctx, s, res); err != nil {
+			return fmt.Errorf("release mismatched reservation %s: %w", res.AttachmentID, err)
+		}
 		return nil
 	}
 
@@ -2247,16 +2291,7 @@ func (s *SyncHandler) finalizeReservationTransaction(ctx context.Context, res mo
 
 		// Increment the user's consumed quota. This matches the field name
 		// in your User struct: QuotaBytes with bson tag "quota_used_bytes".
-		_, err = users.UpdateOne(
-			sc,
-			bson.M{"_id": userObjectID},
-			bson.M{
-				"$inc": bson.M{
-					"quota_used_bytes": actualSize,
-				},
-			},
-		)
-		if err != nil {
+		if err := moveReservedQuota(sc, users, userObjectID, res.SizeBytes, actualSize); err != nil {
 			return nil, err
 		}
 
@@ -2267,10 +2302,6 @@ func (s *SyncHandler) finalizeReservationTransaction(ctx context.Context, res mo
 		return fmt.Errorf("finalize reservation transaction: %w", err)
 	}
 
-	log.Debugw("worker finalized expired reservation",
-		"attachment_id", res.AttachmentID,
-		"user_id", res.UserID,
-		"size", actualSize)
 	return nil
 }
 
@@ -2284,7 +2315,7 @@ func (s *SyncHandler) deleteS3ObjectSilent(ctx context.Context, key string) {
 	defer s.releaseWorker()
 
 	_, err := s.s3Client.DeleteObject(ctx, &s3.DeleteObjectInput{
-		Bucket: aws.String(s.s3Bucket), // TODO manage reservations nie ustawia na consumed i po zmianie online użytkownika lokalnie, notatki z mongo_id sie nie uploadują tylko upadtują, tylko to do naprawienia
+		Bucket: aws.String(s.s3Bucket),
 
 		Key: aws.String(key),
 	})
@@ -2292,34 +2323,3 @@ func (s *SyncHandler) deleteS3ObjectSilent(ctx context.Context, key string) {
 		log.Errorw("silent S3 delete failed", "key", key, "error", err)
 	}
 }
-
-// ## TODO — Sync & Quota Debugging
-
-// ### 4. Test failed / interrupted uploads
-
-// * [ ] Create reservation and do not upload anything.
-// * [ ] Let reservation expire.
-// * [ ] Verify cleanup removes the reservation when S3 object does not exist.
-// * [ ] Upload through presigned URL but do not call `/complete`.
-// * [ ] Verify cleanup finds the object and consumes the reservation.
-// * [ ] Upload an object with an incorrect size and verify it is removed.
-// * [ ] Make `/complete` fail temporarily and verify the cleanup worker eventually fixes the state.
-
-// ### 6. Cleanup worker
-
-// * [ ] Verify worker starts at application startup.
-// * [ ] Verify first cleanup runs immediately.
-// * [ ] Verify periodic cleanup runs every 5 minutes.
-// * [ ] Check logs for expired reservations and S3 reconciliation.
-// * [ ] Verify worker does not delete a reservation when S3 temporarily returns a non-404 error.
-
-// ### 7. Final sanity test
-
-// * [ ] Fresh account.
-// * [ ] New note.
-// * [ ] Multiple attachments.
-// * [ ] Quota reached.
-// * [ ] Restart application.
-// * [ ] Run sync again.
-// * [ ] Verify MongoDB `quota_used_bytes`, reservations and S3 objects are all consistent.
-// TODO manage reservations nie ustawia na consumed i po zmianie online użytkownika lokalnie, notatki z mongo_id sie nie uploadują tylko upadtują, tylko to do naprawienia

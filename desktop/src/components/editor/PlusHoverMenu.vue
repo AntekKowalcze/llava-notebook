@@ -41,7 +41,6 @@ async function settingChanged(id: string, value: string) {
           currentNoteStore.currentNote.sync_state = value === 'off' ? 'LocalOnly' : 'PendingUpload';
         }
       } catch (err) {
-        console.log(err);
         useToast().warning('Failed to change sync state');
       }
       break;
@@ -61,7 +60,6 @@ async function addToFavourites() {
       toast.success('Successfuly added to favourites');
       emitTauri('tags_changed');
     } catch (err) {
-      console.log(err);
       useToast().warning('Failed to add note to favourites');
     }
   }

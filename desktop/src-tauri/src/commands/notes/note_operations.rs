@@ -1,3 +1,80 @@
+//! # Note command module
+//!
+//! **Purpose**: This module provides Tauri commands for reading, modifying,
+//! synchronizing, encrypting, deleting, and restoring local notes.
+//!
+//! It acts as the command-layer bridge between the frontend and the core note,
+//! storage, attachment, and cryptographic services.
+//!
+//! ## Exports
+//!
+//! * [`get_note_content`] — Retrieves the content of a note after verifying
+//!   ownership and decrypts it when the note is encrypted.
+//! * [`save_note`] — Saves note content locally and optionally changes the
+//!   note's encryption state, including reprocessing its title and attachments.
+//! * [`toggle_note_sync`] — Changes whether a note participates in cloud
+//!   synchronization.
+//! * [`get_note_object`] — Retrieves the complete note representation prepared
+//!   by the core storage layer.
+//! * [`change_note_title`] — Updates a note title and encrypts it when the note
+//!   is encrypted.
+//! * [`toggle_note_encryption`] — Changes the stored encryption state of a
+//!   note.
+//! * [`remove_note`] — Soft-deletes a note and moves its local content into
+//!   the configured deleted-note storage.
+//! * [`hard_delete_note`] — Permanently removes a note and its local data.
+//! * [`restore_note`] — Restores a previously soft-deleted note and its local
+//!   content.
+//!
+//! ## Key design decisions
+//!
+//! Note ownership is verified before reading or modifying note content. The
+//! command layer therefore does not rely solely on the caller-provided note
+//! identifier when accessing protected local data.
+//!
+//! Encrypted note content is transparently decrypted for the editor and
+//! encrypted again before being persisted. The encryption key itself is stored
+//! in application state and is never derived or persisted by this command
+//! layer.
+//!
+//! Note encryption applies to more than the Markdown content. When encryption
+//! is enabled or disabled, the note title and all associated attachments are
+//! transformed to keep the complete note consistently encrypted or
+//! unencrypted.
+//!
+//! Attachment contents are rewritten when the note encryption state changes.
+//! The attachment database metadata is updated alongside the file contents so
+//! the synchronization layer can later operate on the correct representation.
+//!
+//! Synchronization state is delegated to the storage layer. This command
+//! module only selects the requested local synchronization state and does not
+//! directly communicate with the remote service.
+//!
+//! Soft deletion and hard deletion are intentionally separate operations.
+//! Soft deletion allows the synchronization and recovery workflows to retain
+//! the necessary metadata, while hard deletion permanently removes local note
+//! data.
+//!
+//! The command layer acquires only the application-state locks required for a
+//! particular operation and passes references to the core services rather than
+//! duplicating storage or cryptographic logic.
+//!
+//! ## Dependencies
+//!
+//! * [`tauri`] — Tauri commands and access to managed application state.
+//! * [`llava_core`] — Core note, storage, attachment, encryption, and error
+//!   handling functionality.
+//! * [`chacha20poly1305`] — Provides the note encryption key type.
+//! * [`anyhow`] — Adds context to UUID parsing and other command-layer
+//!   failures.
+//! * [`uuid`] — Parsing and formatting note and user identifiers.
+//! * [`std::path::PathBuf`] — Represents local attachment paths.
+//! * [`crate::commands`] — Provides the application's command-layer module
+//!   structure.
+//!
+//! The actual persistence and cryptographic implementations are intentionally
+//! kept in `llava_core`; this module is responsible primarily for application
+//! state access, authorization checks, and orchestration.
 use anyhow::Context;
 use llava_core::{storage::SyncState, Note, ProgramFiles};
 use std::{path::PathBuf, str::FromStr};

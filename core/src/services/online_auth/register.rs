@@ -42,7 +42,7 @@
 //! - `anyhow` — Adds error context
 
 use crate::constants::SERVER_ADDRESS;
-use crate::services::online_auth::models::online_account::{
+use crate::models::online_account::{
     AccessToken, ArgonParams, RegisterDevicePayload, RegisterRequest, RegisterUserPayload, Tokens,
 };
 use anyhow::Context;

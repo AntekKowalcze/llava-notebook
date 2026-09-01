@@ -17,10 +17,9 @@
 use crate::constants::*;
 use crate::utils::{Format, log_helper};
 use anyhow::Context;
-use argon2::password_hash;
 use chacha20poly1305::Key;
 
-use crate::services::online_auth::models::online_account::ArgonParams;
+use crate::models::online_account::ArgonParams;
 use argon2::password_hash::rand_core::RngCore;
 use argon2::{
     Argon2, PasswordHash, PasswordVerifier,
@@ -60,7 +59,7 @@ pub fn register_user_offline(
     let notes_key: chacha20poly1305::Key = ChaCha20Poly1305::generate_key(&mut OsRng); //Creating of chacha poly key for encrypting notes
     let (mut kek_bytes, password_hash, salt, encrypted_notes_key, nonce_for_key_wrap, argon_params) =
         generate_enctypted_keys(password, notes_key)?;
-    let new_user = crate::services::local_auth::auth_data_models::local_user::LocalUser {
+    let new_user = crate::models::local_user::LocalUser {
         user_id: uuid::Uuid::new_v4(),
         username,
         password_hash, //SALT ALREADY IN PHC STRING
@@ -116,7 +115,7 @@ pub fn register_user_offline(
     let codes = recovery_code_handling(&new_user.username, users_db, password)?; //get recovery codes as strings
 
     let paths = after_validation(&new_user.user_id, paths)?;
-    crate::services::local_auth::logging::session_operations(
+    crate::services::local_auth::local_login::session_operations(
         users_db,
         new_user.user_id,
         &notes_key,
@@ -423,7 +422,6 @@ pub fn after_validation(
     let tmp_nil_path = paths
         .app_home
         .join("llava/users/00000000-0000-0000-0000-000000000000");
-    println!("{:?}", tmp_nil_path);
     if tmp_nil_path.exists() {
         std::fs::remove_dir_all(
             paths
@@ -782,5 +780,4 @@ fn generate_codes() {
 
     let _u_uuid = uuid::Uuid::parse_str(&u_uuid).unwrap();
     let keys = recovery_code_handling("tescik", &users_db, "ToJestTest!").unwrap();
-    println!("keys: {:#?}", keys);
 }

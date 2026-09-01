@@ -37,10 +37,7 @@
 
 use crate::constants::KEY_ENCRYPTED_KEY_LENGTH;
 use crate::constants::SERVER_ADDRESS;
-use crate::services::online_auth::models::online_account::AccessToken;
-use crate::services::online_auth::models::online_account::ArgonParams;
-use crate::services::online_auth::models::online_account::RefreshResponse;
-use crate::services::online_auth::models::online_account::RefreshToken;
+use crate::models::online_account::{AccessToken,RefreshToken,RefreshResponse,ArgonParams};
 use anyhow::Context;
 use argon2::Argon2;
 use argon2::PasswordHasher;
@@ -77,7 +74,7 @@ struct LoginErrorResponse {
 pub async fn check_if_logged_in_online(
     online_id: &str,
     client: Client,
-) -> Result<crate::services::online_auth::models::online_account::AccessToken, crate::errors::Error>
+) -> Result<crate::models::online_account::AccessToken, crate::errors::Error>
 {
     tracing::debug!(
         task = "online session refresh",

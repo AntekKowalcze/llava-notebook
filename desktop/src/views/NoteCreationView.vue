@@ -48,7 +48,6 @@ const whyDisabled = computed(() => syncStatus.value.whyDisabled);
 const currentNoteStore = useCurrentNoteStore();
 const sync = ref<string>(userSettings.config['online.sync']);
 const encryption = ref<string>(userSettings.config['local.encryption']);
-console.log(sync, encryption);
 const title = ref<string>('');
 
 onMounted(async () => {
@@ -98,7 +97,6 @@ async function createNote(): Promise<void> {
   }
 
   const useEncryption = encryption.value === 'on';
-  console.log('TO JEST TO', useEncryption + encryption.value);
   const useSynchronization = canSync.value && sync.value === 'on';
 
   try {

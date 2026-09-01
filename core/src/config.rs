@@ -41,7 +41,7 @@
 //! - `uuid` — UUIDv4 generation for new device IDs and nil-UUID sentinel on first run
 //! - `std::sync::Mutex` — Thread-safe shared state in [`AppState`]
 use crate::constants::*;
-use crate::services::online_auth::models::online_account::AccessToken;
+use crate::models::online_account::AccessToken;
 use crate::utils::{Format, log_helper};
 use anyhow::Context;
 use dirs_next::data_local_dir;

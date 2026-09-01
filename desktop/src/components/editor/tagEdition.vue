@@ -134,7 +134,6 @@ async function removeTag(tag: UiTag) {
     emit('changed');
     await emitTauri('tags_changed');
   } catch (err) {
-    console.log(err);
     error.value = 'Failed to remove a tag';
   }
 }

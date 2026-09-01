@@ -101,7 +101,6 @@ async function loadNoteContent(id: string): Promise<string> {
 
     return contentFromDb;
   } catch (err) {
-    console.log(err);
     toast.error('failed to get note content');
     return defaultValue.value;
   }
@@ -148,7 +147,6 @@ onMounted(async () => {
   try {
     noteContent.value = await loadNoteContent(noteId.value);
     setWordCount();
-    console.log('LOADED:', JSON.stringify(noteContent.value));
   } catch (err) {
     console.error(err);
   } finally {

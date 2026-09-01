@@ -360,7 +360,6 @@ Content-Type: application/json
 }
 
 ### Oczekiwane: 200 (brak walidacji size_bytes >= 0), attachment trafia do attachments_to_upload
-#TODO dodać walidacje sizebytes
 
 ### 3.5 is_encrypted=true, ale crypto_metadata calkowicie pominiete
 # CryptoMetadata to typ wartosciowy (nie wskaznik) bez walidacji required -> zero-value akceptowany

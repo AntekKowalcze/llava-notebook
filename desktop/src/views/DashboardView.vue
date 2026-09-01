@@ -33,7 +33,6 @@ type DashboardData = {
 const authStore = useAuthStore();
 const username = computed(() => authStore.loggedInUsername);
 const userId = authStore.loggedInUserId;
-console.log(authStore.loggedInUserId);
 const date = ref<Date>(new Date());
 const numberOfNotes = ref<number>(0);
 const numberOfEncrypted = ref<number>(0);

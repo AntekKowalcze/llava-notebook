@@ -86,7 +86,6 @@ async function submitLogin() {
       currentSettings: userConfig.settingList,
       localPassword: localPassword.value
     });
-    console.log('connected');
 
     toast.success('Connected accounts successfully');
 

@@ -34,7 +34,6 @@
 //! - `tracing` — Logging encryption, decryption, and metadata operations without logging
 //!   sensitive cryptographic material
 use std::path::{Path, PathBuf};
-use std::time::SystemTime;
 
 use anyhow::Context;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
@@ -615,7 +614,7 @@ pub fn reencrypt_db(
             let attachment_path: PathBuf = PathBuf::from(attachment_path);
             let decypted_attachment = decrypt_attachment(old_key, notes_db, attachment_id.clone())?;
             let encrypted_with_new_key =
-                encrypt_attachment(new_key, notes_db, &decypted_attachment, attachment_id)?;
+            encrypt_attachment(new_key, notes_db, &decypted_attachment, attachment_id)?;
             atomic_write(&attachment_path, &encrypted_with_new_key)?;
         }
     }

@@ -31,7 +31,6 @@ const routes = [
           }
           return { path: '/main/', replace: true };
         } else if (!hasNoUsers && !authStore.loggedIn) {
-          console.log('not logged in');
           return { path: '/login', replace: true };
         }
       } catch (err) {

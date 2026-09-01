@@ -21,7 +21,7 @@
 use anyhow::Context;
 use reqwest::Client;
 
-use crate::services::online_auth::models::online_account::AccessToken;
+use crate::models::online_account::AccessToken;
 use serde::Serialize;
 
 #[derive(Serialize)]

@@ -1,3 +1,93 @@
+//! # Attachment management module
+//!
+//! **Purpose**: This module is responsible for the local lifecycle of note
+//! attachments, including creation, encryption, decryption, deletion,
+//! synchronization-state management, metadata handling, and filesystem
+//! operations.
+//!
+//! Attachments are stored as files on the local filesystem while their
+//! metadata and synchronization state are maintained in the local SQLite
+//! database.
+//!
+//! ## Exports
+//!
+//! * [`AttachmentCryptoMetadata`] — Stores cryptographic metadata required to
+//!   decrypt an encrypted attachment.
+//! * [`create_attachment`] — Creates a new attachment, optionally encrypts its
+//!   contents, stores the resulting bytes on disk, and creates its database
+//!   record.
+//! * [`read_attachment`] — Reads an attachment from disk and decrypts it when
+//!   the attachment is encrypted.
+//! * [`delete_attachment`] — Removes an attachment from local storage and
+//!   either deletes its database record or marks it for cloud deletion.
+//! * [`check_if_attachment_is_encrypted`] — Retrieves the encryption state of
+//!   an attachment from the local database.
+//! * [`toggle_attachments_encryption_for_note`] — Updates the encryption state
+//!   of all attachments belonging to a note.
+//! * [`toggle_attachments_sync_for_note`] — Changes the synchronization state
+//!   of attachments belonging to a note when transitioning them away from a
+//!   deletion state.
+//! * [`get_attachments_for_note`] — Retrieves local attachment identifiers and
+//!   filesystem paths for a note.
+//! * [`update_attachment_file`] — Replaces the contents of an attachment file
+//!   at the specified filesystem path.
+//! * [`check_attachment_existance`] — Checks whether an attachment exists in
+//!   the local database.
+//!
+//! ## Key design decisions
+//!
+//! Attachment encryption uses [`ChaCha20Poly1305`] with a freshly generated
+//! random nonce for every encrypted attachment. The nonce is stored as
+//! Base64-encoded metadata in SQLite so the attachment can be decrypted later.
+//!
+//! The encryption key is supplied by the caller through [`Key`]. This module
+//! does not persist the encryption key and only stores the nonce required for
+//! decryption.
+//!
+//! The checksum and size recorded for an attachment always describe the exact
+//! bytes stored on disk. For encrypted attachments this therefore means the
+//! encrypted ciphertext, including the authentication tag, rather than the
+//! original plaintext. The same representation can consequently be verified
+//! after synchronization to and from remote storage.
+//!
+//! Attachment filenames on disk are based on the generated UUID rather than
+//! the original filename. The original filename is retained as metadata while
+//! the UUID-based filesystem name avoids collisions and keeps local storage
+//! independent of user-provided filenames.
+//!
+//! Local attachment synchronization is represented through [`SyncState`].
+//! Attachments that exist only locally are removed immediately from the
+//! database when deleted, while synchronized attachments are retained as
+//! tombstones until the cloud synchronization process permanently removes
+//! them.
+//!
+//! Attachment encryption and synchronization state are managed separately.
+//! Changing the state of one does not implicitly perform encryption or file
+//! rewriting; the higher-level application logic is responsible for any
+//! required content transformation.
+//!
+//! ## Dependencies
+//!
+//! * [`chacha20poly1305`] — ChaCha20-Poly1305 authenticated encryption and
+//!   random nonce generation.
+//! * [`base64`] — Encoding and decoding attachment nonces.
+//! * [`rusqlite`] — Local SQLite persistence for attachment metadata and
+//!   synchronization state.
+//! * [`serde`] — Serialization and deserialization of cryptographic metadata.
+//! * [`serde_json`] — Encoding cryptographic metadata stored in SQLite.
+//! * [`uuid`] — Generation and parsing of attachment and note identifiers.
+//! * [`blake3`] — Calculation of checksums for stored attachment bytes.
+//! * [`anyhow`] — Adds contextual information to filesystem, database,
+//!   encryption, and serialization failures.
+//! * [`std::fs`] — Local attachment file creation, reading, writing, and
+//!   deletion.
+//! * [`std::path`] — Filesystem path handling for local attachment storage.
+//! * [`crate::attachments`] — Provides the [`Attachment`] data structure.
+//! * [`crate::storage`] — Provides the [`SyncState`] synchronization state.
+//! * [`crate::utils`] — Provides timestamps used by attachment records.
+//! * [`crate::errors`] — Application-level errors returned by attachment
+//!   operations.
+
 use crate::{attachments::Attachment, storage::SyncState};
 use anyhow::Context;
 use chacha20poly1305::AeadCore;

@@ -1,3 +1,94 @@
+//! # Synchronization command module
+//!
+//! **Purpose**: This module orchestrates the client-side cloud synchronization
+//! workflow between the Tauri application state, the local SQLite database,
+//! the remote synchronization service, and attachment storage.
+//!
+//! It performs full synchronization cycles, refreshes expired access tokens,
+//! processes synchronization instructions, applies local database operations
+//! atomically, retries failed note operations, and periodically runs automatic
+//! synchronization when online sync is enabled.
+//!
+//! ## Exports
+//!
+//! * [`synchronize_all`] — Executes a complete synchronization cycle, including
+//!   connection checks, token refresh, server synchronization checks, uploads,
+//!   downloads, deletions, retries, and final synchronization-state updates.
+//! * [`refresh_access_token`] — Obtains a new access token for an online account
+//!   and stores it in [`AppState`].
+//! * [`run_sync_loop`] — Runs the background synchronization loop that
+//!   periodically triggers [`synchronize_all`] when the application is
+//!   configured for online synchronization.
+//!
+//! ## Key design decisions
+//!
+//! Synchronization is disabled while local mode is active. It is also skipped
+//! when the user has explicitly disabled the `online.sync` setting. These
+//! checks happen before any network or database synchronization work is
+//! started.
+//!
+//! The synchronization workflow is split into a server decision phase and a
+//! client execution phase. The server first determines which notes and
+//! attachments must be uploaded, downloaded, synchronized, or deleted.
+//! [`process_sync_response`] then converts those instructions into filesystem
+//! changes, network operations, and queued [`DbOperation`] values.
+//!
+//! Local SQLite mutations produced by one synchronization response are applied
+//! through a single transaction. This prevents a synchronization batch from
+//! leaving the local database in a partially updated state when one operation
+//! fails.
+//!
+//! Access-token expiration is handled transparently. When a synchronization
+//! request reports [`llava_core::Error::OnlineSessionExpired`], the module
+//! refreshes the online session and retries the synchronization request with
+//! the new token.
+//!
+//! Newly uploaded notes require an additional synchronization pass because
+//! creating a cloud note assigns its server-side MongoDB identifier and
+//! initial cloud version. The second pass allows attachments and subsequent
+//! note state to be evaluated using the newly established cloud identity.
+//!
+//! Failed note synchronizations are collected and retried once more after the
+//! main synchronization processing completes. Notes that still fail after the
+//! retry are marked with [`DbOperation::MarkNoteError`] in the local database.
+//!
+//! Synchronization responses can contain both filesystem operations and
+//! database operations. Files are prepared before the corresponding database
+//! transaction is committed, so database state is not updated to reference
+//! content that could not be successfully downloaded or written.
+//!
+//! Attachment uploads and downloads are delegated to the core synchronization
+//! layer. This command module coordinates the operations and state transitions
+//! but does not directly implement the S3 transfer protocol.
+//!
+//! The background synchronization loop uses a fixed interval and checks local
+//! configuration and authentication state before starting a synchronization
+//! cycle. Synchronization errors are logged without terminating the background
+//! loop, allowing later iterations to continue operating.
+//!
+//! Progress and exceptional synchronization states are communicated to the
+//! frontend through Tauri events such as `sync_progress` and
+//! `quota_exceeded`.
+//!
+//! ## Dependencies
+//!
+//! * [`tauri`] — Tauri commands, managed application state, application handles,
+//!   event emission, and access to application-managed state from background
+//!   tasks.
+//! * [`reqwest`] — HTTP client used for synchronization and authentication
+//!   requests.
+//! * [`tokio`] — Asynchronous synchronization operations, timers, and
+//!   background execution.
+//! * [`serde`] — Serialization of synchronization progress states.
+//! * [`llava_core::sync`] — Core synchronization logic, synchronization data
+//!   structures, database operations, and server communication.
+//! * [`llava_core::online_auth`] — Online session validation and access-token
+//!   refresh logic.
+//! * [`llava_core`] — Provides [`AppState`], application errors, and shared
+//!   configuration structures.
+//! * [`crate::commands::utils`] — Provides connectivity checks before network
+//!   synchronization.
+
 use llava_core::{
     sync::DbOperation,
     AppState,

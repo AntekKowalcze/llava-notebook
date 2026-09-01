@@ -1,3 +1,63 @@
+// Package routes provides the HTTP handler responsible for streaming AI
+// responses into the application's Markdown note editor.
+//
+// Purpose:
+//
+// This package contains the AI request handler that validates incoming prompt
+// data, combines the current document, text selection, and user instruction,
+// sends the resulting context to the configured Google AI model, and streams
+// generated Markdown content back to the client.
+//
+// The handler is designed for incremental response delivery so that the
+// frontend can display generated content while the model is still producing
+// the response.
+//
+// Exports:
+//
+//   - Ai — Validates an AI request, builds the model prompt, invokes the Google
+//     AI streaming API, and writes generated text incrementally to the HTTP
+//     response.
+//
+// Key design decisions:
+//
+// The model receives the document, selection, and instruction as explicitly
+// labeled sections rather than as an unstructured prompt. This keeps the
+// different parts of the editing context distinguishable and allows the
+// system instruction to define how each part should be interpreted.
+//
+// A dedicated system instruction establishes the AI's role as a Markdown
+// editor assistant and constrains the response to content that can be inserted
+// directly into the editor. Explanations, wrapper formats, and Markdown code
+// fences are explicitly disallowed by the prompt.
+//
+// AI output is streamed directly to the client using Fiber's stream writer.
+// The server therefore does not need to buffer the complete generated
+// response before sending it to the frontend.
+//
+// The response is sent as plain UTF-8 text with caching disabled because the
+// client consumes the generated content as an incremental text stream rather
+// than as a structured JSON response.
+//
+// Streaming errors are logged and terminate the stream rather than being
+// serialized into the generated content. This keeps transport or model errors
+// separate from the text consumed by the editor.
+//
+// The Google AI model is invoked with the request context obtained from Fiber,
+// allowing request cancellation or termination to propagate to the model
+// streaming operation.
+//
+// ## Dependencies
+//
+//   - github.com/gofiber/fiber/v3 — HTTP request handling and streaming
+//     response support.
+//   - google.golang.org/genai — Google AI client and streaming content
+//     generation.
+//   - llava-server/middleware — Standardized request validation error
+//     responses.
+//   - llava-server/models — Definition of the incoming AI request payload.
+//   - bufio — Buffered HTTP stream writing.
+//   - fmt — Construction of the structured user prompt.
+//   - log — Logging of streaming and response-writing failures.
 package routes
 
 import (

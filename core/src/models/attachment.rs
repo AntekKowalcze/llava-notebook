@@ -21,3 +21,6 @@ pub struct Attachment {
     pub created_at: i64,
     pub updated_at: i64,
 }
+
+//TODO add documentation to all files and update old documentation, then add logs in file where logs are not added, then just put server on server, host mongodb locally on server and create binaries for aplitacion and share them to peoples
+//but before deploying to people test app on windows

@@ -52,7 +52,6 @@ async function submitRegister() {
       toast.error('Settings not loaded. Try again.');
       return;
     }
-    console.log(userConfig.settingList + ' to jest lista');
     userConfig.updateSettingValue('local.mode', 'off');
     await invoke<void>('register_user_online', {
       email: email.value,
@@ -61,7 +60,6 @@ async function submitRegister() {
       currentSettings: userConfig.settingList,
     });
 
-    console.log('Registration success');
     onlineAuthStore.$patch({
       loggedIn: true,
       loggedInEmail: email.value,
@@ -70,7 +68,6 @@ async function submitRegister() {
     await router.replace('/main/');
   } catch (err: any) {
     userConfig.updateSettingValue('local.mode', 'on');
-    console.log(err);
     const errorKey =
       typeof err === 'string'
         ? err

@@ -127,7 +127,6 @@ async function hardDeleteNote(note: RemovedNote) {
     await invoke<void>('hard_delete_note', { noteId: note.local_id });
     await loadRemovedNotes();
   } catch (err) {
-    console.log(err);
     toast.error('Failed to delete note');
   }
 }
@@ -137,7 +136,6 @@ async function restoreNote(note: RemovedNote) {
     await invoke<void>('restore_note', { noteId: note.local_id });
     await loadRemovedNotes();
   } catch (err) {
-    console.log(err);
     toast.error('Failed to restore note');
   }
 }

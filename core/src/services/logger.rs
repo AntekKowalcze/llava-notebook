@@ -34,10 +34,6 @@ use std::{fmt::Debug, fs::OpenOptions};
 use tracing_subscriber::Layer;
 use tracing_subscriber::{Registry, fmt, layer::SubscriberExt};
 
-pub fn log_success(log_content: &str) {
-    println!("✅ {}", log_content)
-}
-
 pub fn log_error<T>(log_content: &str, error: T)
 where
     T: Debug,

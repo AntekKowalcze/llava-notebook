@@ -1,3 +1,51 @@
+//! # Deleted note cleanup module
+//!
+//! **Purpose**: This module identifies notes whose soft-deletion retention
+//! period has expired and permanently removes them from local storage.
+//!
+//! It queries the local SQLite database for deleted notes older than the
+//! configured hard-delete threshold and delegates the actual permanent
+//! deletion to the storage layer.
+//!
+//! ## Exports
+//!
+//! * [`hard_deletes_terminated_notes`] — Finds notes whose deletion period has
+//!   expired, permanently removes them from local storage, and returns their
+//!   local identifiers.
+//!
+//! ## Key design decisions
+//!
+//! Hard deletion is performed only after the configured retention period has
+//! elapsed. The expiration timestamp is calculated from the current UTC time
+//! and [`crate::constants::HARD_DELETE_TIME`].
+//!
+//! The database query is performed before deleting any files so that the set
+//! of notes to process is determined consistently for the cleanup operation.
+//!
+//! Individual deletion failures are logged but do not abort the cleanup of
+//! other expired notes. This allows the cleanup process to make progress even
+//! when one note cannot currently be removed.
+//!
+//! The actual deletion logic is delegated to
+//! [`crate::storage::hard_delete_note`], keeping filesystem and database
+//! deletion responsibilities outside this module.
+//!
+//! ## Dependencies
+//!
+//! * [`rusqlite`] — Queries the local SQLite database for expired deleted
+//!   notes.
+//! * [`anyhow`] — Adds context to database query failures.
+//! * [`std::path::Path`] — Provides the path to temporary deleted-note
+//!   storage.
+//! * [`crate::constants`] — Provides the configured hard-delete retention
+//!   period.
+//! * [`crate::storage`] — Performs permanent deletion of note data.
+//! * [`crate::utils`] — Provides the current UTC timestamp.
+//! * [`crate::errors`] — Application-level error type returned by the cleanup
+//!   operation.
+//! * [`tracing`] — Logs successful cleanup completion and individual deletion
+//!   failures.
+
 use anyhow::Context;
 use rusqlite::{Connection, named_params};
 use std::path::Path;

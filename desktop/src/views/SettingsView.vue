@@ -184,7 +184,7 @@ async function handleChange(id: string, value: string) {
 }
 
 async function handleUpdate(id: string) {
-  console.log(id);
+  
   switch (id) {
     case 'local.logout': {
       try {
@@ -218,7 +218,7 @@ async function handleUpdate(id: string) {
 
         toast.success('backup loaded successfully');
       } catch (err) {
-        console.log(err);
+        
         toast.error('failed to load backup config');
       }
       break;
@@ -228,7 +228,7 @@ async function handleUpdate(id: string) {
         logContents.value = await invoke<string>('get_logfile_content');
         showLogs.value = true;
       } catch (err) {
-        console.log(err);
+        
         toast.error('failed to show logs');
       }
       break;
@@ -252,24 +252,12 @@ async function handleUpdate(id: string) {
         showPasswordInput.value = false;
       } catch (err) {
         codesLoading.value = false;
-        console.log(err);
 
         toast.error('failed to generate codes');
       }
       break;
     }
-    // case 'local.changeUsername': {
-    //   try {
-    //     showUsernameInput.value = true;
-    //   } catch (err) {
-    //     showUsernameInput.value = false;
-    //     newUsername.value = '';
-    //     console.log(err);
-    //     toast.error('failed to change username');
-    //   }
-     
-    //   break;
-    // }
+   
     case 'local.changePassword': {
       router.replace({ name: 'recovery', query: { origin: 'settings' } });
       break;
@@ -285,7 +273,6 @@ async function handleUpdate(id: string) {
         authStore.linked = false;
         toast.success('Disconnected online account from local account successfully. Notes synchronized with this account will be removed from this device. Local-only notes will remain.');
       } catch (err: any) {
-        console.log(err);
         if (err?.NoInternetConnection) {
           toast.error('No internet connection. Try again later.');
         } else if (err?.RequestError) {

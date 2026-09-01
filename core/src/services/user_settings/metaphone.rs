@@ -1,3 +1,57 @@
+//! # Phonetic search index module
+//!
+//! **Purpose**: This module provides a phonetic search index used to associate
+//! user search terms with application settings and other searchable entries.
+//!
+//! It maintains a static phonetic corpus and converts its keys and associated
+//! words into Metaphone representations. The resulting index maps phonetic
+//! keys to one or more corpus entries that can be matched during fuzzy search.
+//!
+//! ## Exports
+//!
+//! * [`PHONETIC_CORPUS`] — Static mapping of searchable setting identifiers to
+//!   words and phrases associated with their meaning.
+//! * [`create_metaphone_map`] — Builds the runtime phonetic index from
+//!   [`PHONETIC_CORPUS`] and removes duplicate entries for each phonetic key.
+//!
+//! ## Key design decisions
+//!
+//! [`PHONETIC_CORPUS`] is stored as a compile-time [`phf::Map`] so that the
+//! corpus itself does not require runtime allocation or initialization.
+//!
+//! [`create_metaphone_map`] uses a temporary [`HashSet`] for each phonetic key
+//! to deduplicate corpus entries before converting the values into sorted
+//! vectors. Sorting the final vectors makes the generated index deterministic
+//! even though [`HashSet`] does not preserve insertion order.
+//!
+//! Input strings are normalized before phonetic encoding by removing dots and
+//! other non-alphanumeric characters. This is particularly important for
+//! structured setting identifiers such as `local.mode` and `online.login`,
+//! allowing their identifiers to participate in the same phonetic index as
+//! ordinary search words.
+//!
+//! The local [`metaphone`] implementation is intentionally kept inside this
+//! module rather than relying on an external runtime dependency. It implements
+//! the phonetic transformations required by the application's search corpus,
+//! including common English digraphs, silent prefixes and suffixes, and
+//! consonant substitutions.
+//!
+//! The phonetic corpus is designed to be updated manually when the searchable
+//! settings or their supported search vocabulary change.
+//!
+//! ## Dependencies
+//!
+//! * [`phf`] — Provides the compile-time map used for the static phonetic
+//!   corpus.
+//! * [`phf_macros`] — Provides the [`phf_map!`] macro used to construct
+//!   [`PHONETIC_CORPUS`].
+//! * [`std::collections::HashMap`] — Stores the generated runtime phonetic
+//!   index.
+//! * [`std::collections::HashSet`] — Deduplicates entries associated with the
+//!   same phonetic key.
+//! * [`#[test]`] — Provides unit tests for the phonetic transformation and
+//!   generated corpus.
+
 use phf_macros::phf_map;
 use std::collections::{HashMap, HashSet};
 //Metaphone algoritm index, update on setting content change

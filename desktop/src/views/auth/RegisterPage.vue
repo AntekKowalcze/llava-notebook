@@ -49,7 +49,6 @@ async function submitRegister() {
     });
     keys.value = recoveryKeys;
 
-    console.log('Registration success');
     authStore.$patch({
       loggedIn: true,
       loggedInUsername: username.value,
@@ -57,7 +56,6 @@ async function submitRegister() {
       hasNoUsers: false,
       recoveryKeys: keys.value,
     });
-    console.log(authStore.loggedIn, authStore.loggedInUsername);
     toast.success('successfully regisered local user account');
     await router.replace({ name: 'recoveryCodes' });
   } catch (err: any) {

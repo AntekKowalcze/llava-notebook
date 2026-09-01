@@ -1,3 +1,68 @@
+//! # Note list data module
+//!
+//! **Purpose**: This module prepares note metadata for presentation in the
+//! user interface.
+//!
+//! It retrieves active and recently removed notes from the local SQLite
+//! database, resolves their synchronization state and tag relationships, and
+//! decrypts note titles when encryption is enabled.
+//!
+//! ## Exports
+//!
+//! * [`NoteCard`] — Serializable representation of an active note containing
+//!   the data required by the note list UI.
+//! * [`get_all_notes_data`] — Retrieves active notes for a user, loads their
+//!   tags, converts database synchronization states, and decrypts encrypted
+//!   note titles.
+//! * [`RemovedNote`] — Serializable representation of a recently removed note
+//!   shown in the deleted-notes UI.
+//! * [`get_all_removed_notes_data`] — Retrieves notes that are still within the
+//!   configured deletion-retention period and resolves their display titles.
+//!
+//! ## Key design decisions
+//!
+//! Note list queries are scoped by `owner_id` so that only notes belonging to
+//! the requested local user are returned.
+//!
+//! Soft-deleted notes are excluded from the active note list. They are exposed
+//! separately through [`get_all_removed_notes_data`] while they remain within
+//! the configured [`crate::constants::HARD_DELETE_TIME`] retention period.
+//!
+//! Encrypted note titles are decrypted only when data is prepared for the
+//! user interface. The database therefore continues to store the protected
+//! representation while the UI receives the readable title.
+//!
+//! Tags are loaded in a separate query and grouped by local note identifier.
+//! This avoids executing a separate SQL query for every note and allows tag
+//! data to be attached to [`NoteCard`] values efficiently.
+//!
+//! Synchronization states are stored in SQLite as strings and explicitly
+//! converted into [`SyncState`] variants. Unknown database values are treated
+//! as internal errors rather than silently falling back to a valid state.
+//!
+//! The module exposes only the metadata required by the UI through
+//! [`NoteCard`] and [`RemovedNote`] instead of returning database rows
+//! directly.
+//!
+//! ## Dependencies
+//!
+//! * [`rusqlite`] — Queries the local SQLite database for notes and tags.
+//! * [`serde`] — Serialization and deserialization of UI-facing note data.
+//! * [`chacha20poly1305`] — Provides the note encryption key type required by
+//!   title decryption.
+//! * [`anyhow`] — Adds context to database operations and intermediate
+//!   failures.
+//! * [`std::collections::HashMap`] — Groups tags by note identifier.
+//! * [`tracing`] — Logs note retrieval, tag processing, decryption, and
+//!   synchronization-state failures.
+//! * [`crate::crypto`] — Decrypts titles of encrypted notes.
+//! * [`crate::storage`] — Provides the [`SyncState`] synchronization states.
+//! * [`crate::tags`] — Provides the [`UiTag`] representation used by the UI.
+//! * [`crate::constants`] — Provides the hard-delete retention period.
+//! * [`crate::errors`] — Provides application-level errors returned by this
+//!   module.
+//! * [`crate::utils`] — Provides shared structured logging helpers.
+
 use crate::{storage::SyncState, tags::UiTag};
 use anyhow::Context;
 use chacha20poly1305::Key;
