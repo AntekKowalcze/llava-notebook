@@ -39,7 +39,7 @@ pub mod storage {
     pub use crate::services::storage::note_operations::update_title;
     pub use crate::services::storage::note_operations::{
         check_if_note_is_encrypted, check_if_note_is_synced, get_note, get_note_content,
-        toggle_note_encryption, toggle_note_sync, verify_note_owner,
+        toggle_note_encryption, toggle_note_sync, verify_note_owner, resolve_attachment_protocol
     };
     pub use crate::services::storage::update::update_md;
 }

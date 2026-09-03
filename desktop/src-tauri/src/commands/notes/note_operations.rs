@@ -117,7 +117,7 @@ pub async fn get_note_content(
         .lock()
         .map_err(|_| llava_core::Error::LockError)? =
         Some(uuid::Uuid::from_str(&note_id).context("failed to parse uuid")?);
-    let note_content = llava_core::storage::get_note_content(&note.content_path)?;
+    let mut note_content = llava_core::storage::get_note_content(&note.content_path)?;
 
     if note.encrypted {
         let notes_key = {
@@ -149,10 +149,10 @@ pub async fn get_note_content(
             )?
         };
 
-        Ok(content)
-    } else {
-        Ok(note_content)
-    }
+        note_content = content;
+    } 
+    note_content = llava_core::storage::resolve_attachment_protocol(&note_content);
+    Ok(note_content)
 }
 #[tauri::command]
 pub async fn save_note(

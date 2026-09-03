@@ -89,9 +89,6 @@ async function loadNoteContent(id: string): Promise<string> {
     if (currentNoteStore.currentNote?.local_id !== id) {
       currentNoteStore.currentNote = await invoke<Note>('get_note_object', { noteId: id });
     }
-    if (currentNoteStore.currentNote?.local_id !== id) {
-      currentNoteStore.currentNote = await invoke('get_note', { noteId: id });
-    }
 
     if (contentFromDb.trim() === '') {
       return defaultValue.value;

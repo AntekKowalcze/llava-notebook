@@ -96,6 +96,7 @@ use rusqlite::{Connection, OptionalExtension, named_params, params};
 use std::fs;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
+use regex::Regex;
 
 use crate::{Note, crypto::decrypt_title, errors::Error, storage::SyncState};
 
@@ -915,3 +916,23 @@ pub fn check_if_note_is_synced(
     };
     Ok(synced)
 }
+
+pub fn resolve_attachment_protocol(content: &str) -> String {
+  // Windows-style: http://attachment.localhost/<id>  (or https:// on older Tauri versions)
+    let windows_re = Regex::new(r"https?://attachment\.localhost/([A-Za-z0-9%\-_]+)").unwrap();
+    // Unix-style: attachment://localhost/<id>
+    let unix_re = Regex::new(r"attachment://localhost/([A-Za-z0-9%\-_]+)").unwrap();
+
+    #[cfg(target_os = "windows")]
+    {
+        // content came from Linux/macOS -> rewrite unix-style to windows-style
+        unix_re.replace_all(content, "http://attachment.localhost/$1").into_owned()
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        // content came from Windows -> rewrite windows-style to unix-style
+        windows_re.replace_all(content, "attachment://localhost/$1").into_owned()
+    }
+}
+
