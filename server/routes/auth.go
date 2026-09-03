@@ -120,6 +120,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
+	"errors"
 	"llava-server/config"
 	"llava-server/middleware"
 	"llava-server/models"
@@ -317,58 +318,121 @@ type LoginRequest struct {
 
 func (h *Handler) Login(c fiber.Ctx) error {
 	var request = new(LoginRequest)
+
 	err := c.Bind().Body(request)
 	if err != nil {
 		return middleware.BadRequest("no body")
 	}
+
 	if err := h.Validator.Struct(request); err != nil {
 		return middleware.BadRequest("Wrong user struct was sent")
 	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
 	usersColl := h.DB.Collection("users_data")
-	res := usersColl.FindOne(ctx, bson.M{"email": request.Email})
+
+	res := usersColl.FindOne(
+		ctx,
+		bson.M{"email": request.Email},
+	)
+
 	var user models.User
 
 	if err := res.Decode(&user); err != nil {
 		return middleware.Unauthorized("invalid_credentials")
 	}
 
-	deviceColl := h.DB.Collection("devices")
-
-	res = deviceColl.FindOne(ctx, bson.M{"user_id": user.ID, "device_id": request.DeviceID})
-	var device models.Device
-	if err := res.Decode(&device); err != nil {
-		return middleware.Unauthorized("invalid_credentials")
-	}
-
 	now := time.Now().UnixMilli()
+
 	if user.LockoutUntil != nil && now < *user.LockoutUntil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"timeout": *user.LockoutUntil,
 		})
 	}
+
 	pepperSecret, err := config.GetPepperSecret()
 	if err != nil {
 		log.Errorf("register: failed to get pepper secret: %v", err)
 		return middleware.Internal("Internal server configuration error")
 	}
+
 	mac := hmac.New(sha256.New, pepperSecret)
 	mac.Write([]byte(request.PasswordHash))
 	passwordVerifier := mac.Sum(nil)
 
-	if subtle.ConstantTimeCompare([]byte(user.PasswordVerifier), []byte(passwordVerifier)) == 1 {
-		accessToken, err := middleware.GenerateAccessToken(device.DeviceID, user.ID.Hex())
+	if subtle.ConstantTimeCompare(
+		[]byte(user.PasswordVerifier),
+		[]byte(passwordVerifier),
+	) == 1 {
+
+		deviceColl := h.DB.Collection("devices")
+
+		var device models.Device
+
+		err := deviceColl.FindOne(
+			ctx,
+			bson.M{
+				"user_id":   user.ID,
+				"device_id": request.DeviceID,
+			},
+		).Decode(&device)
+
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			device = models.Device{
+				UserID:    *user.ID,
+				DeviceID:  request.DeviceID,
+				CreatedAt: time.Now().UnixMilli(),
+				LastSeen:  time.Now().UnixMilli(),
+			}
+
+			if _, err := deviceColl.InsertOne(ctx, device); err != nil {
+				log.Errorf("login: failed to register device: %v", err)
+				return middleware.Internal("Couldnt register device")
+			}
+		} else if err != nil {
+			log.Errorf("login: failed to find device: %v", err)
+			return middleware.Internal("Couldnt load device")
+		} else {
+			_, err := deviceColl.UpdateOne(
+				ctx,
+				bson.M{
+					"user_id":   user.ID,
+					"device_id": request.DeviceID,
+				},
+				bson.M{
+					"$set": bson.M{
+						"last_seen": time.Now().UnixMilli(),
+					},
+				},
+			)
+
+			if err != nil {
+				log.Errorf("login: failed to update device last seen: %v", err)
+				return middleware.Internal("Couldnt update device")
+			}
+		}
+
+		accessToken, err := middleware.GenerateAccessToken(
+			device.DeviceID,
+			user.ID.Hex(),
+		)
+
 		if err != nil {
 			return middleware.Internal("Couldnt generate Access Token")
 		}
+
 		jti, signature, err := middleware.GenerateRefreshToken()
+
 		if err != nil {
 			return middleware.Internal("Couldnt generate Refresh Token")
 		}
 
 		jwtColl := h.DB.Collection("jwt")
+
 		refreshInsert := new(models.RefreshToken)
+
 		refreshInsert.CreatedAt = time.Now().UnixMilli()
 		refreshInsert.ExpiresAt = time.Now().Add(30 * 24 * time.Hour).UnixMilli()
 		refreshInsert.JTI = jti.String()
@@ -380,12 +444,17 @@ func (h *Handler) Login(c fiber.Ctx) error {
 			return middleware.Internal("couldn't save refresh token")
 		}
 
-		usersColl.UpdateOne(ctx, bson.M{"_id": user.ID}, bson.M{
-			"$set": bson.M{
-				"last_login":      time.Now().UnixMilli(),
-				"failed_attempts": 0,
+		usersColl.UpdateOne(
+			ctx,
+			bson.M{"_id": user.ID},
+			bson.M{
+				"$set": bson.M{
+					"last_login":      time.Now().UnixMilli(),
+					"failed_attempts": 0,
+				},
 			},
-		})
+		)
+
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{
 			"access_token":     accessToken,
 			"refresh_token":    jti.String() + "." + signature,
@@ -397,21 +466,38 @@ func (h *Handler) Login(c fiber.Ctx) error {
 		})
 
 	} else {
+
 		failedAttempts := user.FailedAttempts + 1
-		if _, err := usersColl.UpdateOne(ctx, bson.M{"_id": user.ID}, bson.M{
-			"$set": bson.M{
-				"failed_attempts": failedAttempts,
+
+		if _, err := usersColl.UpdateOne(
+			ctx,
+			bson.M{"_id": user.ID},
+			bson.M{
+				"$set": bson.M{
+					"failed_attempts": failedAttempts,
+				},
 			},
-		}); err != nil {
+		); err != nil {
 			return middleware.Unauthorized("wrong password")
 		}
 
 		if (user.FailedAttempts+1)%5 == 0 {
 			timeoutUntil := time.Now().Add(30 * time.Second).UnixMilli()
-			_, err = usersColl.UpdateOne(ctx, bson.M{"_id": user.ID}, bson.M{"$set": bson.M{"lockout_until": timeoutUntil}})
+
+			_, err = usersColl.UpdateOne(
+				ctx,
+				bson.M{"_id": user.ID},
+				bson.M{
+					"$set": bson.M{
+						"lockout_until": timeoutUntil,
+					},
+				},
+			)
+
 			if err != nil {
 				return middleware.Internal("Internal Error")
 			}
+
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"timeout": timeoutUntil,
 			})

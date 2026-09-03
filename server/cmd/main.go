@@ -88,5 +88,5 @@ func main() {
 	if err := h.RegisterJwtRoutes(app); err != nil {
 		log.Fatal(err)
 	}
-	log.Fatal(app.Listen("127.0.0.1:8080"))
+	log.Fatal(app.Listen("127.0.0.1:3000"))
 }
