@@ -88,5 +88,6 @@ func main() {
 	if err := h.RegisterJwtRoutes(app); err != nil {
 		log.Fatal(err)
 	}
-	log.Fatal(app.Listen("127.0.0.1:3000"))
+	address := os.Getenv("LISTEN_ADDRESS")
+	log.Fatal(app.Listen(address))
 }
