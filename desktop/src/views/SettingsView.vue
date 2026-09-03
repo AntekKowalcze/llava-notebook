@@ -311,7 +311,7 @@ async function handleUpdate(id: string) {
       await emit("reload-left-panel")
       break;
     }
-     case 'online.ai': {
+     case 'online.aiFeatures': {
         toast.success("Remember that using Ai features means that your information may be used to train Ai models. Use it responsibly.")
         break;
     }

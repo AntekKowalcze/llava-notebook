@@ -42,7 +42,6 @@ pub fn register(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wr
     builder.register_asynchronous_uri_scheme_protocol("attachment", handle_request)
 }
 
-#[cfg(not(windows))]
 fn handle_request(
     ctx: tauri::UriSchemeContext<'_, tauri::Wry>,
     request: http::Request<Vec<u8>>,
@@ -50,7 +49,6 @@ fn handle_request(
 ) {
     #[cfg(windows)]
     let attachment_id = request.uri().path().trim_start_matches('/').to_string();
-
     #[cfg(not(windows))]
     let attachment_id = request.uri().host().unwrap_or_default().to_string();
 
