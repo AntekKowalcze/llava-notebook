@@ -136,7 +136,7 @@ fn creating_tables(
     Ok(notes_db)
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Clone)]
 pub enum SyncState {
     LocalOnly,
     PendingUpload,

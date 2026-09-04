@@ -292,7 +292,6 @@ async function saveNote(id: string = noteId.value): Promise<boolean> {
       nextSaveToEncryption: encryptionChangedTo,
     });
     await emit('note-saved');
-    Error('test');
 
     if (currentNoteStore.currentNote && currentNoteStore.currentNote.local_id === id) {
       currentNoteStore.currentNote.updated_at = Date.now();

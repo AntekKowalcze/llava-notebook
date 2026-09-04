@@ -936,3 +936,10 @@ pub fn resolve_attachment_protocol(content: &str) -> String {
     }
 }
 
+
+
+pub fn change_sync_to_pending_upload(notes_db: &Connection, note_id: &str) -> Result<(), crate::errors::Error> {
+notes_db.execute("UPDATE notes SET sync_state = 'PendingUpload' WHERE local_id = ?1", params![note_id]).context("Failed to update sync_state")?;
+Ok(())
+
+}

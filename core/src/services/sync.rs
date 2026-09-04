@@ -236,6 +236,7 @@ pub fn get_all_notes_to_sync(
         (
             String,
             Option<String>,
+            SyncState,
             bool,
             Option<i64>,
             Vec<AttachmentSyncCheck>,
@@ -281,6 +282,7 @@ pub fn get_all_notes_to_sync(
             (
                 local_id.clone(),
                 cloud_id.clone(),
+                sync_state,
                 note_hard_deleted,
                 cloud_version,
                 Vec::new(),
@@ -331,7 +333,7 @@ pub fn get_all_notes_to_sync(
             }
         };
 
-        entry.4.push(AttachmentSyncCheck {
+        entry.5.push(AttachmentSyncCheck {
             attachment_id,
             checksum_encrypted: checksum_encrypted.unwrap(),
             size_bytes: size_bytes.unwrap(),
@@ -344,13 +346,14 @@ pub fn get_all_notes_to_sync(
             crypto_metadata: metadata,
         });
     }
-
-    Ok(notes
-        .into_values()
-        .map(
-            |(local_id, cloud_id, hard_deleted, cloud_version, attachments)| CheckNoteSyncStatus {
+Ok(notes
+    .into_values()
+    .map(
+        |(local_id, cloud_id, sync_state, hard_deleted, cloud_version, attachments)| {
+            CheckNoteSyncStatus {
                 local_id,
                 cloud_id,
+                sync_state,
                 hard_deleted,
                 cloud_version,
                 attachments: if attachments.is_empty() {
@@ -358,11 +361,11 @@ pub fn get_all_notes_to_sync(
                 } else {
                     Some(attachments)
                 },
-            },
-        )
-        .collect())
+            }
+        },
+    )
+    .collect())
 }
-
 pub fn get_note_for_upload(
     conn: &Connection,
     local_id: &str,

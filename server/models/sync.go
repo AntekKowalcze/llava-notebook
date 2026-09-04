@@ -16,8 +16,8 @@ type CheckSyncRequest struct {
 }
 
 type CheckNoteSyncStatus struct {
-	LocalID string `bson:"local_id" json:"local_id" validate:"required"`
-
+	LocalID     string         `bson:"local_id" json:"local_id" validate:"required"`
+	SyncState   string         `json:"sync_state" validate:"required"`
 	CloudID     *bson.ObjectID `bson:"_id,omitempty" json:"cloud_id,omitempty"`
 	HardDeleted bool           `bson:"hard_deleted" json:"hard_deleted"`
 

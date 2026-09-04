@@ -296,8 +296,10 @@ pub async fn save_note(
                     notes_db, true, &note_id,
                 )?;
             }
-            llava_core::storage::toggle_note_encryption(note_id, notes_db, next_value)?;
+            llava_core::storage::toggle_note_encryption(note_id.clone(), notes_db, next_value)?;
         }
+
+        let _ = llava_core::storage::change_sync_to_pending_upload(notes_db, &note_id);
     }
 
     Ok(())

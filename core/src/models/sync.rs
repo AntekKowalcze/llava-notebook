@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{crypto::NoteCryptoMetadata, services::attachment::AttachmentCryptoMetadata};
+use crate::{crypto::NoteCryptoMetadata, services::attachment::AttachmentCryptoMetadata, storage::SyncState};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CheckSyncRequest {
@@ -14,6 +14,7 @@ pub struct CheckSyncRequest {
 pub struct CheckNoteSyncStatus {
     pub local_id: String,
     pub cloud_id: Option<String>,
+    pub sync_state: SyncState,
     pub hard_deleted: bool,
     pub cloud_version: Option<i64>,
     pub attachments: Option<Vec<AttachmentSyncCheck>>,

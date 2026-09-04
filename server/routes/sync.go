@@ -422,21 +422,25 @@ func checkNoteSync(
 		return result, nil
 	}
 
-	if foundNote.CloudVersion > *note.CloudVersion {
-		result.NotesToDownload = append(
-			result.NotesToDownload,
-			*foundNote,
-		)
-	} else if foundNote.CloudVersion < *note.CloudVersion {
+	switch note.SyncState {
+	case "PendingForUpload":
 		result.NotesToUpload = append(
 			result.NotesToUpload,
 			note.LocalID,
 		)
-	} else {
-		result.SyncedNotes = append(
-			result.SyncedNotes,
-			note.LocalID,
-		)
+
+	default:
+		if foundNote.CloudVersion > *note.CloudVersion {
+			result.NotesToDownload = append(
+				result.NotesToDownload,
+				*foundNote,
+			)
+		} else if foundNote.CloudVersion == *note.CloudVersion {
+			result.SyncedNotes = append(
+				result.SyncedNotes,
+				note.LocalID,
+			)
+		}
 	}
 
 	attachmentGroup, attachmentCtx := errgroup.WithContext(ctx)
@@ -1638,7 +1642,7 @@ func (s *SyncHandler) UpdateNote(c fiber.Ctx) error {
 			"mongo_id", mongoID,
 			"error", err,
 		)
-
+		// TODO on 16:9 dashboard is to long
 		return middleware.BadRequest("Invalid mongo_id in path")
 	}
 

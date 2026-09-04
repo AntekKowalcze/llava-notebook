@@ -151,7 +151,7 @@ onUnmounted(() => clearInterval(interval));
       @click="redirect"
     ></ArrowBigLeftDash>
     <!-- greeting -->
-    <div class="relative mt-4 flex items-center justify-center py-10">
+    <div class="relative mt-4 flex items-center justify-center py-5">
       <div class="absolute left-[12.5%]">
         <IconComponent
           :width="'w-44'"
@@ -174,7 +174,7 @@ onUnmounted(() => clearInterval(interval));
     <!-- reszta dashboardu niżej -->
     <div class="flex-1 flex-col items-start">
       <div class="mb-4 h-fit">
-        <p class="mb-0 ml-[12.5%] mt-10 text-3xl font-semibold text-note-ivory">
+        <p class="mb-0 ml-[12.5%] mt-5 text-3xl font-semibold text-note-ivory">
           This is your activity in Llava app
         </p>
       </div>
@@ -265,7 +265,7 @@ onUnmounted(() => clearInterval(interval));
     </div>
   </div>
 
-  <div class="mt-6 px-[12.5%] pb-10">
+  <div class="mt-6 px-[12.5%] pb-4">
     <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
       <!-- Recently edited -->
       <div
