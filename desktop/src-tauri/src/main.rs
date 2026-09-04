@@ -86,6 +86,7 @@ pub fn main() {
                 crate::commands::utils::start_connection_monitor(handle.clone());
                 let handle = app.handle().clone();
                 tauri::async_runtime::spawn(async move {
+                    let _ = crate::commands::sync::sync::first_sync(handle.clone()).await;
                     crate::commands::sync::sync::run_sync_loop(handle).await;
                 });
             }

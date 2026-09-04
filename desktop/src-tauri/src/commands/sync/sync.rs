@@ -422,6 +422,7 @@ async fn process_sync_response(
             next_steps.notes_to_download.clone(),
             notes_db,
             &paths.notes_path,
+            &paths.delete_tmp_path,
             user_id,
         )?;
 
@@ -548,7 +549,6 @@ fn deduplicate_ids(ids: Vec<String>) -> Vec<String> {
 
 pub async fn run_sync_loop(app_handle: AppHandle) {
     let mut ticker = tokio::time::interval(tokio::time::Duration::from_secs(60));
-
     loop {
         ticker.tick().await;
 
@@ -587,3 +587,47 @@ pub async fn run_sync_loop(app_handle: AppHandle) {
         }
     }
 }
+
+pub async fn first_sync(app_handle: AppHandle)  {
+      tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+      let state: tauri::State<'_, AppState> = app_handle.state::<AppState>();
+
+        let (is_local_only, is_online_sync_off, has_user_id) = {
+            let config = state.user_config.lock().unwrap();
+            let user_id = state.online_user_id.lock().unwrap();
+
+            let local = config
+                .as_ref()
+                .and_then(|m| m.get("local.mode"))
+                .map(|v| v == "on")
+                .unwrap_or(false);
+
+            let sync_off = config
+                .as_ref()
+                .and_then(|m| m.get("online.sync"))
+                .map(|v| v == "off")
+                .unwrap_or(false);
+
+            (local, sync_off, user_id.is_some())
+        };
+
+        if is_local_only || is_online_sync_off || !has_user_id {
+             tracing::warn!(
+        is_local_only,
+        is_online_sync_off,
+        has_user_id,
+        "first_sync skipped"
+    );
+            return;
+        }
+        if let Err(e) = synchronize_all(state, app_handle.clone()).await {
+            tracing::error!(
+                task = "auto sync",
+                status = "error",
+                %e,
+                "error"
+            );
+
+}
+}
+// TODO soft delete note after sync is not working when note was opened on another device, also restoring deleted note is not working

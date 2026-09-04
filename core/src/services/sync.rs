@@ -1502,6 +1502,7 @@ pub fn handle_notes_to_download(
     notes_to_download: Vec<DownloadNote>,
     notes_db: &Connection,
     notes_path: &std::path::Path,
+    tmp_deleted_path: &std::path::Path,
     user_id: String,
 ) -> Result<Vec<DbOperation>, crate::errors::Error> {
     let mut operations = Vec::with_capacity(notes_to_download.len());
@@ -1533,8 +1534,14 @@ pub fn handle_notes_to_download(
         } else {
             NOTE_EXTENSION
         };
+let file_path: path::PathBuf;
+        if note.is_deleted  {
+        file_path = tmp_deleted_path.join(format!("{}.{}", local_id, extension))
 
-        let file_path = notes_path.join(format!("{}.{}", local_id, extension));
+        }else {
+         file_path = notes_path.join(format!("{}.{}", local_id, extension));
+
+        }
 
         let bytes_to_write = if note.is_encrypted {
             note.content.into_bytes()
