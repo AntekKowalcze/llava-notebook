@@ -50,7 +50,7 @@ onUnmounted(() => {
 
 </script>
 <template>
-  <div class="flex h-dvh flex-col overflow-hidden bg-note-graphite bg-cover bg-center">
+  <div class="flex h-full min-h-0 flex-col overflow-hidden bg-note-graphite bg-cover bg-center">
     <TitleBar class="shrink-0"></TitleBar>
     <session-expired></session-expired>
     <div
@@ -62,6 +62,8 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <router-view />
+    <div class="min-h-0 flex-1 overflow-hidden">
+      <router-view />
+    </div>
   </div>
 </template>
