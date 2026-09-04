@@ -3128,6 +3128,7 @@ dependencies = [
  "jsonwebtoken",
  "llava_core",
  "mime",
+ "regex",
  "reqwest",
  "rusqlite",
  "serde",

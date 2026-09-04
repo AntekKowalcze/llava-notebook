@@ -43,6 +43,7 @@ http = "1.5.0"
 mime = "0.3.17"
 futures-util = { version = "0.3.34", features = ["channel"] }
 encoding_rs = "0.8.35"
+regex = "1.13.1"
 
 [profile.release]
 opt-level = "s"

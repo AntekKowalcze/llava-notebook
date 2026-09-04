@@ -108,8 +108,8 @@ fn program_flow() {
     assert_eq!(title, "integration test");
     assert!(!summary.is_empty());
 
-    let note_content = llava_core::storage::read_note_content(&program_paths, note_name.clone())
-        .expect("failed to read content from file");
+    let note_content =
+        llava_core::storage::get_note_content(&program_paths.notes_path.join(note_name)).unwrap();
     assert!(!note_content.is_empty(), "Note content should not be empty");
 
     llava_core::storage::delete_note(

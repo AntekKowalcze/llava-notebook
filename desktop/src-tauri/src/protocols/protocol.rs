@@ -48,7 +48,6 @@ fn handle_request(
     responder: tauri::UriSchemeResponder,
 ) {
     let attachment_id = request.uri().path().trim_start_matches('/').to_string();
-
     let app_handle = ctx.app_handle().clone();
 
     std::thread::spawn(move || {
