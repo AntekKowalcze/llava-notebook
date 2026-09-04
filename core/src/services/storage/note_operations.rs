@@ -92,11 +92,11 @@
 //! losing information about the permanent deletion while the device is offline.
 use anyhow::Context;
 use chacha20poly1305::Key;
+use regex::Regex;
 use rusqlite::{Connection, OptionalExtension, named_params, params};
 use std::fs;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
-use regex::Regex;
 
 use crate::{Note, crypto::decrypt_title, errors::Error, storage::SyncState};
 
@@ -572,15 +572,16 @@ pub fn remove_note(
     let deleted_at = crate::utils::get_time();
     tx.execute(
         r#"
-        UPDATE notes
-        SET
-            is_deleted = 1,
-            deleted_at = ?1,
-            sync_state = ?2,
-            updated_at = ?1
-        WHERE local_id = ?3
-        "#,
-        params![deleted_at, new_sync_state, note_id],
+    UPDATE notes
+    SET is_deleted = 1, deleted_at = ?1, sync_state = ?2, updated_at = ?1, content_path = ?3
+    WHERE local_id = ?4
+    "#,
+        params![
+            deleted_at,
+            new_sync_state,
+            target.to_string_lossy().to_string(),
+            note_id
+        ],
     )
     .context("failed to mark note as deleted")
     .map_err(|e| crate::errors::Error::InternalError(e.to_string()))?;
@@ -918,7 +919,7 @@ pub fn check_if_note_is_synced(
 }
 
 pub fn resolve_attachment_protocol(content: &str) -> String {
-  // Windows-style: http://attachment.localhost/<id>  (or https:// on older Tauri versions)
+    // Windows-style: http://attachment.localhost/<id>  (or https:// on older Tauri versions)
     let windows_re = Regex::new(r"https?://attachment\.localhost/([A-Za-z0-9%\-_]+)").unwrap();
     // Unix-style: attachment://localhost/<id>
     let unix_re = Regex::new(r"attachment://localhost/([A-Za-z0-9%\-_]+)").unwrap();
@@ -926,20 +927,29 @@ pub fn resolve_attachment_protocol(content: &str) -> String {
     #[cfg(target_os = "windows")]
     {
         // content came from Linux/macOS -> rewrite unix-style to windows-style
-        unix_re.replace_all(content, "http://attachment.localhost/$1").into_owned()
+        unix_re
+            .replace_all(content, "http://attachment.localhost/$1")
+            .into_owned()
     }
 
     #[cfg(not(target_os = "windows"))]
     {
         // content came from Windows -> rewrite windows-style to unix-style
-        windows_re.replace_all(content, "attachment://localhost/$1").into_owned()
+        windows_re
+            .replace_all(content, "attachment://localhost/$1")
+            .into_owned()
     }
 }
 
-
-
-pub fn change_sync_to_pending_upload(notes_db: &Connection, note_id: &str) -> Result<(), crate::errors::Error> {
-notes_db.execute("UPDATE notes SET sync_state = 'PendingUpload' WHERE local_id = ?1", params![note_id]).context("Failed to update sync_state")?;
-Ok(())
-
+pub fn change_sync_to_pending_upload(
+    notes_db: &Connection,
+    note_id: &str,
+) -> Result<(), crate::errors::Error> {
+    notes_db
+        .execute(
+            "UPDATE notes SET sync_state = 'PendingUpload' WHERE local_id = ?1",
+            params![note_id],
+        )
+        .context("Failed to update sync_state")?;
+    Ok(())
 }
