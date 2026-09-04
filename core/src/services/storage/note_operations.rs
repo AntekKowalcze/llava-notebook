@@ -599,7 +599,6 @@ pub fn remove_note(
 
     Ok(())
 }
-
 pub fn restore_deleted_note(
     notes_db: &Connection,
     tmp_deleted_path: PathBuf,
@@ -609,6 +608,7 @@ pub fn restore_deleted_note(
     let temp_deleted_note_path =
         tmp_deleted_path.join(format!("{}.{}", note_id, crate::constants::NOTE_EXTENSION));
     let target = notes_path.join(format!("{}.{}", note_id, crate::constants::NOTE_EXTENSION));
+
     // Get current note state.
     let (is_deleted, sync_state): (i64, SyncState) = notes_db
         .query_row(
@@ -674,12 +674,14 @@ pub fn restore_deleted_note(
             is_deleted = 0,
             deleted_at = NULL,
             sync_state = :sync_state,
-            updated_at = :updated_at
+            updated_at = :updated_at,
+            content_path = :content_path
         WHERE local_id = :id
         "#,
         named_params! {
             ":sync_state": new_sync_state,
             ":updated_at": now,
+            ":content_path": target.to_string_lossy().to_string(),
             ":id": note_id,
         },
     )
@@ -699,7 +701,6 @@ pub fn restore_deleted_note(
 
     Ok(())
 }
-
 pub fn hard_delete_note(
     notes_db: &Connection,
     tmp_deleted_path: &Path,
@@ -758,14 +759,69 @@ pub fn hard_delete_note(
             "note is not deleted".to_string(),
         ));
     }
+
     /*
-     * For synchronized notes, keep the database row as an outbox entry
-     * for the tombstone.
+     * LocalOnly means the server has never seen this note, so there is
+     * nothing to notify — the local row can be removed immediately.
      *
-     * The transaction guarantees that if removing the file fails,
-     * WaitingForTombstone is not committed.
+     * Every other state (PendingDeleted, Synced, etc.) means the server
+     * still has a record of this note and must be sent a tombstone, so
+     * the row is kept as a WaitingForTombstone outbox entry instead of
+     * being deleted outright.
      */
-    if sync_state == SyncState::PendingDeleted {
+    if sync_state == SyncState::LocalOnly {
+        fs::remove_file(&delete_path)
+            .context("failed to remove note file from tmp_deleted")
+            .map_err(|e| {
+                tracing::error!(
+                    task = "hard delete note",
+                    status = "error",
+                    note_id,
+                    path = ?delete_path,
+                    error = ?e,
+                    "failed to remove note file"
+                );
+
+                crate::errors::Error::FileOperationError(e.to_string())
+            })?;
+
+        notes_db
+            .execute(
+                r#"
+                DELETE FROM notes
+                WHERE local_id = :id
+                "#,
+                named_params! {
+                    ":id": note_id,
+                },
+            )
+            .context("failed to delete local note row")
+            .map_err(|e| {
+                tracing::error!(
+                    task = "hard delete note",
+                    status = "error",
+                    note_id,
+                    error = ?e,
+                    "failed to delete local note row"
+                );
+
+                crate::errors::Error::InternalError(e.to_string())
+            })?;
+
+        tracing::info!(
+            task = "hard delete note",
+            status = "success",
+            note_id,
+            "note permanently deleted locally"
+        );
+    } else {
+        /*
+         * For synchronized (or pending-delete) notes, keep the database row
+         * as an outbox entry for the tombstone.
+         *
+         * The transaction guarantees that if removing the file fails,
+         * WaitingForTombstone is not committed.
+         */
         let attachments: Vec<(String, PathBuf)> =
             crate::services::attachment::get_attachments_for_note(notes_db, note_id)?;
         for (_, path) in attachments {
@@ -775,6 +831,7 @@ pub fn hard_delete_note(
                 Err(e) => return Err(e.into()),
             }
         }
+
         let tx = notes_db
             .unchecked_transaction()
             .context("failed to start hard delete transaction")?;
@@ -843,57 +900,6 @@ pub fn hard_delete_note(
             status = "success",
             note_id,
             "note file permanently deleted; waiting for tombstone synchronization"
-        );
-    } else {
-        /*
-         * LocalOnly means that this deletion does not need to be
-         * propagated to the synchronization server.
-         *
-         * The local database row can therefore be removed immediately.
-         */
-        fs::remove_file(&delete_path)
-            .context("failed to remove note file from tmp_deleted")
-            .map_err(|e| {
-                tracing::error!(
-                    task = "hard delete note",
-                    status = "error",
-                    note_id,
-                    path = ?delete_path,
-                    error = ?e,
-                    "failed to remove note file"
-                );
-
-                crate::errors::Error::FileOperationError(e.to_string())
-            })?;
-
-        notes_db
-            .execute(
-                r#"
-                DELETE FROM notes
-                WHERE local_id = :id
-                "#,
-                named_params! {
-                    ":id": note_id,
-                },
-            )
-            .context("failed to delete local note row")
-            .map_err(|e| {
-                tracing::error!(
-                    task = "hard delete note",
-                    status = "error",
-                    note_id,
-                    error = ?e,
-                    "failed to delete local note row"
-                );
-
-                crate::errors::Error::InternalError(e.to_string())
-            })?;
-
-        tracing::info!(
-            task = "hard delete note",
-            status = "success",
-            note_id,
-            "note permanently deleted locally"
         );
     }
 
