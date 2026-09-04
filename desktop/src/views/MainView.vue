@@ -6,7 +6,7 @@ const layout = useLayoutStore();
 </script>
 
 <template>
-  <div class="flex h-screen flex-col overflow-hidden">
+  <div class="flex h-full min-h-0 flex-col overflow-hidden">
     <div class="flex min-h-0 flex-1">
       <Transition
         enter-active-class="transition-all duration-300 ease-out"
