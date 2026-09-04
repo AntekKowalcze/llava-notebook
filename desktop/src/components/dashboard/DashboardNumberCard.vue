@@ -7,7 +7,7 @@
       </p>
 
       <div
-        class="flex h-32 w-64 items-center justify-between rounded-xl border-2 border-note-pumice/40 bg-note-graphite/60 px-5"
+        class="flex h-28 w-52 items-center justify-between rounded-xl border-2 border-note-pumice/40 bg-note-graphite/60 px-5"
       >
         <div class="h flex w-16 items-center justify-center rounded-lg">
           <slot></slot>

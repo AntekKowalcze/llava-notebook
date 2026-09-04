@@ -154,8 +154,8 @@ onUnmounted(() => clearInterval(interval));
     <div class="relative mt-4 flex items-center justify-center py-5">
       <div class="absolute left-[12.5%]">
         <IconComponent
-          :width="'w-44'"
-          :height="'h-44'"
+          :width="'w-40'"
+          :height="'h-40'"
         />
       </div>
       <div class="flex flex-col items-center gap-3">
@@ -170,7 +170,7 @@ onUnmounted(() => clearInterval(interval));
       </div>
     </div>
 
-    <ScreenDeviderHorizontal class="mt-6" />
+    <ScreenDeviderHorizontal class="mt-4" />
     <!-- reszta dashboardu niżej -->
     <div class="flex-1 flex-col items-start">
       <div class="mb-4 h-fit">
@@ -269,7 +269,7 @@ onUnmounted(() => clearInterval(interval));
     <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
       <!-- Recently edited -->
       <div
-        class="flex flex-col gap-3 rounded-2xl border border-note-pumice/20 bg-note-graphite/60 px-5 py-4"
+        class="flex flex-col gap-3 rounded-2xl border border-note-pumice/20 bg-note-graphite/60 px-5 py-2"
       >
         <div class="flex items-center justify-between">
           <p class="text-lg font-semibold text-note-ivory">Recently edited</p>
@@ -310,13 +310,13 @@ onUnmounted(() => clearInterval(interval));
 
       <!-- Favourite tags -->
       <div
-        class="flex flex-col gap-3 rounded-2xl border border-note-pumice/20 bg-note-graphite/60 px-5 py-4"
+        class="flex flex-col gap-3 rounded-2xl border border-note-pumice/20 bg-note-graphite/60 px-5 py-2"
       >
         <div class="flex items-center justify-between">
           <p class="text-lg font-semibold text-note-ivory">Favourite tags</p>
           <span class="text-[11px] uppercase tracking-widest text-note-pumice/60">top 3</span>
         </div>
-
+<!-- TODO soft delete not syncing correctly -->
         <div
           v-if="favouriteTags.length"
           class="flex flex-col gap-2"
