@@ -127,6 +127,7 @@ async function hardDeleteNote(note: RemovedNote) {
     await invoke<void>('hard_delete_note', { noteId: note.local_id });
     await loadRemovedNotes();
   } catch (err) {
+    console.log(err)
     toast.error('Failed to delete note');
   }
 }

@@ -564,7 +564,11 @@ pub fn remove_note(
         .context("failed to create tmp_delete directory")
         .map_err(|e| crate::errors::Error::FileOperationError(e.to_string()))?;
 
-    let target = tmp_delete_path.join(format!("{}.{}", note_id, crate::constants::NOTE_EXTENSION));
+    let target = tmp_delete_path.join(format!(
+        "{}{}",
+        note_id,
+        crate::constants::TEMP_NOTE_EXTENSION
+    ));
     fs::rename(&source, &target)
         .context("failed to move note to tmp_delete")
         .map_err(|e| crate::errors::Error::FileOperationError(e.to_string()))?;
@@ -598,14 +602,18 @@ pub fn remove_note(
     );
 
     Ok(())
-}pub fn restore_deleted_note(
+}
+pub fn restore_deleted_note(
     notes_db: &Connection,
     tmp_deleted_path: PathBuf,
     notes_path: &PathBuf,
     note_id: &str,
 ) -> Result<(), crate::errors::Error> {
-    let temp_deleted_note_path =
-        tmp_deleted_path.join(format!("{}.{}", note_id, crate::constants::NOTE_EXTENSION));
+    let temp_deleted_note_path = tmp_deleted_path.join(format!(
+        "{}{}",
+        note_id,
+        crate::constants::TEMP_NOTE_EXTENSION
+    ));
     let target = notes_path.join(format!("{}.{}", note_id, crate::constants::NOTE_EXTENSION));
 
     let (is_deleted, sync_state): (i64, SyncState) = notes_db
@@ -679,13 +687,11 @@ pub fn remove_note(
     .context("failed to restore note state")
     .map_err(|e| crate::errors::Error::InternalError(e.to_string()))?;
 
-
     fs::rename(&temp_deleted_note_path, &target)
         .context("failed to restore note file")
         .map_err(|e| crate::errors::Error::FileOperationError(e.to_string()))?;
 
     if let Err(commit_err) = tx.commit().context("failed to commit note restoration") {
-    
         if let Err(rollback_err) = fs::rename(&target, &temp_deleted_note_path) {
             tracing::error!(
                 task = "restore note",
@@ -726,8 +732,11 @@ pub fn hard_delete_note(
     tmp_deleted_path: &Path,
     note_id: &str,
 ) -> Result<(), crate::errors::Error> {
-    let delete_path =
-        tmp_deleted_path.join(format!("{}.{}", note_id, crate::constants::NOTE_EXTENSION));
+    let delete_path = tmp_deleted_path.join(format!(
+        "{}{}",
+        note_id,
+        crate::constants::TEMP_NOTE_EXTENSION
+    ));
     if !delete_path.exists() {
         tracing::error!(
             task = "hard delete note",

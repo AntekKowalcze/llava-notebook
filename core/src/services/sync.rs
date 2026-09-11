@@ -346,25 +346,25 @@ pub fn get_all_notes_to_sync(
             crypto_metadata: metadata,
         });
     }
-Ok(notes
-    .into_values()
-    .map(
-        |(local_id, cloud_id, sync_state, hard_deleted, cloud_version, attachments)| {
-            CheckNoteSyncStatus {
-                local_id,
-                cloud_id,
-                sync_state,
-                hard_deleted,
-                cloud_version,
-                attachments: if attachments.is_empty() {
-                    None
-                } else {
-                    Some(attachments)
-                },
-            }
-        },
-    )
-    .collect())
+    Ok(notes
+        .into_values()
+        .map(
+            |(local_id, cloud_id, sync_state, hard_deleted, cloud_version, attachments)| {
+                CheckNoteSyncStatus {
+                    local_id,
+                    cloud_id,
+                    sync_state,
+                    hard_deleted,
+                    cloud_version,
+                    attachments: if attachments.is_empty() {
+                        None
+                    } else {
+                        Some(attachments)
+                    },
+                }
+            },
+        )
+        .collect())
 }
 pub fn get_note_for_upload(
     conn: &Connection,
@@ -1534,13 +1534,11 @@ pub fn handle_notes_to_download(
         } else {
             NOTE_EXTENSION
         };
-let file_path: path::PathBuf;
-        if note.is_deleted  {
-        file_path = tmp_deleted_path.join(format!("{}.{}", local_id, extension))
-
-        }else {
-         file_path = notes_path.join(format!("{}.{}", local_id, extension));
-
+        let file_path: path::PathBuf;
+        if note.is_deleted {
+            file_path = tmp_deleted_path.join(format!("{}{}", local_id, extension))
+        } else {
+            file_path = notes_path.join(format!("{}.{}", local_id, extension));
         }
 
         let bytes_to_write = if note.is_encrypted {
