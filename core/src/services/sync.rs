@@ -123,7 +123,7 @@
 //! * [`crate::models::online_account::AccessToken`] — Provides the access token
 //!   used to authenticate cloud synchronization requests.
 
-use crate::constants::{NOTE_EXTENSION, SERVER_ADDRESS};
+use crate::constants::{NOTE_EXTENSION, SERVER_ADDRESS, TEMP_NOTE_EXTENSION};
 use crate::models::online_account::AccessToken;
 use crate::models::sync::{
     AttachmentForUpload, AttachmentSyncCheck, CheckNoteSyncStatus, CheckSyncRequest,
@@ -1529,8 +1529,8 @@ pub fn handle_notes_to_download(
             .clone()
             .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
-        let extension = if note.is_encrypted {
-            NOTE_EXTENSION
+        let extension = if note.is_deleted {
+            TEMP_NOTE_EXTENSION
         } else {
             NOTE_EXTENSION
         };

@@ -598,8 +598,7 @@ pub fn remove_note(
     );
 
     Ok(())
-}
-pub fn restore_deleted_note(
+}pub fn restore_deleted_note(
     notes_db: &Connection,
     tmp_deleted_path: PathBuf,
     notes_path: &PathBuf,
@@ -609,7 +608,6 @@ pub fn restore_deleted_note(
         tmp_deleted_path.join(format!("{}.{}", note_id, crate::constants::NOTE_EXTENSION));
     let target = notes_path.join(format!("{}.{}", note_id, crate::constants::NOTE_EXTENSION));
 
-    // Get current note state.
     let (is_deleted, sync_state): (i64, SyncState) = notes_db
         .query_row(
             r#"
@@ -631,8 +629,6 @@ pub fn restore_deleted_note(
         ));
     }
 
-    // A note waiting for a tombstone has already been
-    // permanently deleted locally and should not be restorable.
     if sync_state == SyncState::WaitingForTombstone {
         return Err(crate::errors::Error::InternalError(
             "cannot restore note waiting for tombstone".to_string(),
@@ -650,11 +646,6 @@ pub fn restore_deleted_note(
             "target note file already exists".to_string(),
         ));
     }
-
-    // Restore the file first.
-    fs::rename(&temp_deleted_note_path, &target)
-        .context("failed to restore note file")
-        .map_err(|e| crate::errors::Error::FileOperationError(e.to_string()))?;
 
     let new_sync_state = match sync_state {
         SyncState::LocalOnly => "LocalOnly",
@@ -688,9 +679,38 @@ pub fn restore_deleted_note(
     .context("failed to restore note state")
     .map_err(|e| crate::errors::Error::InternalError(e.to_string()))?;
 
-    tx.commit()
-        .context("failed to commit note restoration")
-        .map_err(|e| crate::errors::Error::InternalError(e.to_string()))?;
+
+    fs::rename(&temp_deleted_note_path, &target)
+        .context("failed to restore note file")
+        .map_err(|e| crate::errors::Error::FileOperationError(e.to_string()))?;
+
+    if let Err(commit_err) = tx.commit().context("failed to commit note restoration") {
+    
+        if let Err(rollback_err) = fs::rename(&target, &temp_deleted_note_path) {
+            tracing::error!(
+                task = "restore note",
+                status = "error",
+                note_id,
+                commit_error = ?commit_err,
+                rollback_error = ?rollback_err,
+                "commit failed after file was already restored, and the \
+                 compensating rollback also failed — filesystem and \
+                 database are now inconsistent for this note and need \
+                 manual reconciliation"
+            );
+        } else {
+            tracing::error!(
+                task = "restore note",
+                status = "error",
+                note_id,
+                error = ?commit_err,
+                "commit failed after file restore; file moved back to \
+                 tmp_deleted to keep state consistent"
+            );
+        }
+
+        return Err(crate::errors::Error::InternalError(commit_err.to_string()));
+    }
 
     crate::utils::log_helper(
         "restore note",

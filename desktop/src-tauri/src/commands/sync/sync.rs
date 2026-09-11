@@ -587,7 +587,7 @@ pub async fn run_sync_loop(app_handle: AppHandle) {
         }
     }
 }
-
+// TODO restore + layout small laptops
 pub async fn first_sync(app_handle: AppHandle)  {
       tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
       let state: tauri::State<'_, AppState> = app_handle.state::<AppState>();
