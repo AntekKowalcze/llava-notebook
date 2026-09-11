@@ -20,6 +20,8 @@
 
 use anyhow::Context;
 use reqwest::Client;
+use std::fs;
+use tracing::error;
 
 use crate::models::online_account::AccessToken;
 use serde::Serialize;
@@ -154,23 +156,72 @@ pub fn set_account_to_offline_in_db(
     Ok(())
 }
 
+
 pub fn delete_synced_notes_on_logout(
     notes_db: &mut rusqlite::Connection,
     user_id: String,
 ) -> Result<(), crate::errors::Error> {
     let tx = notes_db
         .transaction()
-        .context("failed to create transaction")?;
+        .context("Failed to create transaction")?;
+
+    // 1. Gather note file paths
+    let mut note_stmt = tx.prepare(
+        "SELECT content_path FROM notes WHERE owner_id = ?1 AND sync_state != 'LocalOnly'"
+    ).context("Failed to prepare note paths statement")?;
+
+    let note_paths: Vec<String> = note_stmt
+        .query_map(rusqlite::params![user_id], |row| row.get::<_, String>(0))
+        .context("Failed to query note paths")?
+        .filter_map(Result::ok)
+        .collect();
+
+    drop(note_stmt);
+
+    // 2. Gather attachment file paths (local_path can be NULL, so we fetch as Option<String>)
+    let mut attachment_stmt = tx.prepare(
+        "SELECT local_path FROM attachments 
+         WHERE sync_state != 'LocalOnly' 
+         OR note_local_id IN (SELECT local_id FROM notes WHERE owner_id = ?1 AND sync_state != 'LocalOnly')"
+    ).context("Failed to prepare attachment paths statement")?;
+
+    let attachment_paths: Vec<String> = attachment_stmt
+        .query_map(rusqlite::params![user_id], |row| row.get::<_, Option<String>>(0))
+        .context("Failed to query attachment paths")?
+        .filter_map(|res| res.ok().flatten())
+        .collect();
+
+    drop(attachment_stmt);
+
     tx.execute(
-        "DELETE FROM notes WHERE owner_id = ?1 AND sync_state != 'LocalOnly' ",
+        "DELETE FROM attachments 
+         WHERE sync_state != 'LocalOnly' 
+         OR note_local_id IN (SELECT local_id FROM notes WHERE owner_id = ?1 AND sync_state != 'LocalOnly')",
         rusqlite::params![user_id],
     )
-    .context("Failed to delete notes")?;
+    .context("Failed to delete attachments from DB")?;
+
     tx.execute(
-        "DELETE FROM attachments WHERE sync_state != 'LocalOnly' ",
-        [],
+        "DELETE FROM notes WHERE owner_id = ?1 AND sync_state != 'LocalOnly'",
+        rusqlite::params![user_id],
     )
-    .context("Failed to delete synced attachments")?;
-    tx.commit().context("failed to commit transaction")?;
+    .context("Failed to delete notes from DB")?;
+
+    tx.commit().context("Failed to commit transaction")?;
+
+    // 4. Delete the physical files
+    for path in note_paths.into_iter().chain(attachment_paths) {
+        if let Err(e) = fs::remove_file(&path) {
+            // It's safe to ignore NotFound, but we should log other IO errors
+            if e.kind() != std::io::ErrorKind::NotFound {
+                error!(
+                    path = %path, 
+                    error = %e, 
+                    "Failed to delete synced file from disk during logout"
+                );
+            }
+        }
+    }
+
     Ok(())
 }
