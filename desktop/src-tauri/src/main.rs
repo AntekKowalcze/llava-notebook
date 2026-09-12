@@ -51,7 +51,9 @@ pub fn main() {
         .expect("big error while reading device id");
     println!("{}", device_id);
 
-    let mut builder = tauri::Builder::default();
+    let mut builder = tauri::Builder::default()
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build());
     builder = builder.plugin(tauri_plugin_opener::init());
     builder = builder.plugin(tauri_plugin_clipboard_manager::init());
     builder = protocols::protocol::register(builder);

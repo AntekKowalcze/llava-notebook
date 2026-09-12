@@ -1,8 +1,8 @@
 [package]
 name = "llava"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "Llava, safe space for you thoughts"
+authors = ["Antoni Kowalcze"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -35,19 +35,22 @@ anyhow = "1.0.100"
 rusqlite = "0.38.0"
 indexmap = { version = "2.13.0", features = ["serde"] }
 tauri-plugin-clipboard-manager = "2.3.2"
-jsonwebtoken = { version = "10.3.0", features = ["hmac"] }
 reqwest = { version = "0.13.3", features = ["json", "stream"] }
 subtle = "2.6.1"
-tokio = "1.52.3"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs"] }
 http = "1.5.0"
 mime = "0.3.17"
 futures-util = { version = "0.3.34", features = ["channel"] }
 encoding_rs = "0.8.35"
 regex = "1.13.1"
+tauri-plugin-process = "2"
 
 [profile.release]
-opt-level = "s"
-lto = "fat"
+opt-level = 3
+lto = "thin"
 codegen-units = 1
 panic = "abort"
 strip = "symbols"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"

@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "notes": "Initial release",
+  "pub_date": "2026-09-12T00:00:00Z",
+  "platforms": {
+    "linux-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTRzUrZjFLT3RyL0xmR04rOEp0Y2dWYWJ2Uk9hWGthblhYZzl6NXJwS29OcGUzZFBzb0Z5b0Y2eHM4bTVTaVcvc20xZ2ZmeFMrNjc4eSswWG5ZOUZJSWpORW9RSjZQWUFRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MjE0ODk4CWZpbGU6bGxhdmFfMS4wLjBfYW1kNjQuQXBwSW1hZ2UKQVVHeFo0VTA0Y3pDenM2a2pacXprcHRScGhkc3h4dTJDajVUZ0QwVGxleVZhWjgxWTdjSmR5R0N0ZEdQRXRnTVdQeGRXU25jeWZUWFdqc0EzV2paQmc9PQo=",
+      "url": "https://github.com/AntekKowalcze/llava-notebook/releases/download/v1.0.0/llava_1.0.0_amd64.AppImage"
+    }
+  }
+}

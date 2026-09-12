@@ -13,6 +13,7 @@ import { useOnlineAuthStore } from './stores/onlineAuth';
 import { useAuthStore } from './stores/auth';
 import { useMetaStore } from './stores/metaStore.ts';
 import './css/milkdown.css';
+import { checkForUpdates } from './updater/updater.ts';
 const app = createApp(App);
 app.use(PrimeVue);
 app.use(createPinia());
@@ -35,4 +36,5 @@ app.use(router);
   });
 
   app.mount('#app');
+  void checkForUpdates();
 })();
