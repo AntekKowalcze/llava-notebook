@@ -156,7 +156,6 @@ pub fn set_account_to_offline_in_db(
     Ok(())
 }
 
-
 pub fn delete_synced_notes_on_logout(
     notes_db: &mut rusqlite::Connection,
     user_id: String,
@@ -166,9 +165,9 @@ pub fn delete_synced_notes_on_logout(
         .context("Failed to create transaction")?;
 
     // 1. Gather note file paths
-    let mut note_stmt = tx.prepare(
-        "SELECT content_path FROM notes WHERE owner_id = ?1 AND sync_state != 'LocalOnly'"
-    ).context("Failed to prepare note paths statement")?;
+    let mut note_stmt = tx
+        .prepare("SELECT content_path FROM notes WHERE owner_id = ?1 AND sync_state != 'LocalOnly'")
+        .context("Failed to prepare note paths statement")?;
 
     let note_paths: Vec<String> = note_stmt
         .query_map(rusqlite::params![user_id], |row| row.get::<_, String>(0))
@@ -186,7 +185,9 @@ pub fn delete_synced_notes_on_logout(
     ).context("Failed to prepare attachment paths statement")?;
 
     let attachment_paths: Vec<String> = attachment_stmt
-        .query_map(rusqlite::params![user_id], |row| row.get::<_, Option<String>>(0))
+        .query_map(rusqlite::params![user_id], |row| {
+            row.get::<_, Option<String>>(0)
+        })
         .context("Failed to query attachment paths")?
         .filter_map(|res| res.ok().flatten())
         .collect();
@@ -215,8 +216,8 @@ pub fn delete_synced_notes_on_logout(
             // It's safe to ignore NotFound, but we should log other IO errors
             if e.kind() != std::io::ErrorKind::NotFound {
                 error!(
-                    path = %path, 
-                    error = %e, 
+                    path = %path,
+                    error = %e,
                     "Failed to delete synced file from disk during logout"
                 );
             }

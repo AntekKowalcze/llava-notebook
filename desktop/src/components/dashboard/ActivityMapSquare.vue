@@ -18,15 +18,13 @@ const titleString = computed(() => `${props.numberOfContributions} edition(s) â€
 
 <template>
   <div
-    class="mr-0.5 h-4 w-4 rounded-[3px] border border-note-pumice/10"
+    class="h-4 w-4 rounded-[3px] border border-note-pumice/10"
     :class="props.numberOfContributions === 0 ? 'bg-note-graphite' : 'bg-note-graphite/40'"
     :title="titleString"
   >
     <div
-      class="h-full w-full rounded-[3px] bg-note-paprika"
+      class="h-full w-full rounded-[3px] bg-note-paprika transition-opacity duration-150"
       :style="{ opacity }"
     />
   </div>
 </template>
-
-<style scoped></style>

@@ -105,7 +105,6 @@ z-index: 120;
 
 .milkdown [role='menuitem']:hover svg,
 .milkdown [role='option']:hover svg {
-
   color: #0f0f10 !important;
 }
 
@@ -263,6 +262,6 @@ z-index: 120;
   transform: scale(1.25);
 }
 
-.ai-instruction-item-label{
-   color: #fffbeb !important
+.ai-instruction-item-label {
+  color: #fffbeb !important;
 }

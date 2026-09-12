@@ -58,7 +58,9 @@ defineExpose({
 </script>
 
 <template>
-  <div class="flex h-11 w-[40%] shrink-0 items-center gap-3 border-b border-white/5 px-6 backdrop-blur-md">
+  <div
+    class="flex h-11 w-[40%] shrink-0 items-center gap-3 border-b border-white/5 px-6 backdrop-blur-md"
+  >
     <div class="flex min-w-0 items-center">
       <span class="truncate text-lg font-normal text-note-ivory">
         {{ noteName }}

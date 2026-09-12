@@ -150,7 +150,7 @@ pub async fn get_note_content(
         };
 
         note_content = content;
-    } 
+    }
     note_content = llava_core::storage::resolve_attachment_protocol(&note_content);
     Ok(note_content)
 }

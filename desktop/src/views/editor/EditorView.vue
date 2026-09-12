@@ -18,7 +18,7 @@ import { useLayoutStore } from '../../stores/layoutStore.ts';
 import TagEdition from '../../components/editor/tagEdition.vue';
 import NoteHeader from '../../components/editor/NoteHeader.vue';
 import QuitModal from '../../components/editor/QuitModal.vue';
-let leftPanelReloaded = ref<boolean>(false)
+let leftPanelReloaded = ref<boolean>(false);
 const currentNoteStore = useCurrentNoteStore();
 let isDirty = false;
 let isClosing = false;
@@ -54,7 +54,7 @@ async function retrySave() {
   showForceQuitModal.value = false;
 
   const success = await saveNote();
- 
+
   if (!success) {
     showForceQuitModal.value = true;
   }
@@ -81,7 +81,7 @@ const defaultValue = computed(() => {
 });
 
 async function loadNoteContent(id: string): Promise<string> {
-  leftPanelReloaded.value = false
+  leftPanelReloaded.value = false;
   try {
     const contentFromDb = await invoke<string>('get_note_content', {
       noteId: id,
@@ -281,11 +281,10 @@ function getErrorText(err: unknown): string {
 
 async function saveNote(id: string = noteId.value): Promise<boolean> {
   try {
-     if (!leftPanelReloaded.value) {
-  await emit("reload-left-panel")
-  leftPanelReloaded.value = true
-
-  }
+    if (!leftPanelReloaded.value) {
+      await emit('reload-left-panel');
+      leftPanelReloaded.value = true;
+    }
     await invoke('save_note', {
       noteId: id,
       content: noteContent.value,
@@ -376,7 +375,6 @@ function setWordCount(text = noteContent.value) {
     class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
   />
 
-  <!-- Dodano h-full oraz relative -->
   <div
     v-else
     class="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden"

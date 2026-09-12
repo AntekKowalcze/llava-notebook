@@ -69,5 +69,5 @@ fn is_allowed_mime_type(mime_type: &str) -> bool {
     return matches!(
         mime_type,
         "image/png" | "image/jpeg" | "image/webp" | "application/pdf" | "text/plain"
-    )
+    );
 }

@@ -25,7 +25,7 @@ const onlineAuthStore = useOnlineAuthStore();
 const router = useRouter();
 const userConfigStore = useUserConfigStore();
 const { settingList, isDefault } = storeToRefs(userConfigStore);
-const shouldSyncOnLogout = ref<boolean>(true)
+const shouldSyncOnLogout = ref<boolean>(true);
 const cardSettingsIdList: string[] = [
   'local.mode',
   'local.encryption',
@@ -184,7 +184,6 @@ async function handleChange(id: string, value: string) {
 }
 
 async function handleUpdate(id: string) {
-  
   switch (id) {
     case 'local.logout': {
       try {
@@ -218,7 +217,6 @@ async function handleUpdate(id: string) {
 
         toast.success('backup loaded successfully');
       } catch (err) {
-        
         toast.error('failed to load backup config');
       }
       break;
@@ -228,7 +226,6 @@ async function handleUpdate(id: string) {
         logContents.value = await invoke<string>('get_logfile_content');
         showLogs.value = true;
       } catch (err) {
-        
         toast.error('failed to show logs');
       }
       break;
@@ -257,21 +254,23 @@ async function handleUpdate(id: string) {
       }
       break;
     }
-   
+
     case 'local.changePassword': {
       router.replace({ name: 'recovery', query: { origin: 'settings' } });
       break;
     }
     case 'online.logout': {
       try {
-        await invoke<void>('online_logout', {sync: shouldSyncOnLogout.value});
+        await invoke<void>('online_logout', { sync: shouldSyncOnLogout.value });
         onlineAuthStore.$patch({
           loggedIn: false,
           loggedInEmail: null,
           loggedInId: null,
         });
         authStore.linked = false;
-        toast.success('Disconnected online account from local account successfully. Notes synchronized with this account will be removed from this device. Local-only notes will remain.');
+        toast.success(
+          'Disconnected online account from local account successfully. Notes synchronized with this account will be removed from this device. Local-only notes will remain.'
+        );
       } catch (err: any) {
         if (err?.NoInternetConnection) {
           toast.error('No internet connection. Try again later.');
@@ -279,16 +278,20 @@ async function handleUpdate(id: string) {
           toast.error('Server error. Try again later.');
         } else if (err?.ServerNotAvailable) {
           toast.error('Server unavailable. Try again later.');
-        }else if (err?.SyncFailed){
-          toast.error('Synchronization failed, some notes may be lost if you proceed to disconnect accounts, to disconnect, click disconnect again')
-          shouldSyncOnLogout.value = false
+        } else if (err?.SyncFailed) {
+          toast.error(
+            'Synchronization failed, some notes may be lost if you proceed to disconnect accounts, to disconnect, click disconnect again'
+          );
+          shouldSyncOnLogout.value = false;
           try {
-          await invoke<void>('online_logout', {sync: shouldSyncOnLogout.value});
-            toast.success('Disconnected online account from local account successfully. Notes synchronized with this account will be removed from this device. Local-only notes will remain.');
-          }catch(err) {
-            toast.error("Couldnt disconnect accounts, try again later")
+            await invoke<void>('online_logout', { sync: shouldSyncOnLogout.value });
+            toast.success(
+              'Disconnected online account from local account successfully. Notes synchronized with this account will be removed from this device. Local-only notes will remain.'
+            );
+          } catch (err) {
+            toast.error('Couldnt disconnect accounts, try again later');
           }
-          shouldSyncOnLogout.value = true
+          shouldSyncOnLogout.value = true;
         } else {
           toast.error('Logout failed');
         }
@@ -308,12 +311,14 @@ async function handleUpdate(id: string) {
       break;
     }
     case 'online.sync': {
-      await emit("reload-left-panel")
+      await emit('reload-left-panel');
       break;
     }
-     case 'online.aiFeatures': {
-        toast.success("Remember that using Ai features means that your information may be used to train Ai models. Use it responsibly.")
-        break;
+    case 'online.aiFeatures': {
+      toast.success(
+        'Remember that using Ai features means that your information may be used to train Ai models. Use it responsibly.'
+      );
+      break;
     }
   }
 }
@@ -427,7 +432,7 @@ function handleUsernameCancel() {
 <template>
   <div class="relative flex h-full min-h-0 flex-col overflow-hidden px-[10%]">
     <ArrowBigLeftDash
-      class="absolute left-[2%] top-[93%] text-note-paprika/80 transition-transform duration-200 hover:scale-95"
+      class="absolute left-[2%] top-[97%] text-note-paprika/80 transition-transform duration-200 hover:scale-95"
       @click="redirect"
     />
 
@@ -459,7 +464,7 @@ function handleUsernameCancel() {
         <div class="flex h-[27vh] min-h-60 flex-col justify-between">
           <div class="flex flex-col">
             <h1
-              class="text-4xl font-semibold tracking-tight text-note-ivory lg:text-5xl xl:text-6xl"
+              class="text-3xl font-semibold tracking-tight text-note-ivory lg:text-5xl xl:text-6xl"
             >
               Settings of
               <span class="text-note-paprika">{{ username }}</span>
@@ -484,7 +489,7 @@ function handleUsernameCancel() {
         </div>
 
         <div
-          class="flex h-[27vh] min-h-60 w-[28%] min-w-56 shrink-0 flex-col rounded-xl border border-note-pumice/20 bg-note-graphite/80 px-4 py-4"
+          class="flex h-fit w-[28%] min-w-56 shrink-0 flex-col rounded-xl border border-note-pumice/20 bg-note-graphite/80 p-4"
         >
           <div class="mb-4 flex items-center gap-2">
             <div
@@ -501,19 +506,21 @@ function handleUsernameCancel() {
           </div>
 
           <div
-            class="flex flex-1 flex-col justify-between overflow-hidden rounded-lg border border-note-pumice/10 bg-black/40 px-3 py-2"
+            class="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto rounded-lg border border-note-pumice/10 bg-black/40 px-3 py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             <button
               v-for="setting in cardSettings"
               :key="setting.id"
               type="button"
-              class="flex w-full items-center rounded-md px-2 py-1.5 text-xs text-note-pumice/80 transition-colors hover:bg-black/50 hover:text-note-ivory"
+              class="flex w-full shrink-0 items-center rounded-md px-2 py-1.5 text-xs text-note-pumice/80 transition-colors hover:bg-black/50 hover:text-note-ivory"
             >
-              <span class="flex flex-1 justify-start">{{ setting.label }}</span>
-              <span class="flex flex-1 justify-center">{{ setting.currentValue }}</span>
+              <span class="flex flex-1 justify-start truncate pr-2">{{ setting.label }}</span>
+              <span class="flex flex-1 justify-center truncate px-2 text-note-pumice/60">
+                {{ setting.currentValue }}
+              </span>
               <span
                 @click="goToSetting(setting.id)"
-                class="flex flex-1 justify-end text-[11px] uppercase tracking-wide text-note-paprika"
+                class="flex flex-1 justify-end whitespace-nowrap text-[11px] uppercase tracking-wide text-note-paprika"
               >
                 go to setting
               </span>

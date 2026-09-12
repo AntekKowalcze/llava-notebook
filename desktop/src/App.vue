@@ -5,12 +5,12 @@ import LoadingCircle from './components/main/LoadingCircle.vue';
 import SessionExpired from './components/main/SessionExpired.vue';
 import TitleBar from './components/TitleBar/TitleBar.vue';
 import { useLayoutStore } from './stores/layoutStore.ts';
-import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import { useToast } from 'vue-toastification'
-const toast = useToast()
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { useToast } from 'vue-toastification';
+const toast = useToast();
 
-let unlisten: UnlistenFn | null = null
-let shown = false
+let unlisten: UnlistenFn | null = null;
+let shown = false;
 
 const authStore = useAuthStore();
 const showSessionLoader = computed(() => !authStore.sessionReady);
@@ -29,30 +29,28 @@ function handleKeyDown(event: KeyboardEvent) {
 onMounted(async () => {
   void authStore.ensureSession();
   window.addEventListener('keydown', handleKeyDown);
-   unlisten = await listen('quota_exceeded', () => {
-    if (shown) return
+  unlisten = await listen('quota_exceeded', () => {
+    if (shown) return;
 
-    shown = true
+    shown = true;
 
-    toast.error(
-      'Your storage quota has been exceeded. New uploads are currently unavailable.',
-      {
-        timeout: 20000,
-      },
-    )
-  })
+    toast.error('Your storage quota has been exceeded. New uploads are currently unavailable.', {
+      timeout: 20000,
+    });
+  });
 });
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyDown);
-   unlisten?.()
+  unlisten?.();
 });
-
 </script>
 <template>
-  <div class="flex h-full min-h-0 flex-col overflow-hidden bg-note-graphite bg-cover bg-center">
+  <div class="flex h-screen w-full flex-col overflow-hidden bg-note-graphite bg-cover bg-center">
     <TitleBar class="shrink-0"></TitleBar>
+
     <session-expired></session-expired>
+
     <div
       v-if="showSessionLoader"
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
@@ -62,8 +60,8 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div class="min-h-0 flex-1 overflow-hidden">
+    <main class="relative flex min-h-0 w-full flex-1 flex-col">
       <router-view />
-    </div>
+    </main>
   </div>
 </template>

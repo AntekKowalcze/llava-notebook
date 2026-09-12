@@ -52,10 +52,10 @@ const toggleMaximize = async () => {
 };
 
 const closeWin = async () => {
-  if (!layout.reencrypting){
-  await win.close();
-  }else {
-    toast.success("You can't leave application now")
+  if (!layout.reencrypting) {
+    await win.close();
+  } else {
+    toast.success("You can't leave application now");
   }
 };
 </script>

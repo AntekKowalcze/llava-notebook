@@ -8,23 +8,22 @@ import { useAuthStore } from './auth';
 let listenersRegistered = false;
 import { useUserConfigStore } from './userConfig';
 enum SyncResult {
-  Done = "Done",
-  InProgress = "InProgress",
-  Error = "Error",
-  NotSynced = "NotSynced"
+  Done = 'Done',
+  InProgress = 'InProgress',
+  Error = 'Error',
+  NotSynced = 'NotSynced',
 }
 export const useMetaStore = defineStore('metaStore', () => {
   const userConfig = useUserConfigStore();
   const isConnectedToServer = ref<boolean | null>(null);
   const isConnectedToInternet = ref<boolean | null>(null);
-  const syncResult = ref<SyncResult>(SyncResult.NotSynced)
+  const syncResult = ref<SyncResult>(SyncResult.NotSynced);
   if (!listenersRegistered) {
     listenersRegistered = true;
 
-    listen<SyncResult>("sync_progress", (status) => {
-      syncResult.value = status.payload
-    })
-
+    listen<SyncResult>('sync_progress', (status) => {
+      syncResult.value = status.payload;
+    });
 
     listen<boolean>('internet_connection_status', (status) => {
       if (isConnectedToInternet.value === status.payload) return;
@@ -35,9 +34,7 @@ export const useMetaStore = defineStore('metaStore', () => {
       if (isConnectedToServer.value === status.payload) return;
       isConnectedToServer.value = status.payload;
     });
-                
 
-    
     userConfig.init().then(() => {
       if (userConfig.config['local.mode'] === 'off') {
         invoke<[boolean, boolean]>('get_connection_status')
@@ -70,7 +67,7 @@ export const useMetaStore = defineStore('metaStore', () => {
     (newValue) => {
       if (newValue === null) return;
       const toast = useToast();
-      if (newValue && location.hash != "/login") {
+      if (newValue && location.hash != '/login') {
         toast.success('Internet connected');
       } else {
         toast.error('Lost internet connection');

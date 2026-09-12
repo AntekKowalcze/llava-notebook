@@ -13,8 +13,7 @@ export const useOnlineAuthStore = defineStore('onlineAuth', () => {
       loggedInEmail.value = await invoke<string>('get_email_from_id', {
         onlineId: loggedInId.value,
       });
-    } catch (err) {
-    }
+    } catch (err) {}
   }
   listen<void>('online_session_expired', () => {
     sessionExpired.value = true;

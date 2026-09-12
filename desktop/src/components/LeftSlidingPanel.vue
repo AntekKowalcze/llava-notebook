@@ -15,8 +15,6 @@ const userConfig = useUserConfigStore();
 
 let unlistenReload: UnlistenFn | null = null;
 
-
-
 type PanelData = {
   recentlyEdited: {
     title: string;
@@ -40,38 +38,29 @@ onMounted(async () => {
         'online.sync'
       );
     }
-  panelData.value = await invoke<PanelData>('get_panel_data');
-});
-
-
+    panelData.value = await invoke<PanelData>('get_panel_data');
+  });
 
   try {
-
     if (userConfig.settingList) {
       syncStatus.value = userConfig.getValueBySettingId(
         userConfig.settingList.sections,
         'online.sync'
       );
     }
-  
+
     panelData.value = await invoke<PanelData>('get_panel_data');
   } catch (error) {
     console.error('Failed to load sliding panel data:', error);
   }
 });
 
-onUnmounted(()=> {
-
-if (unlistenReload) {
+onUnmounted(() => {
+  if (unlistenReload) {
     unlistenReload();
     unlistenReload = null;
   }
-
-})
-
-
-
-
+});
 
 function togglePanel() {
   layout.toggleLeftPanel();
@@ -117,8 +106,7 @@ function seeRemovedNotes() {
       <X class="h-5 w-5" />
     </button>
 
-    <!-- Header -->
-    <div class="px-6 pb-8 pt-10">
+    <div class="shrink-0 px-6 pb-8 pt-10">
       <h1 class="flex text-2xl font-semibold tracking-wide text-note-ivory">
         <IconComponent
           class="mr-2"
@@ -162,12 +150,11 @@ function seeRemovedNotes() {
     </div>
 
     <!-- Divider -->
-    <ScreenDeviderHorizontal class="mt-0" />
+    <ScreenDeviderHorizontal class="mt-0 shrink-0" />
 
-    <!-- Recent Notes -->
     <div
       v-if="panelData"
-      class="flex-1 px-5 pt-6"
+      class="min-h-0 flex-1 overflow-y-auto px-5 pb-2 pt-6 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       <div class="mb-4 flex items-center gap-2">
         <span class="text-lg text-note-paprika">●</span>
@@ -193,7 +180,7 @@ function seeRemovedNotes() {
         >
           <div class="flex min-w-0 items-center gap-3">
             <div
-              class="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.03] transition-colors group-hover:bg-note-paprika/10"
+              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.03] transition-colors group-hover:bg-note-paprika/10"
             >
               <FileText class="h-4 w-4 text-note-pumice/50 group-hover:text-note-paprika" />
             </div>
@@ -204,7 +191,7 @@ function seeRemovedNotes() {
           </div>
 
           <span
-            class="ml-2 whitespace-nowrap text-xs text-note-pumice/35 group-hover:text-note-pumice/60"
+            class="ml-2 shrink-0 whitespace-nowrap text-xs text-note-pumice/35 group-hover:text-note-pumice/60"
           >
             {{ note.date }}
           </span>
@@ -219,33 +206,37 @@ function seeRemovedNotes() {
     >
       Loading...
     </div>
-    <div class="items center flex w-full justify-center text-note-ivory/90">
+
+    <button
+      class="group inline-flex items-center justify-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-note-ivory/75 transition-all duration-200 hover:bg-note-pumice/5 hover:text-note-ivory active:scale-95"
+      @click="seeAllNotes()"
+    >
+      <span class="text-xs">See all notes</span>
+
+      <ArrowRight
+        :size="16"
+        class="text-note-glow transition-transform duration-200 group-hover:translate-x-1"
+      />
+    </button>
+    <div
+      class="flex w-full shrink-0 flex-col items-center justify-center gap-1 pt-2 text-note-ivory/90"
+    >
       <button
-        class="group inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-note-ivory/75 transition-all duration-200 hover:bg-note-pumice/5 hover:text-note-ivory active:scale-95"
+        class="group inline-flex items-center justify-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-note-ivory/75 transition-all duration-200 hover:bg-note-pumice/5 hover:text-note-ivory active:scale-95"
         @click="seeRemovedNotes()"
       >
         <span class="text-xs">See removed notes</span>
         <Trash2
-          :size="17"
+          :size="16"
           class="transform text-note-garnet duration-200 group-hover:scale-105"
         />
       </button>
-      <button
-        class="group inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-note-ivory/75 transition-all duration-200 hover:bg-note-pumice/5 hover:text-note-ivory active:scale-95"
-        @click="seeAllNotes()"
-      >
-        <span class="text-xs">See all notes</span>
-
-        <ArrowRight
-          :size="17"
-          class="text-note-glow transition-transform duration-200 group-hover:translate-x-1"
-        />
-      </button>
     </div>
+
     <!-- Bottom Card -->
     <div
       v-if="panelData"
-      class="p-4"
+      class="shrink-0 p-4"
     >
       <div class="rounded-2xl border border-note-pumice/10 bg-black/40 p-4">
         <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-note-pumice/45">

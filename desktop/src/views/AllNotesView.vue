@@ -530,7 +530,7 @@ async function deleteNote(note: NoteWithTags) {
     });
 
     notes.value = notes.value.filter((current) => current.local_id !== note.local_id);
-    await emit("reload-left-panel")
+    await emit('reload-left-panel');
     toast.success('Note deleted');
   } catch (err) {
     console.error(err);

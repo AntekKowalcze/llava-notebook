@@ -19,10 +19,9 @@ import { createGoogleProvider } from './googleAiProvider';
 import { computed } from 'vue';
 import { useUserConfigStore } from '../../stores/userConfig';
 const userConfig = useUserConfigStore();
-const aiFeaturesOn = computed(()=> {
- return  userConfig.config["online.aiFeatures"] == "on"
-
-})
+const aiFeaturesOn = computed(() => {
+  return userConfig.config['online.aiFeatures'] == 'on';
+});
 const props = defineProps<{ defaultValue: string }>();
 
 const emit = defineEmits<{
@@ -48,40 +47,37 @@ useEditor((root) => {
     features: {
       [Crepe.Feature.TopBar]: true,
 
-       [Crepe.Feature.AI]: aiFeaturesOn.value,
+      [Crepe.Feature.AI]: aiFeaturesOn.value,
     },
 
     featureConfigs: {
       [Crepe.Feature.AI]: {
-      provider: createGoogleProvider(),
+        provider: createGoogleProvider(),
       },
 
       [Crepe.Feature.ImageBlock]: {
         onUpload: async (file: File) => {
           const bytes = new Uint8Array(await file.arrayBuffer());
           if (bytes.length > 20 * 1024 * 1024) {
-            toast.warning("Attachments over 20mb can not be synced" , {
-              timeout: 10000
-            })
+            toast.warning('Attachments over 20mb can not be synced', {
+              timeout: 10000,
+            });
           }
           try {
-          const attachmentId = await invoke<string>('create_attachment', {
-            file: Array.from(bytes),
-            fileName: file.name,
-            mimeType: file.type,
-          });
+            const attachmentId = await invoke<string>('create_attachment', {
+              file: Array.from(bytes),
+              fileName: file.name,
+              mimeType: file.type,
+            });
 
-              const src: string = convertFileSrc(attachmentId, 'attachment');
+            const src: string = convertFileSrc(attachmentId, 'attachment');
             return src;
-
-          }catch(err: any){
-            if (err.InvalidMimeType){
-                toast.warning("Invalid attachment type");
+          } catch (err: any) {
+            if (err.InvalidMimeType) {
+              toast.warning('Invalid attachment type');
             }
-            throw err
+            throw err;
           }
-         
-
         },
       },
     },

@@ -1534,37 +1534,37 @@ pub fn handle_notes_to_download(
         } else {
             NOTE_EXTENSION
         };
-      let file_path: path::PathBuf;
-if note.is_deleted {
-    file_path = tmp_deleted_path.join(format!("{}{}", local_id, TEMP_NOTE_EXTENSION));
-    let stale_path = notes_path.join(format!("{}.{}", local_id, NOTE_EXTENSION));
-    if let Err(err) = std::fs::remove_file(&stale_path) {
-        if err.kind() != std::io::ErrorKind::NotFound {
-            tracing::error!(
-                task = "sync",
-                local_id = %local_id,
-                path = %stale_path.display(),
-                error = ?err,
-                "failed to remove stale note file before writing deleted copy"
-            );
-        }
-    }
-} else {
-    file_path = notes_path.join(format!("{}.{}", local_id, NOTE_EXTENSION));
+        let file_path: path::PathBuf;
+        if note.is_deleted {
+            file_path = tmp_deleted_path.join(format!("{}{}", local_id, TEMP_NOTE_EXTENSION));
+            let stale_path = notes_path.join(format!("{}.{}", local_id, NOTE_EXTENSION));
+            if let Err(err) = std::fs::remove_file(&stale_path) {
+                if err.kind() != std::io::ErrorKind::NotFound {
+                    tracing::error!(
+                        task = "sync",
+                        local_id = %local_id,
+                        path = %stale_path.display(),
+                        error = ?err,
+                        "failed to remove stale note file before writing deleted copy"
+                    );
+                }
+            }
+        } else {
+            file_path = notes_path.join(format!("{}.{}", local_id, NOTE_EXTENSION));
 
-    let stale_path = tmp_deleted_path.join(format!("{}{}", local_id, TEMP_NOTE_EXTENSION));
-    if let Err(err) = std::fs::remove_file(&stale_path) {
-        if err.kind() != std::io::ErrorKind::NotFound {
-            tracing::error!(
-                task = "sync",
-                local_id = %local_id,
-                path = %stale_path.display(),
-                error = ?err,
-                "failed to remove stale tmp_deleted file before writing restored copy"
-            );
+            let stale_path = tmp_deleted_path.join(format!("{}{}", local_id, TEMP_NOTE_EXTENSION));
+            if let Err(err) = std::fs::remove_file(&stale_path) {
+                if err.kind() != std::io::ErrorKind::NotFound {
+                    tracing::error!(
+                        task = "sync",
+                        local_id = %local_id,
+                        path = %stale_path.display(),
+                        error = ?err,
+                        "failed to remove stale tmp_deleted file before writing restored copy"
+                    );
+                }
+            }
         }
-    }
-}
 
         let bytes_to_write = if note.is_encrypted {
             note.content.into_bytes()

@@ -74,14 +74,14 @@ async function submitRegister() {
   <FormCard
     header-text="Register"
     sub-text="create account"
-    class="pb-4"
+    class="pb-[2vh] sm:pb-4"
   >
     <template v-if="!loading">
       <TextInput
         :placeholder="'username'"
         :type="InputTypes.Text"
         :name="'username'"
-        class="mt-6"
+        class="mt-[2vh] sm:mt-6"
         v-model="username"
       ></TextInput>
       <TextInput
@@ -98,6 +98,7 @@ async function submitRegister() {
         :name="'repeatPassword'"
         v-model="repeatPassword"
       ></TextInput>
+
       <TinyError
         v-if="repeatPassword && !passwordsMatch"
         error-content="Passwords do not match!"
@@ -105,16 +106,19 @@ async function submitRegister() {
       <TinyError
         v-if="!isUsernameNotEmpty"
         error-content="Username to short!"
-        class="mt-2"
+        class="mt-1 sm:mt-2"
       ></TinyError>
+
       <SubmitButton
         :disabled="!canSubmit"
         :content="'Submit'"
         @click="submitRegister"
+        class="mt-[2vh] sm:mt-4"
       ></SubmitButton>
+
       <RouterLink
         to="/login"
-        class="mb-0 mt-8 text-note-ivory/80 hover:underline"
+        class="mb-0 mt-[3vh] text-sm text-note-ivory/80 transition-colors hover:text-note-ivory hover:underline sm:mt-8 sm:text-base"
       >
         Do you have account already? Login.
       </RouterLink>

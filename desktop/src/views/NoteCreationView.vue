@@ -18,17 +18,13 @@ const router = useRouter();
 const toast = useToast();
 const userSettings = useUserConfigStore();
 const syncStatus = computed(() => {
-  const {
-    'online.sync': onlineSync,
-    'local.mode': localMode,
-  } = userSettings.config;
+  const { 'online.sync': onlineSync, 'local.mode': localMode } = userSettings.config;
 
   if (localMode === 'on') {
     return {
-          canSync: false,
-          whyDisabled:
-            'You are in offline mode.',
-        };
+      canSync: false,
+      whyDisabled: 'You are in offline mode.',
+    };
   }
 
   return onlineSync == 'on'
@@ -107,12 +103,11 @@ async function createNote(): Promise<void> {
     currentNoteStore.$patch({
       currentNote: createdNote,
     });
-    await emit("reload-left-panel")
+    await emit('reload-left-panel');
 
     toast.success('Note created successfully');
 
     await router.push(`/main/editor/${createdNote.local_id}`);
-
   } catch (err: unknown) {
     console.error('Failed to create note:', err);
 
@@ -138,23 +133,26 @@ async function createNote(): Promise<void> {
   }
 }
 </script>
-
 <template>
-  <div class="flex h-full w-full items-center justify-center bg-note-graphite px-8">
-    <div class="w-full max-w-4xl">
-      <!-- Icon -->
+  <div
+    class="flex h-full w-full flex-col items-center overflow-y-auto bg-note-graphite px-4 [-ms-overflow-style:none] [scrollbar-width:none] sm:px-8 [&::-webkit-scrollbar]:hidden"
+  >
+    <div class="min-h-0 w-full shrink grow-[1.5]"></div>
+
+    <div class="w-full max-w-4xl shrink-0 py-2">
       <div class="flex justify-center">
         <IconComponent
-          width="w-56"
-          height="h-56"
+          width="w-[16vh] min-w-[8rem] max-w-[12rem]"
+          height="h-[16vh] min-h-[8rem] max-h-[12rem]"
+          class="object-contain"
         />
       </div>
 
       <!-- Heading -->
-      <div class="mt-10 text-center">
-
-  
-        <h1 class="mx-auto mt-6 max-w-2xl text-4xl font-bold leading-relaxed text-note-pumice">
+      <div class="mt-[2.5vh] text-center">
+        <h1
+          class="mx-auto max-w-2xl text-2xl font-bold leading-snug text-note-pumice sm:text-3xl md:text-4xl md:leading-relaxed"
+        >
           <span class="text-note-paprika">Your ideas</span>
           deserve a place to stay.
           <br />
@@ -163,10 +161,12 @@ async function createNote(): Promise<void> {
       </div>
 
       <div
-        class="mt-14 rounded-3xl border border-note-pumice/10 bg-black/40 p-10 shadow-2xl backdrop-blur-2xl"
+        class="mt-[3.5vh] rounded-2xl border border-note-pumice/10 bg-black/40 px-6 py-5 shadow-2xl backdrop-blur-2xl sm:rounded-3xl sm:px-8 sm:py-7 md:px-10 md:py-8"
       >
         <div>
-          <label class="mb-3 block text-sm uppercase tracking-[0.25em] text-note-pumice/50">
+          <label
+            class="mb-2 block text-xs uppercase tracking-[0.25em] text-note-pumice/50 sm:mb-3 sm:text-sm"
+          >
             Note title
           </label>
 
@@ -179,52 +179,60 @@ async function createNote(): Promise<void> {
           ></TextInput>
         </div>
 
-        <!-- Settings -->
-        <div class="mt-10 space-y-4">
+        <div class="mt-[3.5vh] space-y-3 sm:space-y-4">
           <div
-            class="flex items-center justify-between rounded-2xl border border-note-pumice/10 bg-black/30 px-6 py-5"
+            class="flex items-center justify-between rounded-xl border border-note-pumice/10 bg-black/30 px-5 py-3 sm:rounded-2xl sm:px-6 sm:py-5"
           >
-            <div class="flex items-center gap-5">
-              <div class="flex h-14 w-14 items-center justify-center rounded-xl bg-note-paprika/10">
-                <LockKeyhole class="h-7 w-7 text-note-paprika" />
+            <div class="flex items-center gap-4 sm:gap-5">
+              <div
+                class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-note-paprika/10 sm:h-14 sm:w-14"
+              >
+                <LockKeyhole class="h-6 w-6 text-note-paprika sm:h-7 sm:w-7" />
               </div>
 
               <div>
-                <p class="text-lg text-note-ivory">Encryption</p>
-
-                <p class="text-sm text-note-pumice/50">Protect your private thoughts</p>
+                <p class="text-base text-note-ivory sm:text-lg">Encryption</p>
+                <p class="text-[11px] text-note-pumice/50 sm:text-sm">
+                  Protect your private thoughts
+                </p>
               </div>
             </div>
             <SwitchInput
               :current-value="encryption"
               id="encryption"
+              class="shrink-0"
               @setting-changed="settingChanged"
             />
           </div>
 
           <div
-            class="flex items-center justify-between rounded-2xl border border-note-pumice/10 bg-black/30 px-6 py-5"
+            class="flex items-center justify-between rounded-xl border border-note-pumice/10 bg-black/30 px-5 py-3 sm:rounded-2xl sm:px-6 sm:py-5"
           >
-            <div class="flex items-center gap-5">
-              <div class="flex h-14 w-14 items-center justify-center rounded-xl bg-note-glow/10">
-                <Cloud class="h-7 w-7 text-note-glow" />
+            <div class="flex items-center gap-4 sm:gap-5">
+              <div
+                class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-note-glow/10 sm:h-14 sm:w-14"
+              >
+                <Cloud class="h-6 w-6 text-note-glow sm:h-7 sm:w-7" />
               </div>
 
               <div>
-                <p class="text-lg text-note-ivory">Synchronization</p>
-
-                <p class="text-sm text-note-pumice/50">Keep your knowledge everywhere</p>
+                <p class="text-base text-note-ivory sm:text-lg">Synchronization</p>
+                <p class="text-[11px] text-note-pumice/50 sm:text-sm">
+                  Keep your knowledge everywhere
+                </p>
               </div>
             </div>
+
             <SwitchInput
               :current-value="sync"
               id="sync"
+              class="shrink-0"
               @setting-changed="settingChanged"
               v-if="canSync"
             />
-
             <DisabledSwitch
               id="sync"
+              class="shrink-0"
               :why-disabled="whyDisabled"
               v-else
               :checked="false"
@@ -234,10 +242,12 @@ async function createNote(): Promise<void> {
 
         <SubmitButton
           content="Create note"
-          class="mt-8 h-14 w-full text-xl active:scale-[98%]"
+          class="mt-[3.5vh] h-12 w-full text-lg active:scale-[98%] sm:h-14 sm:text-xl"
           @click="createNote"
         />
       </div>
     </div>
+
+    <div class="min-h-[1rem] w-full shrink grow-[1]"></div>
   </div>
 </template>

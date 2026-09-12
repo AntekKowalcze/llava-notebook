@@ -97,7 +97,7 @@ export const useAuthStore = defineStore('auth', () => {
     pendingNotLoggedInTimeout = setTimeout(() => {
       pendingNotLoggedInTimeout = null;
       notLoggedInToastShown = true;
-      useOnlineAuthStore().loggedIn = false
+      useOnlineAuthStore().loggedIn = false;
       useToast().warning('online user is not logged in');
     }, NOT_LOGGED_IN_GRACE_MS);
   }
@@ -200,7 +200,6 @@ export const useAuthStore = defineStore('auth', () => {
       }
     });
   }
-
 
   async function ensureSession() {
     if (sessionReady.value) {

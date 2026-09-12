@@ -1,5 +1,5 @@
-use std::collections::HashSet;
 use regex::Regex;
+use std::collections::HashSet;
 
 use llava_core::{
     attachments::{delete_attachment, get_attachments_for_note},
@@ -34,10 +34,12 @@ pub async fn clean_attachments(
     // Matches both resolved formats:
     //   attachment://localhost/<uuid>          (Linux/macOS)
     //   http(s)://attachment.localhost/<uuid>  (Windows)
-    let uuid_pattern = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
+    let uuid_pattern =
+        r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
     let re = Regex::new(&format!(
         r"(?:attachment://localhost/|https?://attachment\.localhost/)({uuid_pattern})"
-    )).unwrap();
+    ))
+    .unwrap();
 
     let used_attachment_ids: HashSet<String> = re
         .captures_iter(&content)

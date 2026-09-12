@@ -12,7 +12,7 @@ import { useAuthStore } from '../../stores/auth';
 import { useUserConfigStore } from '../../stores/userConfig';
 import LoadingCircle from '../../components/main/LoadingCircle.vue';
 import { useLayoutStore } from '../../stores/layoutStore.ts';
-const isLoading = ref<boolean>(false)
+const isLoading = ref<boolean>(false);
 const toast = useToast();
 const authStore = useAuthStore();
 const onlineAuthStore = useOnlineAuthStore();
@@ -20,15 +20,15 @@ const router = useRouter();
 const password = ref<string>('');
 const email = ref<string>('');
 const userConfig = useUserConfigStore();
-const localPassword = ref<string>('')
+const localPassword = ref<string>('');
 const lockoutUntil = ref<number | null>(null);
 let lockoutTimer: ReturnType<typeof setTimeout> | null = null;
-const layoutStore = useLayoutStore()
-onMounted(async()=> {
-await layoutStore.setupReencryptingListener();
-
-})
-const emailPattern = /^[\p{L}\p{N}!#$%&'*+/=?^_`{|}~-]+(?:\.[\p{L}\p{N}!#$%&'*+/=?^_`{|}~-]+)*@(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?\.)+[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?$/u;
+const layoutStore = useLayoutStore();
+onMounted(async () => {
+  await layoutStore.setupReencryptingListener();
+});
+const emailPattern =
+  /^[\p{L}\p{N}!#$%&'*+/=?^_`{|}~-]+(?:\.[\p{L}\p{N}!#$%&'*+/=?^_`{|}~-]+)*@(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?\.)+[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?$/u;
 const correctEmail = computed(() => {
   return emailPattern.test(email.value);
 });
@@ -79,12 +79,12 @@ async function submitLogin() {
 
     userConfig.updateSettingValue('local.mode', 'off');
 
-  isLoading.value = true;
+    isLoading.value = true;
     let online_user_id = await invoke<string>('login_online', {
       email: email.value,
       password: password.value,
       currentSettings: userConfig.settingList,
-      localPassword: localPassword.value
+      localPassword: localPassword.value,
     });
 
     toast.success('Connected accounts successfully');
@@ -98,7 +98,7 @@ async function submitLogin() {
     });
 
     await onlineAuthStore.fetchEmail();
-    void invoke<void>("synchronize_all")
+    void invoke<void>('synchronize_all');
     router.replace('/main/');
   } catch (err: any) {
     console.log(err);
@@ -154,43 +154,44 @@ onBeforeUnmount(() => {
   <FormCard
     header-text="Sign in"
     sub-text="log in to existing online account"
-  > <LoadingCircle v-if="isLoading"></LoadingCircle>
-  <template v-else>
-    <TextInput
-      :name="'email'"
-      :placeholder="'email'"
-      :type="InputTypes.Email"
-      v-model="email"
-    ></TextInput>
-    <TextInput
-      :name="'password'"
-      :placeholder="'online account password'"
-      :type="InputTypes.Password"
-      v-model="password"
-    ></TextInput>
-     <TextInput
-      :name="'password'"
-      :placeholder="'local account password'"
-      :type="InputTypes.Password"
-      v-model="localPassword"
-    ></TextInput>
-    <SubmitButton
-      :disabled="submitDisabled"
-      :content="'Submit'"
-      @click="submitLogin"
-    ></SubmitButton>
-    <RouterLink
-      to="/register/online"
-      class="mt-12 text-note-ivory/80 hover:underline"
-    >
-      Do you want to create online account?
-    </RouterLink>
-    <RouterLink
-      :to="'/main/settings'"
-      class="mt-4 text-note-ivory/80 hover:underline"
-    >
-      Return
-    </RouterLink>
+  >
+    <LoadingCircle v-if="isLoading"></LoadingCircle>
+    <template v-else>
+      <TextInput
+        :name="'email'"
+        :placeholder="'email'"
+        :type="InputTypes.Email"
+        v-model="email"
+      ></TextInput>
+      <TextInput
+        :name="'password'"
+        :placeholder="'online account password'"
+        :type="InputTypes.Password"
+        v-model="password"
+      ></TextInput>
+      <TextInput
+        :name="'password'"
+        :placeholder="'local account password'"
+        :type="InputTypes.Password"
+        v-model="localPassword"
+      ></TextInput>
+      <SubmitButton
+        :disabled="submitDisabled"
+        :content="'Submit'"
+        @click="submitLogin"
+      ></SubmitButton>
+      <RouterLink
+        to="/register/online"
+        class="mt-12 text-note-ivory/80 hover:underline"
+      >
+        Do you want to create online account?
+      </RouterLink>
+      <RouterLink
+        :to="'/main/settings'"
+        class="mt-4 text-note-ivory/80 hover:underline"
+      >
+        Return
+      </RouterLink>
     </template>
   </FormCard>
 </template>

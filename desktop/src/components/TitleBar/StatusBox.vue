@@ -13,11 +13,7 @@ defineProps<{
     <div class="flex flex-col gap-2.5">
       <!-- Current user -->
       <div class="flex min-w-0 items-center">
-        <span
-          class="w-28 shrink-0 whitespace-nowrap text-sm text-note-pumice"
-        >
-          Current user:
-        </span>
+        <span class="w-28 shrink-0 whitespace-nowrap text-sm text-note-pumice">Current user:</span>
 
         <span
           class="min-w-0 flex-1 truncate text-right text-sm text-note-ivory"
@@ -29,11 +25,7 @@ defineProps<{
 
       <!-- Online account -->
       <div class="flex min-w-0 items-center">
-        <span
-          class="w-28 shrink-0 whitespace-nowrap text-sm text-note-pumice"
-        >
-          Email:
-        </span>
+        <span class="w-28 shrink-0 whitespace-nowrap text-sm text-note-pumice">Email:</span>
 
         <span
           class="min-w-0 flex-1 truncate text-right text-sm text-note-ivory"
@@ -45,27 +37,15 @@ defineProps<{
 
       <!-- Internet -->
       <div class="flex min-w-0 items-center">
-        <span
-          class="w-28 shrink-0 whitespace-nowrap text-sm text-note-pumice"
-        >
-          Internet:
-        </span>
+        <span class="w-28 shrink-0 whitespace-nowrap text-sm text-note-pumice">Internet:</span>
 
         <span
           class="flex min-w-0 flex-1 items-center justify-end gap-1.5 text-xs"
-          :class="
-            internetConnection
-              ? 'text-note-glow'
-              : 'text-note-garnet'
-          "
+          :class="internetConnection ? 'text-note-glow' : 'text-note-garnet'"
         >
           <span
             class="h-1.5 w-1.5 shrink-0 rounded-full"
-            :class="
-              internetConnection
-                ? 'bg-note-glow'
-                : 'bg-note-garnet'
-            "
+            :class="internetConnection ? 'bg-note-glow' : 'bg-note-garnet'"
           />
           {{ internetConnection ? 'Connected' : 'Offline' }}
         </span>
@@ -73,27 +53,15 @@ defineProps<{
 
       <!-- Server -->
       <div class="flex min-w-0 items-center">
-        <span
-          class="w-28 shrink-0 whitespace-nowrap text-sm text-note-pumice"
-        >
-          Server:
-        </span>
+        <span class="w-28 shrink-0 whitespace-nowrap text-sm text-note-pumice">Server:</span>
 
         <span
           class="flex min-w-0 flex-1 items-center justify-end gap-1.5 text-xs"
-          :class="
-            serverConnection
-              ? 'text-note-glow'
-              : 'text-note-garnet'
-          "
+          :class="serverConnection ? 'text-note-glow' : 'text-note-garnet'"
         >
           <span
             class="h-1.5 w-1.5 shrink-0 rounded-full"
-            :class="
-              serverConnection
-                ? 'bg-note-glow'
-                : 'bg-note-garnet'
-            "
+            :class="serverConnection ? 'bg-note-glow' : 'bg-note-garnet'"
           />
           {{ serverConnection ? 'Connected' : 'Unavailable' }}
         </span>

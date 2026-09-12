@@ -127,7 +127,7 @@ async function hardDeleteNote(note: RemovedNote) {
     await invoke<void>('hard_delete_note', { noteId: note.local_id });
     await loadRemovedNotes();
   } catch (err) {
-    console.log(err)
+    console.log(err);
     toast.error('Failed to delete note');
   }
 }
@@ -274,19 +274,3 @@ async function restoreNote(note: RemovedNote) {
     </main>
   </div>
 </template>
-
-<!-- Create here removed notes component, which will look similar to allNotes view, i want it to use the same collor palette
- 
-          graphite: '#0F0F10', // Background
-          garnet: '#9F1239', //Red accent
-          paprika: '#F97316', // Orange accent
-          glow: '#FACC15', // Yellow accent
-          pumice: '#E7E5E4', // Grey
-          ivory: '#FFFBEB', //  Light ideal for text
-
-    i want on the top title "Removed notes" and under i want to have some text like 
-    your notes will be deleted 30 after removing them 
-    on the card i want to have title, and time left to delete note i also want to see tags
-    
-
--->
