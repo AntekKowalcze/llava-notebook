@@ -139,19 +139,26 @@ async function createNote(): Promise<void> {
   >
     <div class="min-h-0 w-full shrink grow-[1.5]"></div>
 
-    <div class="w-full max-w-4xl shrink-0 py-2">
+    <!-- 
+      Responsive Max Width:
+      < 1600px: max-w-2xl (compact)
+      >= 1600px: max-w-4xl (roomy desktop)
+    -->
+    <div class="w-full max-w-2xl shrink-0 py-2 min-[1600px]:max-w-4xl">
+      
+      <!-- Responsive Icon Sizing -->
       <div class="flex justify-center">
         <IconComponent
-          width="w-[16vh] min-w-[8rem] max-w-[12rem]"
-          height="h-[16vh] min-h-[8rem] max-h-[12rem]"
+          width="w-[12vh] min-w-[5.5rem] max-w-[8rem] min-[1600px]:w-[16vh] min-[1600px]:min-w-[8rem] min-[1600px]:max-w-[12rem]"
+          height="h-[12vh] min-h-[5.5rem] max-h-[8rem] min-[1600px]:h-[16vh] min-[1600px]:min-h-[8rem] min-[1600px]:max-h-[12rem]"
           class="object-contain"
         />
       </div>
 
-      <!-- Heading -->
-      <div class="mt-[2.5vh] text-center">
+      <!-- Responsive Heading -->
+      <div class="mt-[2vh] text-center min-[1600px]:mt-[2.5vh]">
         <h1
-          class="mx-auto max-w-2xl text-2xl font-bold leading-snug text-note-pumice sm:text-3xl md:text-4xl md:leading-relaxed"
+          class="mx-auto max-w-2xl text-xl font-bold leading-snug text-note-pumice sm:text-2xl min-[1600px]:text-4xl min-[1600px]:leading-relaxed"
         >
           <span class="text-note-paprika">Your ideas</span>
           deserve a place to stay.
@@ -160,12 +167,13 @@ async function createNote(): Promise<void> {
         </h1>
       </div>
 
+      <!-- Responsive Form Card -->
       <div
-        class="mt-[3.5vh] rounded-2xl border border-note-pumice/10 bg-black/40 px-6 py-5 shadow-2xl backdrop-blur-2xl sm:rounded-3xl sm:px-8 sm:py-7 md:px-10 md:py-8"
+        class="mt-[2.5vh] rounded-2xl border border-note-pumice/10 bg-black/40 px-5 py-5 shadow-2xl backdrop-blur-2xl sm:rounded-3xl sm:px-6 sm:py-6 min-[1600px]:mt-[3.5vh] min-[1600px]:p-10"
       >
         <div>
           <label
-            class="mb-2 block text-xs uppercase tracking-[0.25em] text-note-pumice/50 sm:mb-3 sm:text-sm"
+            class="mb-1.5 block text-xs uppercase tracking-[0.25em] text-note-pumice/50 sm:mb-2 sm:text-sm"
           >
             Note title
           </label>
@@ -179,20 +187,23 @@ async function createNote(): Promise<void> {
           ></TextInput>
         </div>
 
-        <div class="mt-[3.5vh] space-y-3 sm:space-y-4">
+        <!-- Responsive Settings Stack -->
+        <div class="mt-[2.5vh] space-y-2.5 sm:space-y-3 min-[1600px]:mt-[3.5vh] min-[1600px]:space-y-4">
+          
+          <!-- Encryption Row -->
           <div
-            class="flex items-center justify-between rounded-xl border border-note-pumice/10 bg-black/30 px-5 py-3 sm:rounded-2xl sm:px-6 sm:py-5"
+            class="flex items-center justify-between rounded-xl border border-note-pumice/10 bg-black/30 px-4 py-3 sm:rounded-2xl sm:px-5 sm:py-3.5 min-[1600px]:px-6 min-[1600px]:py-5"
           >
-            <div class="flex items-center gap-4 sm:gap-5">
+            <div class="flex items-center gap-3 sm:gap-4 min-[1600px]:gap-5">
               <div
-                class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-note-paprika/10 sm:h-14 sm:w-14"
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-note-paprika/10 sm:h-11 sm:w-11 min-[1600px]:h-14 min-[1600px]:w-14"
               >
-                <LockKeyhole class="h-6 w-6 text-note-paprika sm:h-7 sm:w-7" />
+                <LockKeyhole class="h-5 w-5 text-note-paprika sm:h-6 sm:w-6 min-[1600px]:h-7 min-[1600px]:w-7" />
               </div>
 
               <div>
-                <p class="text-base text-note-ivory sm:text-lg">Encryption</p>
-                <p class="text-[11px] text-note-pumice/50 sm:text-sm">
+                <p class="text-sm text-note-ivory sm:text-base min-[1600px]:text-lg">Encryption</p>
+                <p class="text-[10px] text-note-pumice/50 sm:text-xs min-[1600px]:text-sm">
                   Protect your private thoughts
                 </p>
               </div>
@@ -205,19 +216,20 @@ async function createNote(): Promise<void> {
             />
           </div>
 
+          <!-- Sync Row -->
           <div
-            class="flex items-center justify-between rounded-xl border border-note-pumice/10 bg-black/30 px-5 py-3 sm:rounded-2xl sm:px-6 sm:py-5"
+            class="flex items-center justify-between rounded-xl border border-note-pumice/10 bg-black/30 px-4 py-3 sm:rounded-2xl sm:px-5 sm:py-3.5 min-[1600px]:px-6 min-[1600px]:py-5"
           >
-            <div class="flex items-center gap-4 sm:gap-5">
+            <div class="flex items-center gap-3 sm:gap-4 min-[1600px]:gap-5">
               <div
-                class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-note-glow/10 sm:h-14 sm:w-14"
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-note-glow/10 sm:h-11 sm:w-11 min-[1600px]:h-14 min-[1600px]:w-14"
               >
-                <Cloud class="h-6 w-6 text-note-glow sm:h-7 sm:w-7" />
+                <Cloud class="h-5 w-5 text-note-glow sm:h-6 sm:w-6 min-[1600px]:h-7 min-[1600px]:w-7" />
               </div>
 
               <div>
-                <p class="text-base text-note-ivory sm:text-lg">Synchronization</p>
-                <p class="text-[11px] text-note-pumice/50 sm:text-sm">
+                <p class="text-sm text-note-ivory sm:text-base min-[1600px]:text-lg">Synchronization</p>
+                <p class="text-[10px] text-note-pumice/50 sm:text-xs min-[1600px]:text-sm">
                   Keep your knowledge everywhere
                 </p>
               </div>
@@ -240,9 +252,10 @@ async function createNote(): Promise<void> {
           </div>
         </div>
 
+        <!-- Responsive Submit Button -->
         <SubmitButton
           content="Create note"
-          class="mt-[3.5vh] h-12 w-full text-lg active:scale-[98%] sm:h-14 sm:text-xl"
+          class="mt-[2.5vh] h-11 w-full text-base active:scale-[98%] sm:h-12 min-[1600px]:mt-[3.5vh] min-[1600px]:h-14 min-[1600px]:text-xl"
           @click="createNote"
         />
       </div>
