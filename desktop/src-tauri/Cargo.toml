@@ -1,6 +1,6 @@
 [package]
 name = "llava"
-version = "0.1.0"
+version = "1.0.0"
 description = "Llava, safe space for you thoughts"
 authors = ["Antoni Kowalcze"]
 edition = "2021"
