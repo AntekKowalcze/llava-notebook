@@ -9,28 +9,65 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  create-release:
+    name: Create release
+    runs-on: ubuntu-latest
+
+    outputs:
+      release_id: ${{ steps.release.outputs.release_id }}
+
+    steps:
+      - name: Create draft release
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASE_ID=$(
+            gh api \
+              --method POST \
+              "/repos/${GITHUB_REPOSITORY}/releases" \
+              -f tag_name="${GITHUB_REF_NAME}" \
+              -f name="llava ${GITHUB_REF_NAME}" \
+              -f body="See the assets below to download llava." \
+              -F draft=true \
+              -F prerelease=false \
+              --jq '.id'
+          )
+
+          echo "release_id=$RELEASE_ID" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ matrix.name }}
+    needs: create-release
+
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-22.04
+          - name: Linux x86_64
+            os: ubuntu-22.04
             args: ""
-          - os: windows-latest
+
+          - name: Windows x86_64
+            os: windows-latest
             args: ""
-          - os: macos-latest
+
+          - name: macOS x86_64
+            os: macos-latest
             args: "--target x86_64-apple-darwin"
-          - os: macos-latest
+
+          - name: macOS ARM64
+            os: macos-latest
             args: "--target aarch64-apple-darwin"
 
     runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: lts/*
           cache: npm
@@ -65,7 +102,54 @@ jobs:
         working-directory: desktop
         run: npm ci
 
-      - name: Build and publish Tauri app
+      - name: Sync app version from tag
+        shell: bash
+        working-directory: desktop
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+
+          echo "Setting app version to ${VERSION}"
+
+          jq --arg v "$VERSION" \
+            '.version = $v' \
+            src-tauri/tauri.conf.json \
+            > src-tauri/tauri.conf.json.tmp
+
+          mv src-tauri/tauri.conf.json.tmp src-tauri/tauri.conf.json
+
+          python3 - "$VERSION" <<'EOF'
+          import re
+          import sys
+
+          version = sys.argv[1]
+          path = "src-tauri/Cargo.toml"
+
+          with open(path, encoding="utf-8") as f:
+              content = f.read()
+
+          new_content, count = re.subn(
+              r'(?m)^version\s*=\s*".*"',
+              f'version = "{version}"',
+              content,
+              count=1,
+          )
+
+          if count != 1:
+              raise SystemExit(
+                  f"Expected exactly one package version in {path}, replaced {count}"
+              )
+
+          with open(path, "w", encoding="utf-8") as f:
+              f.write(new_content)
+          EOF
+
+          echo "tauri.conf.json:"
+          jq -r '.version' src-tauri/tauri.conf.json
+
+          echo "Cargo.toml:"
+          grep -m1 '^version' src-tauri/Cargo.toml
+
+      - name: Build and upload Tauri app
         uses: tauri-apps/tauri-action@action-v1.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -73,9 +157,125 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: desktop
-          tagName: ${{ github.ref_name }}
-          releaseName: "llava ${{ github.ref_name }}"
-          releaseBody: "See the assets below to download llava."
-          releaseDraft: true
-          prerelease: false
+          releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}
+          uploadUpdaterJson: false
+          uploadUpdaterSignatures: true
+
+  generate-updater-json:
+    name: Generate updater metadata
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download signatures
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir signatures
+
+          gh release download "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "*.sig" \
+            --dir signatures
+
+      - name: Generate latest.json
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+
+          echo "Available signatures:"
+          find signatures -maxdepth 1 -type f -print
+
+          LINUX_SIG_FILE=$(find signatures -maxdepth 1 -type f \
+            -name "*.AppImage.sig" | head -n 1)
+
+          WINDOWS_SIG_FILE=$(find signatures -maxdepth 1 -type f \
+            -name "*-setup.exe.sig" | head -n 1)
+
+          MACOS_X86_SIG_FILE=$(find signatures -maxdepth 1 -type f \
+            -name "*.app.tar.gz.sig" \
+            | grep -E '_(x64|x86_64)\.app\.tar\.gz\.sig$' \
+            | head -n 1)
+
+          MACOS_ARM_SIG_FILE=$(find signatures -maxdepth 1 -type f \
+            -name "*.app.tar.gz.sig" \
+            | grep -E '_aarch64\.app\.tar\.gz\.sig$' \
+            | head -n 1)
+
+          test -n "$LINUX_SIG_FILE" || {
+            echo "Linux signature not found"
+            exit 1
+          }
+
+          test -n "$WINDOWS_SIG_FILE" || {
+            echo "Windows NSIS signature not found"
+            exit 1
+          }
+
+          test -n "$MACOS_X86_SIG_FILE" || {
+            echo "macOS x86_64 signature not found"
+            exit 1
+          }
+
+          test -n "$MACOS_ARM_SIG_FILE" || {
+            echo "macOS aarch64 signature not found"
+            exit 1
+          }
+
+          LINUX_SIG=$(cat "$LINUX_SIG_FILE")
+          WINDOWS_SIG=$(cat "$WINDOWS_SIG_FILE")
+          MACOS_X86_SIG=$(cat "$MACOS_X86_SIG_FILE")
+          MACOS_ARM_SIG=$(cat "$MACOS_ARM_SIG_FILE")
+
+          LINUX_ASSET=$(basename "$LINUX_SIG_FILE" .sig)
+          WINDOWS_ASSET=$(basename "$WINDOWS_SIG_FILE" .sig)
+          MACOS_X86_ASSET=$(basename "$MACOS_X86_SIG_FILE" .sig)
+          MACOS_ARM_ASSET=$(basename "$MACOS_ARM_SIG_FILE" .sig)
+
+          cat > latest.json <<EOF
+          {
+            "version": "${VERSION}",
+            "notes": "Release ${TAG}",
+            "pub_date": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "platforms": {
+              "linux-x86_64": {
+                "signature": "${LINUX_SIG}",
+                "url": "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${LINUX_ASSET}"
+              },
+              "windows-x86_64": {
+                "signature": "${WINDOWS_SIG}",
+                "url": "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${WINDOWS_ASSET}"
+              },
+              "darwin-x86_64": {
+                "signature": "${MACOS_X86_SIG}",
+                "url": "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${MACOS_X86_ASSET}"
+              },
+              "darwin-aarch64": {
+                "signature": "${MACOS_ARM_SIG}",
+                "url": "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${MACOS_ARM_ASSET}"
+              }
+            }
+          }
+          EOF
+
+          cat latest.json
+
+      - name: Upload latest.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload \
+            "${GITHUB_REF_NAME}" \
+            latest.json \
+            --repo "${GITHUB_REPOSITORY}" \
+            --clobber
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release edit "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --draft=false

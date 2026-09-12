@@ -27,7 +27,7 @@ const layout = useLayoutStore();
     </div>
 
     <BottomBar
-      :version="'1.0.0'"
+      :version="'1.0.1'"
       :synced="'synced'"
       class="w-full shrink-0"
     />
