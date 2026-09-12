@@ -6,6 +6,10 @@
     "linux-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTRzUrZjFLT3RyL0xmR04rOEp0Y2dWYWJ2Uk9hWGthblhYZzl6NXJwS29OcGUzZFBzb0Z5b0Y2eHM4bTVTaVcvc20xZ2ZmeFMrNjc4eSswWG5ZOUZJSWpORW9RSjZQWUFRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MjE0ODk4CWZpbGU6bGxhdmFfMS4wLjBfYW1kNjQuQXBwSW1hZ2UKQVVHeFo0VTA0Y3pDenM2a2pacXprcHRScGhkc3h4dTJDajVUZ0QwVGxleVZhWjgxWTdjSmR5R0N0ZEdQRXRnTVdQeGRXU25jeWZUWFdqc0EzV2paQmc9PQo=",
       "url": "https://github.com/AntekKowalcze/llava-notebook/releases/download/v1.0.0/llava_1.0.0_amd64.AppImage"
+    },
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTRzUrZjFLT3RyL0xMYmt4aEF2MjZZY2ZLdGtUdW5YazhtT1BiV0ZTMmMxeEFoKzY1UytyTEpGRGM2bHNQdkN0RFBUTnhJT1RVSVRBOUQrNDVZSmp0RG12b3ovZVA4L1FVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MjI0ODM4CWZpbGU6bGxhdmFfMS4wLjBfeDY0LXNldHVwLmV4ZQp5ZWJnU21wMUxhV3RqYnhSYXJGK3NQK1BjTy82c3lrVndFa3JrTnJRT2hyNk9vK3F2VHU1U2JaYXRkYlNNZ3BxY2xEMmhsRTI3eGRFTXJsM2lDYmxDZz09Cg==",
+      "url": "https://github.com/AntekKowalcze/llava-notebook/releases/download/v1.0.0/llava-1.0.0-x64-setup.exe"
     }
   }
 }
