@@ -112,11 +112,7 @@ The result is a project that is both a functional application and a learning exp
 
 ### Demo
 
-<p align="center">
-  <a href="https://github.com/user-attachments/assets/23f1b340-dab6-46b2-9602-7c9dccbb9ccf">
-    <img src="assets/thumbnail.png" alt="Watch Llava Demo" width="480">
-  </a>
-</p>
+[![Watch Llava Demo](assets/thumbnail.png)](https://github.com/user-attachments/assets/23f1b340-dab6-46b2-9602-7c9dccbb9ccf)
 
 <p align="center">
   <em>Click to watch the full demo</em>
