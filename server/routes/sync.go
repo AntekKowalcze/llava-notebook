@@ -1640,7 +1640,6 @@ func (s *SyncHandler) UpdateNote(c fiber.Ctx) error {
 			"mongo_id", mongoID,
 			"error", err,
 		)
-		// TODO on 16:9 dashboard is to long
 		return middleware.BadRequest("Invalid mongo_id in path")
 	}
 

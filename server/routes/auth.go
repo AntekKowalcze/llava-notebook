@@ -299,7 +299,6 @@ func (h *Handler) PreLogin(c fiber.Ctx) error {
 	).Decode(&user)
 
 	if err != nil {
-		// Nie ujawniamy, czy email istnieje.
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{
 			"password_salt": base64.RawStdEncoding.EncodeToString(generateDummySalt()),
 		})
