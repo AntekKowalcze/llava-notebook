@@ -421,25 +421,19 @@ func checkNoteSync(
 
 		return result, nil
 	}
-
-	switch note.SyncState {
-	case "PendingUpload":
-		result.NotesToUpload = append(
-			result.NotesToUpload,
-			note.LocalID,
+	if foundNote.CloudVersion > *note.CloudVersion {
+		result.NotesToDownload = append(
+			result.NotesToDownload,
+			*foundNote,
 		)
-	case "PendingDeleted":
-		result.NotesToUpload = append(
-			result.NotesToUpload,
-			note.LocalID,
-		)
-	default:
-		if foundNote.CloudVersion > *note.CloudVersion {
-			result.NotesToDownload = append(
-				result.NotesToDownload,
-				*foundNote,
+	} else if foundNote.CloudVersion == *note.CloudVersion {
+		switch note.SyncState {
+		case "PendingUpload", "PendingDeleted":
+			result.NotesToUpload = append(
+				result.NotesToUpload,
+				note.LocalID,
 			)
-		} else if foundNote.CloudVersion == *note.CloudVersion {
+		default:
 			result.SyncedNotes = append(
 				result.SyncedNotes,
 				note.LocalID,
