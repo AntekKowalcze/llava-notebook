@@ -114,9 +114,6 @@ The result is a project that is both a functional application and a learning exp
 
 [![Watch Llava Demo](assets/thumbnail.png)](https://github.com/user-attachments/assets/23f1b340-dab6-46b2-9602-7c9dccbb9ccf)
 
-<p align="center">
-  <em>Click to watch the full demo</em>
-</p>
 
 The demo shows Llava running simultaneously on a **Windows client** and a **Linux client**, demonstrating the local-first synchronization model while both devices interact with the same account.
 
