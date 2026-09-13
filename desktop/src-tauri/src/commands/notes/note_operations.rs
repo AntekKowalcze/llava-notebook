@@ -299,7 +299,11 @@ pub async fn save_note(
             llava_core::storage::toggle_note_encryption(note_id.clone(), notes_db, next_value)?;
         }
 
+        if let Ok(sync_state) = llava_core::storage::check_if_note_is_synced(&note_id, notes_db) {
+    if sync_state {
         let _ = llava_core::storage::change_sync_to_pending_upload(notes_db, &note_id);
+    }
+}
     }
 
     Ok(())
@@ -489,3 +493,4 @@ pub fn restore_note(
 
     Ok(())
 }
+

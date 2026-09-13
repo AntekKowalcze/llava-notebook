@@ -30,7 +30,6 @@ const cardSettingsIdList: string[] = [
   'local.mode',
   'local.encryption',
   'local.logout',
-
   'local.showLogs',
   'local.deleteLocalFiles',
 ];

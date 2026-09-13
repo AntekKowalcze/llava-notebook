@@ -139,11 +139,7 @@ async function createNote(): Promise<void> {
   >
     <div class="min-h-0 w-full shrink grow-[1.5]"></div>
 
-    <!-- 
-      Responsive Max Width:
-      < 1600px: max-w-2xl (compact)
-      >= 1600px: max-w-4xl (roomy desktop)
-    -->
+  
     <div class="w-full max-w-2xl shrink-0 py-2 min-[1600px]:max-w-4xl">
       
       <!-- Responsive Icon Sizing -->

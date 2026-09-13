@@ -1529,11 +1529,7 @@ pub fn handle_notes_to_download(
             .clone()
             .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
-        let extension = if note.is_deleted {
-            TEMP_NOTE_EXTENSION
-        } else {
-            NOTE_EXTENSION
-        };
+    
         let file_path: path::PathBuf;
         if note.is_deleted {
             file_path = tmp_deleted_path.join(format!("{}{}", local_id, TEMP_NOTE_EXTENSION));

@@ -19,8 +19,9 @@ const isChangingTitle = ref(false);
 const newTitle = ref('');
 const encryptionState = computed(() => (currentNoteStore.currentNote?.encrypted ? 'on' : 'off'));
 
-const syncState = computed(() =>
-  currentNoteStore.currentNote?.sync_state === 'LocalOnly' ? 'off' : 'on'
+const syncState = computed(() =>{
+ return  currentNoteStore.currentNote?.sync_state === 'LocalOnly' ? 'off' : 'on'
+}
 );
 
 async function settingChanged(id: string, value: string) {
@@ -36,7 +37,6 @@ async function settingChanged(id: string, value: string) {
     case 'sync': {
       try {
         await invoke<void>('toggle_note_sync', { noteId, value });
-
         if (currentNoteStore.currentNote) {
           currentNoteStore.currentNote.sync_state = value === 'off' ? 'LocalOnly' : 'PendingUpload';
         }
