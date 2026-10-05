@@ -18,19 +18,18 @@
 //!   record.
 //! * [`read_attachment`] — Reads an attachment from disk and decrypts it when
 //!   the attachment is encrypted.
+//! * [`copy_attachment_with_encryption`] — Copies an attachment into a new
+//!   one stored encrypted or as plaintext (used when a note's encryption is
+//!   switched; attachments are never rewritten in place).
 //! * [`delete_attachment`] — Removes an attachment from local storage and
 //!   either deletes its database record or marks it for cloud deletion.
 //! * [`check_if_attachment_is_encrypted`] — Retrieves the encryption state of
 //!   an attachment from the local database.
-//! * [`toggle_attachments_encryption_for_note`] — Updates the encryption state
-//!   of all attachments belonging to a note.
 //! * [`toggle_attachments_sync_for_note`] — Changes the synchronization state
 //!   of attachments belonging to a note when transitioning them away from a
 //!   deletion state.
 //! * [`get_attachments_for_note`] — Retrieves local attachment identifiers and
 //!   filesystem paths for a note.
-//! * [`update_attachment_file`] — Replaces the contents of an attachment file
-//!   at the specified filesystem path.
 //! * [`check_attachment_existance`] — Checks whether an attachment exists in
 //!   the local database.
 //!
@@ -309,7 +308,17 @@ pub fn delete_attachment(
         )
         .context("failed to get attachment")?;
 
-    fs::remove_file(&local_path).context("failed to delete attachment file")?;
+    // A file that is already gone must not block removing the database entry,
+    // otherwise cleanup would fail on the same attachment forever.
+    match fs::remove_file(&local_path) {
+        Ok(()) => {}
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+        Err(err) => {
+            return Err(anyhow::Error::from(err)
+                .context("failed to delete attachment file")
+                .into());
+        }
+    }
 
     match sync_state {
         SyncState::LocalOnly => {
@@ -340,6 +349,49 @@ pub fn delete_attachment(
 
     Ok(())
 }
+/// Copies an attachment into a new attachment of the same note, stored
+/// encrypted or as plaintext according to `encrypt`.
+///
+/// Used when a note's encryption is switched. Attachments are never rewritten
+/// in place: sync treats them as immutable (a changed checksum makes it
+/// download the cloud copy back), so a rewritten file would be reverted and
+/// the cloud would keep the old bytes. A copy gets a new id, is uploaded as a
+/// new object, and the old attachment can be deleted everywhere.
+///
+/// # Errors
+/// Returns an error if the attachment cannot be read or the copy cannot be
+/// stored.
+pub fn copy_attachment_with_encryption(
+    notes_key: &Key,
+    assets_path: &PathBuf,
+    notes_db: &rusqlite::Connection,
+    attachment_id: &str,
+    encrypt: bool,
+    is_synced: bool,
+) -> Result<Attachment, crate::errors::Error> {
+    let (note_id, filename, mime_type): (String, String, String) = notes_db
+        .query_row(
+            "SELECT note_local_id, filename, mime_type FROM attachments WHERE attachment_id = ?1",
+            params![attachment_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .context("failed to get attachment metadata")?;
+
+    let plaintext = read_attachment(notes_key, notes_db, attachment_id.to_string())?;
+
+    create_attachment(
+        notes_key,
+        assets_path,
+        notes_db,
+        note_id,
+        filename,
+        mime_type,
+        encrypt,
+        plaintext,
+        is_synced,
+    )
+}
+
 pub fn check_if_attachment_is_encrypted(
     attachment_id: &str,
     notes_db: &rusqlite::Connection,
@@ -383,20 +435,6 @@ pub fn check_if_attachment_is_encrypted(
     );
 
     Ok(is_encrypted)
-}
-
-pub fn toggle_attachments_encryption_for_note(
-    notes_db: &rusqlite::Connection,
-    value: bool,
-    note_id: &str,
-) -> Result<(), crate::errors::Error> {
-    let updated_at = crate::utils::get_time();
-    notes_db.execute("UPDATE attachments SET encrypted = :value, updated_at = :updated_at WHERE note_local_id = :note_id",named_params! {
-                ":value": value,
-                ":updated_at": updated_at,
-                ":note_id": note_id,
-            }, ).context("failed to toggle encryption for attachments")?;
-    Ok(())
 }
 
 pub fn toggle_attachments_sync_for_note(
@@ -463,14 +501,6 @@ pub fn get_attachments_for_note(
     Ok(return_vec)
 }
 
-pub fn update_attachment_file(
-    path: &std::path::Path,
-    content: Vec<u8>,
-) -> Result<(), crate::errors::Error> {
-    std::fs::write(path, content)?;
-    Ok(())
-}
-
 pub fn check_attachment_existance(notes_db: &rusqlite::Connection, attachment_id: &str) -> bool {
     notes_db
         .query_row(
@@ -479,4 +509,91 @@ pub fn check_attachment_existance(notes_db: &rusqlite::Connection, attachment_id
             |row| row.get::<_, bool>(0),
         )
         .unwrap_or(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::constants::NOTE_DB_SCHEMA;
+
+    const NOTE_ID: &str = "0b9f6a8e-3c0d-4a51-9a52-1d0f2f6a7c11";
+
+    fn setup() -> (rusqlite::Connection, tempfile::TempDir, Key) {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(NOTE_DB_SCHEMA).unwrap();
+        conn.execute(
+            "INSERT INTO notes (local_id, owner_id, title, summary, content_path, created_at, updated_at)
+             VALUES (?1, 'owner', 't', 's', 'p', 1, 1)",
+            params![NOTE_ID],
+        )
+        .unwrap();
+        (
+            conn,
+            tempfile::tempdir().unwrap(),
+            *Key::from_slice(&[7u8; 32]),
+        )
+    }
+
+    fn row(conn: &rusqlite::Connection, id: &str) -> (bool, String, String) {
+        conn.query_row(
+            "SELECT encrypted, sync_state, local_path FROM attachments WHERE attachment_id = ?1",
+            params![id],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn copy_switches_encryption_and_keeps_the_original() {
+        let (conn, dir, key) = setup();
+        let assets = dir.path().to_path_buf();
+        let image = b"\x89PNG fake image bytes".to_vec();
+
+        let original = create_attachment(
+            &key,
+            &assets,
+            &conn,
+            NOTE_ID.into(),
+            "a.png".into(),
+            "image/png".into(),
+            false,
+            image.clone(),
+            true,
+        )
+        .unwrap();
+        let original_id = original.attachment_id.to_string();
+
+        let encrypted =
+            copy_attachment_with_encryption(&key, &assets, &conn, &original_id, true, true)
+                .unwrap();
+        let encrypted_id = encrypted.attachment_id.to_string();
+
+        assert_ne!(encrypted_id, original_id);
+        let (is_encrypted, sync_state, path) = row(&conn, &encrypted_id);
+        assert!(is_encrypted);
+        assert_eq!(sync_state, "PendingUpload");
+        assert_ne!(
+            std::fs::read(&path).unwrap(),
+            image,
+            "stored bytes must be ciphertext"
+        );
+        assert_eq!(
+            read_attachment(&key, &conn, encrypted_id.clone()).unwrap(),
+            image
+        );
+
+        // The original is untouched (it is deleted separately).
+        let (original_encrypted, _, original_path) = row(&conn, &original_id);
+        assert!(!original_encrypted);
+        assert_eq!(std::fs::read(original_path).unwrap(), image);
+
+        let plain =
+            copy_attachment_with_encryption(&key, &assets, &conn, &encrypted_id, false, false)
+                .unwrap();
+        let (plain_encrypted, plain_state, plain_path) =
+            row(&conn, &plain.attachment_id.to_string());
+        assert!(!plain_encrypted);
+        assert_eq!(plain_state, "LocalOnly");
+        assert_eq!(std::fs::read(plain_path).unwrap(), image);
+    }
 }

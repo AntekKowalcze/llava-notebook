@@ -176,6 +176,12 @@ pub async fn sync(
         return Err(crate::errors::Error::OnlineSessionExpired);
     }
 
+    if status == reqwest::StatusCode::CONFLICT {
+        tracing::debug!(task = "sync", "server reports a sync already in progress");
+
+        return Err(crate::errors::Error::SyncInProgress);
+    }
+
     if !status.is_success() {
         tracing::error!(
             task = "sync",
@@ -196,6 +202,42 @@ pub async fn sync(
 
         crate::errors::Error::InternalError("Failed to decode response".to_string())
     })
+}
+
+/// Removes download instructions for notes the user switched to local-only.
+///
+/// Local-only notes are not part of the sync request, so the server treats a
+/// note that was synced earlier as missing on this client and offers it for
+/// download. Applying that would overwrite the local copy and flip it back to
+/// `Synced`, silently undoing the user's choice and discarding local edits.
+pub fn drop_instructions_for_local_only_notes(
+    notes_db: &Connection,
+    response: &mut CheckSyncResponse,
+) -> Result<(), crate::errors::Error> {
+    let mut stmt = notes_db
+        .prepare(
+            "SELECT mongo_id FROM notes WHERE sync_state = 'LocalOnly' AND mongo_id IS NOT NULL",
+        )
+        .context("failed to prepare local-only notes query")?;
+
+    let local_only: std::collections::HashSet<String> = stmt
+        .query_map([], |row| row.get::<_, String>(0))
+        .context("failed to query local-only notes")?
+        .filter_map(Result::ok)
+        .collect();
+
+    if local_only.is_empty() {
+        return Ok(());
+    }
+
+    response
+        .notes_to_download
+        .retain(|note| !local_only.contains(&note.cloud_id));
+    response
+        .attachments_to_download
+        .retain(|attachment| !local_only.contains(&attachment.note_cloud_id));
+
+    Ok(())
 }
 
 pub fn get_all_notes_to_sync(
@@ -502,6 +544,13 @@ pub fn execute_db_operation(
     operation: DbOperation,
 ) -> Result<(), crate::errors::Error> {
     match operation {
+        // Only valid after the commit; execute_db_operations defers it.
+        DbOperation::ReplaceNoteFile { .. } => {
+            return Err(crate::errors::Error::InternalError(
+                "note file replacement must run through execute_db_operations".to_string(),
+            ));
+        }
+
         DbOperation::InsertNote {
             local_id,
             mongo_id,
@@ -617,16 +666,97 @@ pub fn execute_db_operation(
             .context("failed to update note from cloud")?;
         }
 
+        // Applied when the server reports a note as already in sync. The note
+        // may have been edited (or deleted) after the sync-check request was
+        // built; flipping such a note back to 'Synced' would drop its pending
+        // upload, so only idle states are touched.
         DbOperation::MarkNoteSynced { local_id } => {
             tx.execute(
                 r#"
                 UPDATE notes
                 SET sync_state = 'Synced'
                 WHERE local_id = ?1
+                  AND sync_state NOT IN (
+                      'PendingUpload', 'PendingDeleted', 'WaitingForTombstone', 'LocalOnly'
+                  )
                 "#,
                 params![local_id],
             )
             .context("failed to mark note synced")?;
+        }
+
+        // Applied after this client uploaded the note. `updated_at` is the
+        // value the uploaded snapshot had: if the user edited the note while
+        // the upload was in flight it differs, and the note must stay
+        // PendingUpload so the newer edit is uploaded on the next sync.
+        // A note permanently deleted (WaitingForTombstone) or made local-only
+        // meanwhile keeps that state: neither changes `updated_at`, and
+        // flipping it to Synced would drop the tombstone or undo the choice.
+        DbOperation::MarkNoteSyncedIfUnchanged {
+            local_id,
+            updated_at,
+        } => {
+            tx.execute(
+                r#"
+                UPDATE notes
+                SET sync_state = 'Synced'
+                WHERE local_id = ?1
+                  AND updated_at = ?2
+                  AND sync_state NOT IN ('WaitingForTombstone', 'LocalOnly')
+                "#,
+                params![local_id, updated_at],
+            )
+            .context("failed to mark uploaded note synced")?;
+        }
+
+        DbOperation::InsertConflictCopy {
+            local_id,
+            owner_id,
+            title,
+            summary,
+            content_path,
+            created_at,
+            updated_at,
+            encrypted,
+            crypto_meta,
+        } => {
+            tx.execute(
+                r#"
+                INSERT INTO notes (
+                    local_id,
+                    mongo_id,
+                    owner_id,
+                    title,
+                    summary,
+                    content_path,
+                    created_at,
+                    updated_at,
+                    deleted_at,
+                    version,
+                    cloud_version,
+                    sync_state,
+                    is_deleted,
+                    encrypted,
+                    crypto_meta
+                )
+                VALUES (
+                    ?1, NULL, ?2, ?3, ?4, ?5, ?6, ?7,
+                    NULL, 0, NULL, 'PendingUpload', 0, ?8, ?9
+                )
+                "#,
+                params![
+                    local_id,
+                    owner_id,
+                    title,
+                    summary,
+                    content_path,
+                    created_at,
+                    updated_at,
+                    encrypted,
+                    crypto_meta,
+                ],
+            )
+            .context("failed to insert conflict copy")?;
         }
 
         DbOperation::SetCloudVersion {
@@ -715,6 +845,18 @@ pub fn execute_db_operation(
                     ?1, ?2, ?3, ?4, ?5, ?6, ?7,
                     ?8, ?9, ?10, ?11, ?12, ?13
                 )
+                ON CONFLICT(attachment_id) DO UPDATE SET
+                    filename = excluded.filename,
+                    mime_type = excluded.mime_type,
+                    size_bytes = excluded.size_bytes,
+                    local_path = excluded.local_path,
+                    cloud_key = excluded.cloud_key,
+                    checksum_encrypted = excluded.checksum_encrypted,
+                    encrypted = excluded.encrypted,
+                    crypto_meta = excluded.crypto_meta,
+                    sync_state = excluded.sync_state,
+                    created_at = excluded.created_at,
+                    updated_at = excluded.updated_at
                 "#,
                 params![
                     attachment_id,
@@ -828,18 +970,73 @@ pub fn execute_db_operations(
     operations: Vec<DbOperation>,
 ) -> Result<(), crate::errors::Error> {
     let tx = conn.transaction().context("failed to create transaction")?;
+    let mut file_replacements = Vec::new();
 
     for operation in operations {
-        execute_db_operation(&tx, operation)?;
+        match operation {
+            DbOperation::ReplaceNoteFile {
+                staged,
+                target,
+                stale,
+            } => {
+                file_replacements.push((staged, target, stale));
+            }
+            operation => execute_db_operation(&tx, operation)?,
+        }
     }
 
     tx.commit().context("failed to commit transaction")?;
 
+    for (staged, target, stale) in file_replacements {
+        replace_note_file(&staged, &target, &stale);
+    }
+
     Ok(())
 }
 
+/// Moves staged cloud content into place after its database update was
+/// committed. Failures are logged: the database already describes the new
+/// version, and the staged file is kept so the content is not lost.
+fn replace_note_file(staged: &str, target: &str, stale: &str) {
+    if let Err(err) = std::fs::rename(staged, target) {
+        tracing::error!(
+            task = "sync",
+            staged = %staged,
+            target = %target,
+            error = ?err,
+            "failed to move downloaded note content into place"
+        );
+        return;
+    }
+
+    if let Err(err) = std::fs::remove_file(stale) {
+        if err.kind() != std::io::ErrorKind::NotFound {
+            tracing::error!(
+                task = "sync",
+                path = %stale,
+                error = ?err,
+                "failed to remove stale note file"
+            );
+        }
+    }
+}
+
+/// Suffix of cloud content staged by [`handle_notes_to_download`] until the
+/// database update for the note is committed.
+const STAGED_SUFFIX: &str = ".incoming";
+
 #[derive(Debug)]
 pub enum DbOperation {
+    /// Moves downloaded content (`staged`) over an existing note's file
+    /// (`target`) and removes the note's copy in the other folder (`stale`).
+    /// Applied only after the transaction commits, see
+    /// [`execute_db_operations`].
+    ReplaceNoteFile {
+        staged: String,
+        target: String,
+        stale: String,
+    },
+
     InsertNote {
         local_id: String,
         mongo_id: String,
@@ -876,6 +1073,25 @@ pub enum DbOperation {
 
     MarkNoteSynced {
         local_id: String,
+    },
+
+    MarkNoteSyncedIfUnchanged {
+        local_id: String,
+        updated_at: i64,
+    },
+
+    /// Local copy of a note whose unsynced edits would otherwise be
+    /// overwritten by a newer cloud version.
+    InsertConflictCopy {
+        local_id: String,
+        owner_id: String,
+        title: String,
+        summary: String,
+        content_path: String,
+        created_at: i64,
+        updated_at: i64,
+        encrypted: bool,
+        crypto_meta: Option<String>,
     },
 
     SetCloudVersion {
@@ -996,11 +1212,38 @@ pub async fn execute_server_operations(
 struct UploadNoteResponse {
     mongo_id: String,
     cloud_version: i64,
+    /// False when the note already existed in the cloud (an earlier upload's
+    /// response was lost) and this upload's content was not stored. Servers
+    /// that do not send it always created the note.
+    #[serde(default = "default_true")]
+    created: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Deserialize)]
 struct UpdateNoteResponse {
     cloud_version: i64,
+}
+
+/// Sends one note to the cloud: a new note is created, an existing one is
+/// updated by its cloud ID.
+async fn send_note_upload(
+    client: &Client,
+    access_token: &AccessToken,
+    note: &NoteForUpload,
+    as_new_note: bool,
+) -> Result<reqwest::Response, reqwest::Error> {
+    let request = match (as_new_note, note.mongo_id.as_ref()) {
+        (false, Some(mongo_id)) => {
+            client.put(format!("{}sync/update-note/{}", SERVER_ADDRESS, mongo_id))
+        }
+        _ => client.post(format!("{}sync/upload-note", SERVER_ADDRESS)),
+    };
+
+    request.bearer_auth(&access_token.0).json(note).send().await
 }
 
 pub async fn upload_notes(
@@ -1011,28 +1254,15 @@ pub async fn upload_notes(
     let mut operations = Vec::new();
 
     for note in notes_to_upload {
-        let is_new_note = note
+        let mut is_new_note = note
             .mongo_id
             .as_ref()
             .map_or(true, |value| value.is_empty());
 
         let local_id = note.local_id.clone();
+        let uploaded_updated_at = note.updated_at;
 
-        let request = if is_new_note {
-            client.post(format!("{}sync/upload-note", SERVER_ADDRESS))
-        } else {
-            client.put(format!(
-                "{}sync/update-note/{}",
-                SERVER_ADDRESS,
-                note.mongo_id.as_ref().unwrap()
-            ))
-        };
-
-        let response = match request
-            .bearer_auth(&access_token.0)
-            .json(&note)
-            .send()
-            .await
+        let mut response = match send_note_upload(&client, &access_token, &note, is_new_note).await
         {
             Ok(response) => response,
 
@@ -1048,6 +1278,35 @@ pub async fn upload_notes(
             }
         };
 
+        if !is_new_note && response.status() == reqwest::StatusCode::NOT_FOUND {
+            // The server has no such note for this account (for example it was
+            // uploaded under another account or the cloud copy was lost), so
+            // updating it can never succeed. Create it again; the upload
+            // endpoint never overwrites a note that already exists.
+            tracing::warn!(
+                task = "sync",
+                local_id = %local_id,
+                "note is missing in the cloud, uploading it again as a new note"
+            );
+
+            is_new_note = true;
+
+            response = match send_note_upload(&client, &access_token, &note, true).await {
+                Ok(response) => response,
+
+                Err(err) => {
+                    tracing::error!(
+                        task = "sync",
+                        local_id = %local_id,
+                        error = ?err,
+                        "failed to upload note"
+                    );
+
+                    continue;
+                }
+            };
+        }
+
         let status = response.status();
 
         if status == reqwest::StatusCode::UNAUTHORIZED {
@@ -1055,10 +1314,13 @@ pub async fn upload_notes(
         }
 
         if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+
             tracing::error!(
                 task = "sync",
                 local_id = %local_id,
                 http_status = status.as_u16(),
+                response_body = %body,
                 "note upload request rejected"
             );
 
@@ -1091,7 +1353,15 @@ pub async fn upload_notes(
                 cloud_version: result.cloud_version,
             });
 
-            operations.push(DbOperation::MarkNoteSynced { local_id });
+            // An existing cloud note did not receive this content: leave the
+            // note pending so the next sync updates it by id (or resolves a
+            // conflict) instead of treating these edits as uploaded.
+            if result.created {
+                operations.push(DbOperation::MarkNoteSyncedIfUnchanged {
+                    local_id,
+                    updated_at: uploaded_updated_at,
+                });
+            }
         } else {
             let result: UpdateNoteResponse = match response.json().await {
                 Ok(result) => result,
@@ -1113,7 +1383,10 @@ pub async fn upload_notes(
                 cloud_version: result.cloud_version,
             });
 
-            operations.push(DbOperation::MarkNoteSynced { local_id });
+            operations.push(DbOperation::MarkNoteSyncedIfUnchanged {
+                local_id,
+                updated_at: uploaded_updated_at,
+            });
         }
     }
 
@@ -1529,53 +1802,76 @@ pub fn handle_notes_to_download(
             .clone()
             .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
-    
-        let file_path: path::PathBuf;
-        if note.is_deleted {
-            file_path = tmp_deleted_path.join(format!("{}{}", local_id, TEMP_NOTE_EXTENSION));
-            let stale_path = notes_path.join(format!("{}.{}", local_id, NOTE_EXTENSION));
-            if let Err(err) = std::fs::remove_file(&stale_path) {
-                if err.kind() != std::io::ErrorKind::NotFound {
-                    tracing::error!(
-                        task = "sync",
-                        local_id = %local_id,
-                        path = %stale_path.display(),
-                        error = ?err,
-                        "failed to remove stale note file before writing deleted copy"
-                    );
-                }
-            }
-        } else {
-            file_path = notes_path.join(format!("{}.{}", local_id, NOTE_EXTENSION));
-
-            let stale_path = tmp_deleted_path.join(format!("{}{}", local_id, TEMP_NOTE_EXTENSION));
-            if let Err(err) = std::fs::remove_file(&stale_path) {
-                if err.kind() != std::io::ErrorKind::NotFound {
-                    tracing::error!(
-                        task = "sync",
-                        local_id = %local_id,
-                        path = %stale_path.display(),
-                        error = ?err,
-                        "failed to remove stale tmp_deleted file before writing restored copy"
-                    );
-                }
-            }
-        }
-
         let bytes_to_write = if note.is_encrypted {
-            note.content.into_bytes()
+            note.content.clone().into_bytes()
         } else {
             BASE64
                 .decode(&note.content)
                 .context("failed to decode note content")?
         };
 
-        if let Err(err) = std::fs::write(&file_path, &bytes_to_write) {
-            rollback_files(&added_files);
-            return Err(err.into());
+        // Another device changed this note while it still has unsynced local
+        // edits here. Keep those edits as a separate note before the cloud
+        // version overwrites them.
+        if existing_local_id.is_some() {
+            match conflict_copy_operation(
+                notes_db,
+                &local_id,
+                &note,
+                &bytes_to_write,
+                notes_path,
+                &mut added_files,
+            ) {
+                Ok(Some(operation)) => operations.push(operation),
+                Ok(None) => {}
+                Err(err) => {
+                    rollback_files(&added_files);
+                    return Err(err);
+                }
+            }
         }
 
-        added_files.push(file_path.clone());
+        // A deleted note lives in tmp_deleted, any other in notes; the copy
+        // in the other folder (if any) is stale.
+        let (file_path, stale_path) = if note.is_deleted {
+            (
+                tmp_deleted_path.join(format!("{}{}", local_id, TEMP_NOTE_EXTENSION)),
+                notes_path.join(format!("{}.{}", local_id, NOTE_EXTENSION)),
+            )
+        } else {
+            (
+                notes_path.join(format!("{}.{}", local_id, NOTE_EXTENSION)),
+                tmp_deleted_path.join(format!("{}{}", local_id, TEMP_NOTE_EXTENSION)),
+            )
+        };
+
+        // An existing note's files must not change until the database update
+        // for it is committed: if this sync pass fails later, the note would
+        // otherwise hold cloud content while the database (and the conflict
+        // check on the next pass) still treat it as the unsynced local
+        // version, and the local edits would be lost. The cloud content is
+        // staged next to the file and moved in after the commit.
+        let replace_file = if existing_local_id.is_some() {
+            let staged = path::PathBuf::from(format!("{}{}", file_path.display(), STAGED_SUFFIX));
+            if let Err(err) = std::fs::write(&staged, &bytes_to_write) {
+                rollback_files(&added_files);
+                return Err(err.into());
+            }
+            added_files.push(staged.clone());
+
+            Some(DbOperation::ReplaceNoteFile {
+                staged: staged.to_string_lossy().into_owned(),
+                target: file_path.to_string_lossy().into_owned(),
+                stale: stale_path.to_string_lossy().into_owned(),
+            })
+        } else {
+            if let Err(err) = std::fs::write(&file_path, &bytes_to_write) {
+                rollback_files(&added_files);
+                return Err(err.into());
+            }
+            added_files.push(file_path.clone());
+            None
+        };
 
         let crypto_meta = match note.crypto_meta {
             Some(meta) => Some(
@@ -1602,6 +1898,7 @@ pub fn handle_notes_to_download(
                     encrypted: note.is_encrypted,
                     crypto_meta,
                 });
+                operations.extend(replace_file);
             }
 
             None => {
@@ -1629,6 +1926,128 @@ pub fn handle_notes_to_download(
     Ok(operations)
 }
 
+/// Builds the operation that preserves unsynced local edits of `local_id`
+/// before `incoming` (a newer cloud version) overwrites them.
+///
+/// Returns `None` when there is nothing to preserve: the local note has no
+/// pending edits, or its content and title already equal the cloud version
+/// (for example an upload that succeeded but whose response was lost).
+/// Attachments are not duplicated; the copy keeps referencing the original
+/// note's attachments by id.
+fn conflict_copy_operation(
+    notes_db: &Connection,
+    local_id: &str,
+    incoming: &DownloadNote,
+    incoming_bytes: &[u8],
+    notes_path: &path::Path,
+    added_files: &mut Vec<path::PathBuf>,
+) -> Result<Option<DbOperation>, crate::errors::Error> {
+    type LocalNoteRow = (
+        SyncState,
+        String,
+        String,
+        String,
+        i64,
+        bool,
+        Option<String>,
+        String,
+    );
+
+    let row: Option<LocalNoteRow> = notes_db
+        .query_row(
+            r#"
+            SELECT sync_state, content_path, title, summary, created_at,
+                   encrypted, crypto_meta, owner_id
+            FROM notes
+            WHERE local_id = ?1
+            "#,
+            params![local_id],
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                    row.get(5)?,
+                    row.get(6)?,
+                    row.get(7)?,
+                ))
+            },
+        )
+        .optional()
+        .context("failed to read local note before conflict check")?;
+
+    let Some((
+        sync_state,
+        content_path,
+        title,
+        summary,
+        created_at,
+        encrypted,
+        crypto_meta,
+        owner_id,
+    )) = row
+    else {
+        return Ok(None);
+    };
+
+    // Error means an earlier sync of the note failed with its edits unsent.
+    if !matches!(sync_state, SyncState::PendingUpload | SyncState::Error) {
+        return Ok(None);
+    }
+
+    let local_bytes = match std::fs::read(&content_path) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            tracing::warn!(
+                task = "sync",
+                local_id = %local_id,
+                error = ?err,
+                "cannot read local note to preserve it as a conflict copy"
+            );
+
+            return Ok(None);
+        }
+    };
+
+    if local_bytes == incoming_bytes && title == incoming.title {
+        return Ok(None);
+    }
+
+    let copy_id = uuid::Uuid::new_v4().to_string();
+    let copy_path = notes_path.join(format!("{}.{}", copy_id, NOTE_EXTENSION));
+
+    std::fs::write(&copy_path, &local_bytes)?;
+    added_files.push(copy_path.clone());
+
+    tracing::warn!(
+        task = "sync",
+        local_id = %local_id,
+        copy_id = %copy_id,
+        "local edits conflict with a newer cloud version, kept them as a copy"
+    );
+
+    // Encrypted titles are opaque blobs, so only plain titles can be labelled.
+    let copy_title = if encrypted {
+        title
+    } else {
+        format!("{} (conflict copy)", title)
+    };
+
+    Ok(Some(DbOperation::InsertConflictCopy {
+        local_id: copy_id,
+        owner_id,
+        title: copy_title,
+        summary,
+        content_path: copy_path.to_string_lossy().into_owned(),
+        created_at,
+        updated_at: crate::utils::get_time(),
+        encrypted,
+        crypto_meta,
+    }))
+}
+
 fn rollback_files(files: &[std::path::PathBuf]) {
     for file in files {
         let _ = std::fs::remove_file(file);
@@ -1647,4 +2066,339 @@ pub async fn complete_attachment_upload(
     response.error_for_status()?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::constants::NOTE_DB_SCHEMA;
+
+    fn db() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(NOTE_DB_SCHEMA).unwrap();
+        conn
+    }
+
+    fn insert_note(conn: &Connection, id: &str, state: &str, path: &path::Path, title: &str) {
+        conn.execute(
+            "INSERT INTO notes (local_id, mongo_id, owner_id, title, summary, content_path,
+                                created_at, updated_at, version, cloud_version, sync_state,
+                                is_deleted, encrypted)
+             VALUES (?1, 'mongo-1', 'owner', ?2, 'sum', ?3, 1, 100, 1, 3, ?4, 0, 0)",
+            params![id, title, path.to_string_lossy().to_string(), state],
+        )
+        .unwrap();
+    }
+
+    fn cloud_note(content: &str, title: &str) -> DownloadNote {
+        DownloadNote {
+            cloud_id: "mongo-1".into(),
+            owner_id: String::new(),
+            cloud_version: 4,
+            title: title.into(),
+            summary: "sum".into(),
+            content: BASE64.encode(content),
+            created_at: 1,
+            updated_at: 200,
+            is_deleted: false,
+            deleted_at: None,
+            hard_deleted: false,
+            is_encrypted: false,
+            deleted_attachments: None,
+            crypto_meta: None,
+        }
+    }
+
+    fn apply(conn: &mut Connection, ops: Vec<DbOperation>) {
+        execute_db_operations(conn, ops).unwrap();
+    }
+
+    fn sync_state(conn: &Connection, id: &str) -> String {
+        conn.query_row(
+            "SELECT sync_state FROM notes WHERE local_id = ?1",
+            params![id],
+            |r| r.get(0),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn local_only_note_is_not_overwritten_by_cloud_download() {
+        let conn = db();
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("a.md");
+        std::fs::write(&file, "x").unwrap();
+        insert_note(&conn, "a", "LocalOnly", &file, "t");
+
+        let mut response = CheckSyncResponse {
+            to_upload: vec![],
+            notes_to_download: vec![cloud_note("cloud", "t")],
+            notes_synced: vec![],
+            attachments_to_upload: vec![],
+            attachments_to_download: vec![],
+            attachments_synced: vec![],
+            attachments_to_hard_delete: vec![],
+            notes_to_hard_delete: vec![],
+            notes_failed: vec![],
+            quota_exceeded: false,
+        };
+
+        drop_instructions_for_local_only_notes(&conn, &mut response).unwrap();
+        assert!(response.notes_to_download.is_empty());
+
+        // A different cloud note is untouched.
+        let mut other = cloud_note("cloud", "t");
+        other.cloud_id = "mongo-2".into();
+        response.notes_to_download.push(other);
+        drop_instructions_for_local_only_notes(&conn, &mut response).unwrap();
+        assert_eq!(response.notes_to_download.len(), 1);
+    }
+
+    #[test]
+    fn edit_made_during_upload_stays_pending() {
+        let mut conn = db();
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("a.md");
+        std::fs::write(&file, "x").unwrap();
+        insert_note(&conn, "a", "PendingUpload", &file, "t");
+
+        // Upload snapshot had updated_at = 100, then the user edited (updated_at moved).
+        conn.execute("UPDATE notes SET updated_at = 150 WHERE local_id = 'a'", [])
+            .unwrap();
+        apply(
+            &mut conn,
+            vec![DbOperation::MarkNoteSyncedIfUnchanged {
+                local_id: "a".into(),
+                updated_at: 100,
+            }],
+        );
+        assert_eq!(sync_state(&conn, "a"), "PendingUpload");
+
+        apply(
+            &mut conn,
+            vec![DbOperation::MarkNoteSyncedIfUnchanged {
+                local_id: "a".into(),
+                updated_at: 150,
+            }],
+        );
+        assert_eq!(sync_state(&conn, "a"), "Synced");
+    }
+
+    #[test]
+    fn delete_or_local_only_during_upload_is_kept() {
+        let mut conn = db();
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("a.md");
+        std::fs::write(&file, "x").unwrap();
+        insert_note(&conn, "deleted", "WaitingForTombstone", &file, "t");
+        insert_note(&conn, "local", "LocalOnly", &file, "t");
+
+        apply(
+            &mut conn,
+            ["deleted", "local"]
+                .into_iter()
+                .map(|id| DbOperation::MarkNoteSyncedIfUnchanged {
+                    local_id: id.into(),
+                    updated_at: 100,
+                })
+                .collect(),
+        );
+
+        assert_eq!(sync_state(&conn, "deleted"), "WaitingForTombstone");
+        assert_eq!(sync_state(&conn, "local"), "LocalOnly");
+    }
+
+    #[test]
+    fn server_synced_report_does_not_clear_pending_edits() {
+        let mut conn = db();
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("a.md");
+        std::fs::write(&file, "x").unwrap();
+        insert_note(&conn, "a", "PendingUpload", &file, "t");
+        insert_note(&conn, "b", "Error", &file, "t");
+
+        apply(
+            &mut conn,
+            handle_notes_synced(vec!["a".into(), "b".into()])
+                .into_iter()
+                .collect(),
+        );
+
+        assert_eq!(sync_state(&conn, "a"), "PendingUpload");
+        assert_eq!(sync_state(&conn, "b"), "Synced");
+    }
+
+    #[test]
+    fn newer_cloud_version_keeps_unsynced_local_edits_as_copy() {
+        let mut conn = db();
+        let dir = tempfile::tempdir().unwrap();
+        let notes = dir.path().join("notes");
+        let tmp = dir.path().join("tmp");
+        std::fs::create_dir_all(&notes).unwrap();
+        std::fs::create_dir_all(&tmp).unwrap();
+        let file = notes.join("a.md");
+        std::fs::write(&file, "my offline edit").unwrap();
+        insert_note(&conn, "a", "PendingUpload", &file, "Title");
+
+        let ops = handle_notes_to_download(
+            vec![cloud_note("their edit", "Title")],
+            &conn,
+            &notes,
+            &tmp,
+            "owner".into(),
+        )
+        .unwrap();
+        apply(&mut conn, ops);
+
+        // Original now holds the cloud version...
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "their edit");
+        assert_eq!(sync_state(&conn, "a"), "Synced");
+
+        // ...and the local edit survives as a new, not-yet-uploaded note.
+        let (copy_id, title, path, state, mongo): (String, String, String, String, Option<String>) =
+            conn.query_row(
+                "SELECT local_id, title, content_path, sync_state, mongo_id
+                 FROM notes WHERE local_id != 'a'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+            )
+            .unwrap();
+        assert_ne!(copy_id, "a");
+        assert_eq!(title, "Title (conflict copy)");
+        assert_eq!(state, "PendingUpload");
+        assert_eq!(mongo, None);
+        assert_eq!(std::fs::read_to_string(path).unwrap(), "my offline edit");
+    }
+
+    #[test]
+    fn aborted_sync_pass_keeps_local_edits_for_the_next_pass() {
+        let mut conn = db();
+        let dir = tempfile::tempdir().unwrap();
+        let notes = dir.path().join("notes");
+        let tmp = dir.path().join("tmp");
+        std::fs::create_dir_all(&notes).unwrap();
+        std::fs::create_dir_all(&tmp).unwrap();
+        let file = notes.join("a.md");
+        std::fs::write(&file, "my offline edit").unwrap();
+        insert_note(&conn, "a", "PendingUpload", &file, "Title");
+
+        // First pass downloads, then fails before its database operations run.
+        let _dropped = handle_notes_to_download(
+            vec![cloud_note("their edit", "Title")],
+            &conn,
+            &notes,
+            &tmp,
+            "owner".into(),
+        )
+        .unwrap();
+        assert_eq!(
+            std::fs::read_to_string(&file).unwrap(),
+            "my offline edit",
+            "the note file must not change before the database update commits"
+        );
+
+        // The next pass still sees the local edit and keeps it as a copy.
+        let ops = handle_notes_to_download(
+            vec![cloud_note("their edit", "Title")],
+            &conn,
+            &notes,
+            &tmp,
+            "owner".into(),
+        )
+        .unwrap();
+        apply(&mut conn, ops);
+
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "their edit");
+        assert!(!notes.join(format!("a.md{STAGED_SUFFIX}")).exists());
+        let copy: String = conn
+            .query_row(
+                "SELECT content_path FROM notes WHERE local_id != 'a'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(std::fs::read_to_string(copy).unwrap(), "my offline edit");
+    }
+
+    #[test]
+    fn no_copy_when_cloud_already_has_the_local_content_or_note_is_synced() {
+        let mut conn = db();
+        let dir = tempfile::tempdir().unwrap();
+        let notes = dir.path().join("notes");
+        let tmp = dir.path().join("tmp");
+        std::fs::create_dir_all(&notes).unwrap();
+        std::fs::create_dir_all(&tmp).unwrap();
+        let file = notes.join("a.md");
+
+        // Upload succeeded but its response was lost: same content on both sides.
+        std::fs::write(&file, "same").unwrap();
+        insert_note(&conn, "a", "PendingUpload", &file, "Title");
+        let ops = handle_notes_to_download(
+            vec![cloud_note("same", "Title")],
+            &conn,
+            &notes,
+            &tmp,
+            "owner".into(),
+        )
+        .unwrap();
+        apply(&mut conn, ops);
+        assert_eq!(
+            conn.query_row("SELECT COUNT(*) FROM notes", [], |r| r.get::<_, i64>(0))
+                .unwrap(),
+            1
+        );
+
+        // A synced note simply takes the cloud version.
+        conn.execute("UPDATE notes SET sync_state = 'Synced'", [])
+            .unwrap();
+        let ops = handle_notes_to_download(
+            vec![cloud_note("newer", "Title")],
+            &conn,
+            &notes,
+            &tmp,
+            "owner".into(),
+        )
+        .unwrap();
+        apply(&mut conn, ops);
+        assert_eq!(
+            conn.query_row("SELECT COUNT(*) FROM notes", [], |r| r.get::<_, i64>(0))
+                .unwrap(),
+            1
+        );
+    }
+
+    #[test]
+    fn downloading_an_attachment_the_client_already_has_does_not_fail_the_batch() {
+        let mut conn = db();
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("a.md");
+        std::fs::write(&file, "x").unwrap();
+        insert_note(&conn, "a", "Synced", &file, "t");
+
+        let insert = |checksum: &str| DbOperation::InsertAttachment {
+            attachment_id: "att-1".into(),
+            note_cloud_id: "mongo-1".into(),
+            filename: "f.png".into(),
+            mime_type: "image/png".into(),
+            size_bytes: 3,
+            local_path: Some("/tmp/f.png".into()),
+            cloud_key: Some("u/attachments/att-1".into()),
+            checksum_encrypted: checksum.into(),
+            encrypted: false,
+            crypto_meta: None,
+            sync_state: "Synced".into(),
+            created_at: 1,
+            updated_at: 1,
+        };
+
+        apply(&mut conn, vec![insert("old")]);
+        apply(&mut conn, vec![insert("new")]);
+
+        let checksum: String = conn
+            .query_row("SELECT checksum_encrypted FROM attachments", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(checksum, "new");
+    }
 }

@@ -113,7 +113,7 @@ pub fn add_tag_to_note(
 
     notes_db
         .execute(
-            "INSERT INTO note_tags (
+            "INSERT OR IGNORE INTO note_tags (
                 note_local_id,
                 tag_id,
                 created_at
@@ -312,4 +312,25 @@ pub fn find_tag_id(
         .context("failed to check if tag exists")?;
 
     Ok(tag_id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::constants::NOTE_DB_SCHEMA;
+
+    #[test]
+    fn adding_the_same_tag_twice_is_not_an_error() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(NOTE_DB_SCHEMA).unwrap();
+        // Only the primary key is under test, so the note/tag rows need not exist.
+        conn.execute_batch("PRAGMA foreign_keys = OFF;").unwrap();
+        add_tag_to_note(&conn, "note-1".into(), "tag-1".into()).unwrap();
+        add_tag_to_note(&conn, "note-1".into(), "tag-1".into()).unwrap();
+
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM note_tags", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+    }
 }

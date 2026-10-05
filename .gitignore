@@ -3,3 +3,6 @@ target/
 core/target/
 node_modules
 **/*.env
+# Local-only test suites (not committed)
+core/tests/app_flows/
+desktop/e2e-local/

@@ -70,5 +70,5 @@ features to add
 <!-- TODO export import notes -->
 <!-- TODO backup -->
 <!-- TODO change username -->
-<!-- TODO  delete account,  Remove local data,-->
+<!-- TODO delete account,  Remove local data,-->
 <!-- TODO bug fix with attachment handling in not encrypted notes (probably regex is validated and protocols are swiched only while decrypting content) -->

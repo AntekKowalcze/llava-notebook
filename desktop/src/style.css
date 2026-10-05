@@ -3,17 +3,51 @@
 @tailwind utilities;
 
 @layer components {
+  /* Toasts are fully opaque: a translucent toast showed the editor and the
+     note header through it in different shades, so it looked cut in half. */
   .Vue-Toastification__toast--success.my-toast {
-    @apply border-none bg-note-pumice/90 text-note-graphite shadow-none;
+    @apply border-none bg-note-pumice text-note-graphite shadow-lg;
   }
 
-  @layer components {
-    .Vue-Toastification__toast--warning.my-toast {
-      @apply bg-note-paprika text-note-graphite;
-    }
+  .Vue-Toastification__toast--warning.my-toast {
+    @apply border-none bg-note-paprika text-note-graphite shadow-lg;
   }
 
   .Vue-Toastification__toast--error.my-toast {
-    @apply bg-note-garnet text-note-graphite;
+    @apply border-none bg-note-garnet text-note-ivory shadow-lg;
+  }
+
+  .Vue-Toastification__toast--info.my-toast,
+  .Vue-Toastification__toast--default.my-toast {
+    @apply border-none shadow-lg;
+  }
+
+  /* Keep toasts above the status bar (h-7) instead of covering it. */
+  .Vue-Toastification__container.bottom-center {
+    bottom: 2.5rem;
+  }
+
+  /* The editor also has the note header bar (h-11) above the status bar. */
+  .editor-open .Vue-Toastification__container.bottom-center {
+    bottom: 5.25rem;
+  }
+
+  /* The library turns toasts into full-width square strips below 600px;
+     keep the same floating look on small laptop windows. */
+  @media only screen and (max-width: 600px) {
+    .Vue-Toastification__container.bottom-center {
+      width: auto;
+      left: 50%;
+      right: auto;
+      margin-left: 0;
+      transform: translateX(-50%);
+      max-width: calc(100vw - 1.5rem);
+    }
+
+    .Vue-Toastification__toast.my-toast {
+      border-radius: 8px;
+      min-width: 0;
+      width: 100%;
+    }
   }
 }

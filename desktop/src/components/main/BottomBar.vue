@@ -19,6 +19,7 @@ import { useMetaStore } from '../../stores/metaStore';
 import { useRoute } from 'vue-router';
 import { useCurrentNoteStore } from '../../stores/currentNoteStore';
 import { useOnlineAuthStore } from '../../stores/onlineAuth';
+import { formatTimeAgo } from '../../lib/time';
 const syncResult = computed(() => metaStore.syncResult);
 const userConfig = useUserConfigStore();
 const metaStore = useMetaStore();
@@ -76,9 +77,7 @@ const currentLocation = computed(() => route.name);
 const isEditor = computed(() => route.name === 'editor');
 
 const encrypted = computed(() => userConfig.config['local.encryption']);
-const local = computed(() => {
-  return userConfig.config['local.mode'] == 'on';
-});
+const isLocalMode = computed(() => userConfig.config['local.mode'] == 'on');
 const syncPossible = computed(
   () => userConfig.config['online.sync'] === 'on' && isLoggedInOnline.value
 );
@@ -86,45 +85,7 @@ const syncEnabled = computed(() => {
   return userConfig.config['online.sync'] === 'on';
 });
 
-const isLocal = computed(() => userConfig.config['local.mode'] === 'off');
-
-defineProps<{ version: string; synced: string }>();
-
-function formatTimeAgo(timestamp: number, currentTime: number): string {
-  const milliseconds = Math.max(0, currentTime - timestamp);
-
-  if (milliseconds < 60_000) {
-    return 'just now';
-  }
-
-  if (milliseconds < 3_600_000) {
-    const minutes = Math.floor(milliseconds / 60_000);
-
-    return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
-  }
-
-  if (milliseconds < 86_400_000) {
-    const hours = Math.floor(milliseconds / 3_600_000);
-
-    return `${hours} hour${hours === 1 ? '' : 's'} ago`;
-  }
-
-  if (milliseconds < 2_592_000_000) {
-    const days = Math.floor(milliseconds / 86_400_000);
-
-    return `${days} day${days === 1 ? '' : 's'} ago`;
-  }
-
-  if (milliseconds < 31_536_000_000) {
-    const weeks = Math.floor(milliseconds / 604_800_000);
-
-    return `${weeks} week${weeks === 1 ? '' : 's'} ago`;
-  }
-
-  const months = Math.floor(milliseconds / 2_592_000_000);
-
-  return `${months} month${months === 1 ? '' : 's'} ago`;
-}
+defineProps<{ version: string }>();
 </script>
 <template>
   <div
@@ -143,9 +104,9 @@ function formatTimeAgo(timestamp: number, currentTime: number): string {
 
       <div class="h-3 w-px bg-white/10" />
 
-      <span>Markdown</span>
+      <span class="hidden md:inline">Markdown</span>
 
-      <div class="h-3 w-px bg-white/10" />
+      <div class="hidden h-3 w-px bg-white/10 md:block" />
 
       <div
         class="flex items-center gap-1 transition-all duration-300 sm:gap-1.5"
@@ -178,7 +139,7 @@ function formatTimeAgo(timestamp: number, currentTime: number): string {
     <div class="ml-4 flex items-center gap-1.5 sm:gap-2">
       <!-- sync result -->
       <div
-        v-if="!local && syncPossible"
+        v-if="!isLocalMode && syncPossible"
         class="flex items-center gap-1 sm:gap-1.5"
       >
         <div
@@ -282,7 +243,7 @@ function formatTimeAgo(timestamp: number, currentTime: number): string {
 
       <!-- local -->
       <div
-        v-if="!isLocal"
+        v-if="isLocalMode"
         class="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 text-note-pumice"
       >
         <HardDrive
@@ -304,9 +265,11 @@ function formatTimeAgo(timestamp: number, currentTime: number): string {
         <span>Online mode</span>
       </div>
 
-      <div class="h-3 w-px bg-white/10" />
+      <template v-if="version">
+        <div class="hidden h-3 w-px bg-white/10 md:block" />
 
-      <span class="text-note-pumice/30">v{{ version }}</span>
+        <span class="hidden text-note-pumice/30 md:inline">v{{ version }}</span>
+      </template>
     </div>
   </div>
 </template>

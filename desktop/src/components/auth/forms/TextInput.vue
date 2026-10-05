@@ -18,12 +18,14 @@ function toggleVisibility() {
     currentType.value === InputTypes.Password ? InputTypes.Text : InputTypes.Password;
 }
 
+// Mirrors the rules in core (`validate_password`): length is counted in UTF-8
+// bytes and a symbol is any ASCII punctuation character.
 const requirements = computed(() => [
-  { text: 'Minimum 8 characters', met: inputValue.value.length >= 8 },
+  { text: 'Minimum 8 characters', met: new TextEncoder().encode(inputValue.value).length >= 8 },
   { text: 'At least one lowercase letter', met: /[a-z]/.test(inputValue.value) },
   {
     text: 'At least one symbol',
-    met: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(inputValue.value),
+    met: /[!-/:-@[-`{-~]/.test(inputValue.value),
   },
   { text: 'At least one uppercase letter', met: /[A-Z]/.test(inputValue.value) },
 ]);

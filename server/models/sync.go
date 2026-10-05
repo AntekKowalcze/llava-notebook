@@ -75,6 +75,10 @@ type DownloadNote struct {
 	OwnerID      string        `bson:"owner_id" json:"-"`
 	CloudVersion int64         `bson:"cloud_version" json:"cloud_version" validate:"required"`
 
+	// Server-side only: the uploading client's local note ID. Kept on
+	// tombstones so a retried upload cannot recreate a hard-deleted note.
+	LocalID string `bson:"local_id,omitempty" json:"-"`
+
 	Title   string `bson:"title" json:"title"`
 	Summary string `bson:"summary" json:"summary"`
 	Content string `bson:"content" json:"content"`
@@ -89,8 +93,12 @@ type DownloadNote struct {
 
 	IsEncrypted bool `bson:"is_encrypted" json:"is_encrypted"`
 
-	DeletedAttachments []string        `bson:"deleted_attachments,omitempty" json:"-"`
-	CryptoMeta         *NoteCryptoMeta `bson:"crypto_meta,omitempty" json:"crypto_meta,omitempty"`
+	DeletedAttachments []string `bson:"deleted_attachments,omitempty" json:"-"`
+	// Server-side only: IDs of attachments any device has been given an upload
+	// URL for. Lets other devices discover attachments added to a note they
+	// already have.
+	AttachmentIDs []string        `bson:"attachment_ids,omitempty" json:"-"`
+	CryptoMeta    *NoteCryptoMeta `bson:"crypto_meta,omitempty" json:"crypto_meta,omitempty"`
 }
 
 type DownloadAttachment struct {

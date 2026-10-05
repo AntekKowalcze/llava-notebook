@@ -225,12 +225,27 @@ pub async fn online_logout(
     sync: bool,
 ) -> Result<(), llava_core::Error> {
     crate::commands::utils::check_connection_before_request(state.clone())?;
-    if sync {
-        let res = synchronize_all(state.clone(), app_handle).await;
 
-        if res.is_err() {
-            return Err(llava_core::Error::SyncFailed);
+    // Keeps the background sync from starting while local data is removed and
+    // waits for a sync that is already running instead of skipping past it.
+    let _sync_lock = if sync {
+        Some(
+            crate::commands::sync::sync::acquire_sync_lock(std::time::Duration::from_secs(60))
+                .await?,
+        )
+    } else {
+        None
+    };
+
+    if sync {
+        if !crate::commands::sync::sync::is_online_sync_off(&state) {
+            let res = crate::commands::sync::sync::sync_cycle(state.clone(), app_handle).await;
+
+            if res.is_err() {
+                return Err(llava_core::Error::SyncFailed);
+            }
         }
+
         let mut notes_db_guard = state
             .notes_db
             .lock()
@@ -248,6 +263,16 @@ pub async fn online_logout(
                 .as_ref()
                 .ok_or(llava_core::Error::LockError)?
         };
+
+        // A finished sync cycle can still leave notes unsent (failed, skipped
+        // because sync is switched off, edited meanwhile). Deleting local data
+        // now would destroy them, so refuse; the frontend then offers to
+        // disconnect without removing notes.
+        if llava_core::online_auth::count_unsynced_notes(notes_db, &local_user_id.to_string())? > 0
+        {
+            return Err(llava_core::Error::SyncFailed);
+        }
+
         llava_core::online_auth::delete_synced_notes_on_logout(
             notes_db,
             local_user_id.to_string(),

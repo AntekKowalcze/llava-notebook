@@ -18,11 +18,6 @@ export const useOnlineAuthStore = defineStore('onlineAuth', () => {
   listen<void>('online_session_expired', () => {
     sessionExpired.value = true;
   });
-  listen<string>('logged_in_online', async (event) => {
-    loggedIn.value = true;
-    loggedInId.value = event.payload;
-    await fetchEmail();
-  });
 
   function setSessionExpired(value: boolean) {
     sessionExpired.value = value;

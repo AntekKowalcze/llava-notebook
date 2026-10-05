@@ -8,6 +8,7 @@ import { useRouter } from 'vue-router';
 import { useToast } from 'vue-toastification';
 import { useAuthStore } from '../../stores/auth';
 import SubmitButton from '../../components/commons/SubmitButton.vue';
+import { errorKey, errorPayload } from '../../lib/errors';
 
 const toast = useToast();
 
@@ -40,17 +41,6 @@ function applyLockout(timeoutMs: number) {
   }, timeoutMs);
 }
 
-function extractTimeout(err: unknown): number | null {
-  if (err && typeof err === 'object') {
-    const typedErr = err as { AccountLocked?: unknown };
-    if (typeof typedErr.AccountLocked === 'number') {
-      return typedErr.AccountLocked;
-    }
-  }
-
-  return null;
-}
-
 async function submitLogin() {
   const authStore = useAuthStore(); //here before login command check if user is timeouted
   if (submitDisabled.value) {
@@ -79,18 +69,27 @@ async function submitLogin() {
     });
 
     router.replace('/main/');
-  } catch (err: any) {
-    const timeout = extractTimeout(err);
-    if (timeout !== null) {
-      applyLockout(timeout);
-      showTimeout(timeout);
-    } else if (err == 'WrongPassword' || err?.WrongPassword) {
-      toast.warning('Wrong Password', {});
-    } else if (err.AccountLocked) {
-      applyLockout(err.AccountLocked);
-      showTimeout(err.AccountLocked);
-    } else if (err === 'UserNotExists' || err?.UserNotExists) {
-      toast.warning('User does not exist!');
+  } catch (err) {
+    switch (errorKey(err)) {
+      case 'AccountLocked': {
+        const timeout = errorPayload<number>(err) ?? 0;
+        if (timeout > 0) {
+          applyLockout(timeout);
+          showTimeout(timeout);
+        } else {
+          toast.error('Too many failed attempts. Try again in a moment.');
+        }
+        break;
+      }
+      case 'WrongPassword':
+        toast.warning('Wrong Password');
+        break;
+      case 'UserNotExists':
+        toast.warning('User does not exist!');
+        break;
+      default:
+        console.error('Login failed:', err);
+        toast.error('Login failed. Try again.');
     }
     return;
   } finally {

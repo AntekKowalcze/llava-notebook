@@ -98,11 +98,13 @@ import (
 	"context"
 	"llava-server/config"
 	"llava-server/middleware"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/log"
 	"github.com/gofiber/fiber/v3/middleware/limiter"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -131,7 +133,7 @@ func (h *Handler) RegisterJwtRoutes(app fiber.Router) error { //this is "receive
 		Max:        10,
 		Expiration: time.Minute,
 		KeyGenerator: func(c fiber.Ctx) string {
-			return "ip:" + c.IP()
+			return "ip:" + middleware.ClientIP(c)
 		},
 		LimitReached: func(c fiber.Ctx) error {
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
@@ -157,6 +159,8 @@ type SyncHandler struct {
 	s3Bucket  string
 	presigner *s3.PresignClient
 	workerSem chan struct{}
+	// activeSyncs holds the IDs of users with a sync-check in flight.
+	activeSyncs sync.Map
 }
 
 func NewSyncHandler(db *mongo.Database, v *validator.Validate, s3Client *s3.Client, s3Bucket string, presigner *s3.PresignClient) *SyncHandler {
@@ -175,7 +179,40 @@ func (s *SyncHandler) EnsureIndexes(ctx context.Context) error {
 			SetUnique(true).
 			SetPartialFilterExpression(bson.M{"local_id": bson.M{"$exists": true}}),
 	})
-	return err
+	if err != nil {
+		return err
+	}
+
+	s.ensureQueryIndexes(ctx)
+
+	return nil
+}
+
+// ensureQueryIndexes adds indexes that only speed up existing queries. The
+// unique index above cannot serve them (it is partial), so every full sync
+// scanned the whole notes collection, and the reservation cleanup and quota
+// lookups scanned all reservations. A failure here only costs speed, so it is
+// logged instead of stopping the server.
+func (s *SyncHandler) ensureQueryIndexes(ctx context.Context) {
+	if _, err := s.Coll.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "owner_id", Value: 1}},
+		Options: options.Index().SetName("owner_id"),
+	}); err != nil {
+		log.Warnf("could not create notes owner_id index: %v", err)
+	}
+
+	if _, err := s.DB.Collection("reservations").Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "status", Value: 1}, {Key: "expires_at", Value: 1}},
+			Options: options.Index().SetName("status_expires_at"),
+		},
+		{
+			Keys:    bson.D{{Key: "user_id", Value: 1}, {Key: "attachment_id", Value: 1}},
+			Options: options.Index().SetName("user_attachment"),
+		},
+	}); err != nil {
+		log.Warnf("could not create reservation indexes: %v", err)
+	}
 }
 
 func (s *SyncHandler) acquireWorker(ctx context.Context) error {
@@ -212,7 +249,7 @@ func (s *SyncHandler) RegisterSyncRoutes(app fiber.Router) error {
 				return "user:" + userID
 			}
 
-			return "ip:" + c.IP()
+			return "ip:" + middleware.ClientIP(c)
 		},
 
 		LimitReached: func(c fiber.Ctx) error {
@@ -232,7 +269,7 @@ func (s *SyncHandler) RegisterSyncRoutes(app fiber.Router) error {
 				return "user:" + userID
 			}
 
-			return "ip:" + c.IP()
+			return "ip:" + middleware.ClientIP(c)
 		},
 
 		LimitReached: func(c fiber.Ctx) error {
@@ -246,6 +283,20 @@ func (s *SyncHandler) RegisterSyncRoutes(app fiber.Router) error {
 	g.Post("/upload-note", syncWriteLimiter, s.UploadNote)
 	g.Put("/update-note/:mongo_id", syncWriteLimiter, s.UpdateNote)
 	g.Post("/upload-compleated/:attachment_id", syncWriteLimiter, s.manageReservationAndQuota)
+	// Separate limiter so dashboard refreshes never use up the sync budget.
+	storageLimiter := limiter.New(limiter.Config{
+		Max:        30,
+		Expiration: time.Minute,
+
+		KeyGenerator: func(c fiber.Ctx) string {
+			if userID, ok := c.Locals("userID").(string); ok && userID != "" {
+				return "user:" + userID
+			}
+
+			return "ip:" + middleware.ClientIP(c)
+		},
+	})
+	g.Get("/storage", storageLimiter, s.StorageUsage)
 	return nil
 }
 
@@ -272,7 +323,7 @@ func (a *AiHandler) RegisterAiRoutes(app fiber.Router) error {
 				return "user:" + userID
 			}
 
-			return "ip:" + c.IP()
+			return "ip:" + middleware.ClientIP(c)
 		},
 		LimitReached: func(c fiber.Ctx) error {
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{

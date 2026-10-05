@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { ArrowBigLeftDash, Trash2, RotateCcw } from 'lucide-vue-next';
 import { invoke } from '@tauri-apps/api/core';
 import { useRouter } from 'vue-router';
@@ -75,8 +76,10 @@ function getRemainingColor(removedAt: number, now: number): string {
   return 'text-note-pumice/60';
 }
 
-async function loadRemovedNotes() {
-  loading.value = true;
+async function loadRemovedNotes(silent = false) {
+  if (!silent) {
+    loading.value = true;
+  }
 
   try {
     const loadedNotes = await invoke<Omit<RemovedNote, 'tags'>[]>('get_all_removed_notes_data', {
@@ -118,11 +121,43 @@ function goBack() {
   router.back();
 }
 
+let unlistenSyncFinished: UnlistenFn | null = null;
+
 onMounted(async () => {
   await loadRemovedNotes();
+  unlistenSyncFinished = await listen('sync_finished', () => {
+    void loadRemovedNotes(true);
+  });
 });
 
+onUnmounted(() => {
+  resetDeleteConfirmation();
+  unlistenSyncFinished?.();
+  unlistenSyncFinished = null;
+});
+
+// First click arms the button, second click (within a few seconds) deletes.
+// Permanent delete cannot be undone and is propagated to the cloud.
+const confirmDeleteId = ref<string | null>(null);
+let confirmTimer: ReturnType<typeof setTimeout> | null = null;
+
+function resetDeleteConfirmation() {
+  confirmDeleteId.value = null;
+  if (confirmTimer) {
+    clearTimeout(confirmTimer);
+    confirmTimer = null;
+  }
+}
+
 async function hardDeleteNote(note: RemovedNote) {
+  if (confirmDeleteId.value !== note.local_id) {
+    resetDeleteConfirmation();
+    confirmDeleteId.value = note.local_id;
+    confirmTimer = setTimeout(resetDeleteConfirmation, 4000);
+    return;
+  }
+  resetDeleteConfirmation();
+
   try {
     await invoke<void>('hard_delete_note', { noteId: note.local_id });
     await loadRemovedNotes();
@@ -258,14 +293,25 @@ async function restoreNote(note: RemovedNote) {
               <!-- Hard delete -->
               <button
                 type="button"
-                class="group flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium text-note-garnet/70 transition-colors duration-200 hover:bg-note-garnet/10 hover:text-note-garnet"
+                class="group flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium transition-colors duration-200"
+                :class="
+                  confirmDeleteId === note.local_id
+                    ? 'bg-note-garnet text-note-ivory'
+                    : 'text-note-garnet/70 hover:bg-note-garnet/10 hover:text-note-garnet'
+                "
                 title="Permanently delete this note"
                 @click.stop="hardDeleteNote(note)"
               >
                 <Trash2
                   class="h-3.5 w-3.5 transition-transform duration-200 group-hover:scale-105"
                 />
-                <span>Delete permanently</span>
+                <span>
+                  {{
+                    confirmDeleteId === note.local_id
+                      ? 'Click again to confirm'
+                      : 'Delete permanently'
+                  }}
+                </span>
               </button>
             </div>
           </div>

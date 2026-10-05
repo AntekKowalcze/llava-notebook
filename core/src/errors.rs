@@ -102,6 +102,11 @@ pub enum Error {
     #[error("Sync failed")]
     SyncFailed,
 
+    /// The server is already running a sync-check for this account (another
+    /// device or an overlapping request). Not a failure: try again next tick.
+    #[error("Sync already in progress")]
+    SyncInProgress,
+
     #[error("Attachment upload failed")]
     FailedToUploadAttachment,
     #[error("Attachment download failed")]

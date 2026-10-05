@@ -14,6 +14,7 @@ const router = useRouter();
 const userConfig = useUserConfigStore();
 
 let unlistenReload: UnlistenFn | null = null;
+let unlistenSyncFinished: UnlistenFn | null = null;
 
 type PanelData = {
   recentlyEdited: {
@@ -31,7 +32,7 @@ const panelData = ref<PanelData | null>(null);
 const syncStatus = ref('Loading...');
 
 onMounted(async () => {
-  unlistenReload = await listen('reload-left-panel', async () => {
+  const reloadPanel = async () => {
     if (userConfig.settingList) {
       syncStatus.value = userConfig.getValueBySettingId(
         userConfig.settingList.sections,
@@ -39,6 +40,14 @@ onMounted(async () => {
       );
     }
     panelData.value = await invoke<PanelData>('get_panel_data');
+  };
+
+  unlistenReload = await listen('reload-left-panel', reloadPanel);
+  // A sync changed notes (e.g. edited or created on another device).
+  unlistenSyncFinished = await listen('sync_finished', () => {
+    void reloadPanel().catch((error) =>
+      console.error('Failed to refresh panel after sync:', error)
+    );
   });
 
   try {
@@ -59,6 +68,10 @@ onUnmounted(() => {
   if (unlistenReload) {
     unlistenReload();
     unlistenReload = null;
+  }
+  if (unlistenSyncFinished) {
+    unlistenSyncFinished();
+    unlistenSyncFinished = null;
   }
 });
 
@@ -96,7 +109,7 @@ function seeRemovedNotes() {
 
 <template>
   <aside
-    class="relative z-20 flex h-full w-72 shrink-0 flex-col border-r border-note-pumice/10 bg-note-graphite/80 text-note-ivory backdrop-blur-xl"
+    class="relative z-20 flex h-full w-72 shrink-0 flex-col border-r border-note-pumice/10 bg-note-graphite text-note-ivory"
   >
     <!-- Close -->
     <button

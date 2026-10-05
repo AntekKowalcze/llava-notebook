@@ -11,6 +11,8 @@ import SubmitButton from '../commons/SubmitButton.vue';
 import { useOnlineAuthStore } from '../../stores/onlineAuth';
 import { useAuthStore } from '../../stores/auth';
 import { computed } from 'vue';
+import { errorKey, errorPayload } from '../../lib/errors';
+import { isValidEmail } from '../../lib/validation';
 import { useUserConfigStore } from '../../stores/userConfig';
 //if was account linked just set task which try to log in when internet connection is back
 const toast = useToast();
@@ -20,34 +22,20 @@ const userConfig = useUserConfigStore();
 const { settingList } = storeToRefs(userConfig);
 const email = ref('');
 const password = ref('');
+const localPassword = ref('');
 const loading = ref<boolean>(false);
-const emailPattern =
-  /[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?/;
-
 const isDisabled = computed(() => {
-  return !emailPattern.test(email.value);
+  return !isValidEmail(email.value) || !password.value || !localPassword.value;
 });
 //await window.__TAURI__.event.emit('online_session_expired', null) then implement timeuot handling on login, and implememnt logging online, after loging with code, and add register to settings then implement no internet, no server connection handling and add error hadling to this
 function clearFields() {
   email.value = '';
   password.value = '';
-}
-
-function getErrorText(err: unknown): string {
-  if (typeof err === 'string') return err;
-
-  if (err && typeof err === 'object') {
-    const typedErr = err as { message?: unknown; error?: unknown; reason?: unknown };
-    if (typeof typedErr.message === 'string') return typedErr.message;
-    if (typeof typedErr.error === 'string') return typedErr.error;
-    if (typeof typedErr.reason === 'string') return typedErr.reason;
-  }
-
-  return String(err ?? '');
+  localPassword.value = '';
 }
 
 async function submit() {
-  if (!email.value || !password.value) return;
+  if (isDisabled.value || loading.value) return;
   loading.value = true;
   try {
     if (!settingList.value) {
@@ -61,6 +49,7 @@ async function submit() {
       email: email.value,
       password: password.value,
       currentSettings: settingList.value,
+      localPassword: localPassword.value,
     });
     toast.success('Connected accounts successfully');
     onlineAuthStore.$patch({
@@ -74,19 +63,29 @@ async function submit() {
     onlineAuthStore.setSessionExpired(false);
     clearFields();
   } catch (err: unknown) {
-    const message = getErrorText(err).toLowerCase();
-    if (message.includes('wrong password')) {
-      toast.warning('Wrong Password');
-    } else if (message.includes('wrong credentials') || message.includes('invalid_credentials')) {
-      toast.warning('Wrong email or password');
-    } else if (message.includes('user does not exist') || message.includes('user not exists')) {
-      toast.warning('User does not exist');
-    } else if (message.includes('no internet connection')) {
-      toast.error('No internet connection');
-    } else if (message.includes('server not responding')) {
-      toast.error('Server not responding');
-    } else {
-      toast.error('Login failed');
+    switch (errorKey(err)) {
+      case 'WrongPassword':
+        toast.warning('Wrong password');
+        break;
+      case 'WrongCredentials':
+        toast.warning('Wrong email or password');
+        break;
+      case 'UserNotExists':
+        toast.warning('User does not exist');
+        break;
+      case 'AccountLocked': {
+        const minutes = Math.max(1, Math.ceil((errorPayload<number>(err) ?? 0) / 60000));
+        toast.error(`Account locked. Try again in about ${minutes} min.`);
+        break;
+      }
+      case 'NoInternetConnection':
+        toast.error('No internet connection');
+        break;
+      case 'ServerNotAvailable':
+        toast.error('Server not responding');
+        break;
+      default:
+        toast.error('Login failed');
     }
   } finally {
     loading.value = false;
@@ -138,10 +137,18 @@ watch(
 
       <TextInput
         class="mt-3"
-        :placeholder="'Password'"
+        :placeholder="'Online account password'"
         :type="InputTypes.Password"
         :name="'password'"
         v-model="password"
+      />
+
+      <TextInput
+        class="mt-3"
+        :placeholder="'Local account password'"
+        :type="InputTypes.Password"
+        :name="'localPassword'"
+        v-model="localPassword"
       />
 
       <div class="mt-4 flex items-center justify-end gap-3">

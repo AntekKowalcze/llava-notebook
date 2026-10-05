@@ -13,6 +13,8 @@ import { useToast } from 'vue-toastification';
 import LoadingCircle from '../../components/main/LoadingCircle.vue';
 import { useOnlineAuthStore } from '../../stores/onlineAuth';
 import { useUserConfigStore } from '../../stores/userConfig';
+import { errorKey } from '../../lib/errors';
+import { isValidEmail } from '../../lib/validation';
 const onlineAuthStore = useOnlineAuthStore();
 const userConfig = useUserConfigStore();
 const router = useRouter();
@@ -23,11 +25,7 @@ const isPasswordValid = ref<boolean>(false);
 const toast = useToast();
 
 const loading = ref(false);
-const emailPattern =
-  /[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?/g;
-const correctEmail = computed(() => {
-  return email.value.match(emailPattern);
-});
+const correctEmail = computed(() => isValidEmail(email.value));
 const passwordsMatch = computed(() => {
   return password.value === repeatPassword.value;
 });
@@ -46,12 +44,14 @@ async function submitRegister() {
   if (!canSubmit.value) return;
   loading.value = true;
 
+  let previousMode: string | null = null;
   try {
     await userConfig.init();
     if (!userConfig.settingList) {
       toast.error('Settings not loaded. Try again.');
       return;
     }
+    previousMode = userConfig.getValueBySettingId(userConfig.settingList.sections, 'local.mode');
     userConfig.updateSettingValue('local.mode', 'off');
     await invoke<void>('register_user_online', {
       email: email.value,
@@ -66,33 +66,37 @@ async function submitRegister() {
     });
     toast.success('successfully regisered and connected to online account');
     await router.replace('/main/');
-  } catch (err: any) {
-    userConfig.updateSettingValue('local.mode', 'on');
-    const errorKey =
-      typeof err === 'string'
-        ? err
-        : typeof err?.error === 'string'
-          ? err.error
-          : typeof err?.message === 'string'
-            ? err.message
-            : null;
+  } catch (err) {
+    console.error('Online registration failed:', err);
+    // Put back what was there instead of assuming local mode was on.
+    if (previousMode !== null && previousMode !== 'ID NOT EXISTS') {
+      userConfig.updateSettingValue('local.mode', previousMode);
+    }
 
-    if (errorKey === 'NoInternetConnection' || err?.NoInternetConnection) {
-      toast.error('No internet connection');
-    } else if (errorKey === 'ServerNotAvailable' || err?.ServerNotAvailable) {
-      toast.error('Server unavailable. Try again later.');
-    } else if (errorKey === 'EmailAlreadyUsed' || err?.EmailAlreadyUsed) {
-      toast.warning('Email already used');
-    } else if (errorKey === 'WrongEmail' || err?.WrongEmail) {
-      toast.warning('Invalid email address');
-    } else if (errorKey === 'PasswordValidation' || err?.PasswordValidation) {
-      toast.warning('Password does not meet requirements');
-    } else if (err?.RequestError) {
-      toast.error('Server error. Try again later.');
-    } else if (errorKey === 'InternalError' || err?.InternalError) {
-      toast.error('Registration failed. Try again later.');
-    } else {
-      toast.error('Internal Error failed to register user, try again');
+    switch (errorKey(err)) {
+      case 'NoInternetConnection':
+        toast.error('No internet connection');
+        break;
+      case 'ServerNotAvailable':
+        toast.error('Server unavailable. Try again later.');
+        break;
+      case 'EmailAlreadyUsed':
+        toast.warning('Email already used');
+        break;
+      case 'WrongEmail':
+        toast.warning('Invalid email address');
+        break;
+      case 'PasswordValidation':
+        toast.warning('Password does not meet requirements');
+        break;
+      case 'RequestError':
+        toast.error('Server error. Try again later.');
+        break;
+      case 'InternalError':
+        toast.error('Registration failed. Try again later.');
+        break;
+      default:
+        toast.error('Failed to register user, try again');
     }
   } finally {
     loading.value = false;

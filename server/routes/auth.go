@@ -270,10 +270,30 @@ type PreLoginRequest struct {
 	Email string `json:"email"  validate:"required,email"`
 }
 
-func generateDummySalt() []byte {
-	salt := make([]byte, 16)
-	rand.Read(salt)
-	return salt
+// dummySalt returns the salt PreLogin reports for an email that has no
+// account. It must be stable per email: a random value on every call would
+// differ between two requests, while a real account always returns the same
+// salt, which tells an attacker which emails are registered. Deriving it from
+// the server secret keeps it unguessable. The encoding matches the client's
+// argon2 salts (unpadded base64 of 16 bytes).
+func dummySalt(email string) string {
+	pepper, err := config.GetPepperSecret()
+	if err != nil {
+		// Without the secret there is nothing stable to derive from; random is
+		// the previous behaviour.
+		salt := make([]byte, 16)
+		rand.Read(salt)
+		return base64.RawStdEncoding.EncodeToString(salt)
+	}
+
+	// The exact email, not a normalised form: accounts are looked up by exact
+	// match, so "Alice@x" and "alice@x" must get different (independent)
+	// dummy salts just as they would different real ones. Normalising here
+	// made the two answers identical only for unregistered emails.
+	mac := hmac.New(sha256.New, pepper)
+	mac.Write([]byte("prelogin-dummy-salt:" + email))
+
+	return base64.RawStdEncoding.EncodeToString(mac.Sum(nil)[:16])
 }
 func (h *Handler) PreLogin(c fiber.Ctx) error {
 	request := new(PreLoginRequest)
@@ -300,7 +320,7 @@ func (h *Handler) PreLogin(c fiber.Ctx) error {
 
 	if err != nil {
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{
-			"password_salt": base64.RawStdEncoding.EncodeToString(generateDummySalt()),
+			"password_salt": dummySalt(request.Email),
 		})
 	}
 

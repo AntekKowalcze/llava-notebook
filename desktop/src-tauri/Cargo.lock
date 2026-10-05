@@ -2778,6 +2778,7 @@ dependencies = [
  "chacha20poly1305",
  "encoding_rs",
  "futures-util",
+ "gtk",
  "http",
  "indexmap 2.14.2",
  "llava_core",

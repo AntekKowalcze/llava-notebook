@@ -25,6 +25,7 @@ export type SyncState =
   | 'Synced'
   | 'PendingUpload'
   | 'PendingDownload'
+  | 'PendingDeleted'
   | 'Conflict'
   | 'Error'
   | 'LocalOnly'

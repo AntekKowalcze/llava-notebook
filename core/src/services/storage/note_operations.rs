@@ -389,6 +389,20 @@ pub fn toggle_note_sync(
     Ok(())
 }
 
+/// Checks a note title the user typed (on create and rename): it must not be
+/// empty and may have at most [`crate::constants::MAX_TITLE_LENGTH`]
+/// characters. Returns the trimmed title.
+pub fn validate_title(title: &str) -> Result<String, crate::errors::Error> {
+    let title = title.trim();
+    if title.is_empty() {
+        return Err(crate::errors::Error::NoteNameError);
+    }
+    if title.chars().count() > crate::constants::MAX_TITLE_LENGTH {
+        return Err(crate::errors::Error::TitleTooLong);
+    }
+    Ok(title.to_string())
+}
+
 pub fn update_title(
     notes_db: &Connection,
     note_id: &str,
@@ -982,7 +996,9 @@ pub fn change_sync_to_pending_upload(
 ) -> Result<(), crate::errors::Error> {
     notes_db
         .execute(
-            "UPDATE notes SET sync_state = 'PendingUpload' WHERE local_id = ?1",
+            "UPDATE notes SET sync_state = 'PendingUpload'
+             WHERE local_id = ?1
+               AND sync_state NOT IN ('LocalOnly', 'PendingDeleted', 'WaitingForTombstone')",
             params![note_id],
         )
         .context("Failed to update sync_state")?;

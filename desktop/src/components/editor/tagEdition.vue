@@ -148,7 +148,7 @@ async function removeTag(tag: UiTag) {
     @click.self="props.showBackdrop && emit('close')"
   >
     <div
-      class="relative w-[420px] overflow-hidden rounded-xl border border-white/10 bg-note-graphite/95 shadow-2xl shadow-black/60 backdrop-blur-xl"
+      class="relative max-h-[calc(100vh-4rem)] w-[420px] max-w-[calc(100vw-2rem)] overflow-y-auto overflow-x-hidden rounded-xl border border-white/10 bg-note-graphite/95 shadow-2xl shadow-black/60 backdrop-blur-xl"
     >
       <!-- ambient glow -->
       <div

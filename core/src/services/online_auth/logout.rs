@@ -156,6 +156,29 @@ pub fn set_account_to_offline_in_db(
     Ok(())
 }
 
+/// Number of the user's notes that exist (or are meant to exist) in the cloud
+/// but whose latest state has not been confirmed there: pending uploads and
+/// deletions, failed syncs and tombstones still waiting to be sent. Logging
+/// out must not remove such notes locally.
+pub fn count_unsynced_notes(
+    notes_db: &rusqlite::Connection,
+    user_id: &str,
+) -> Result<i64, crate::errors::Error> {
+    let count = notes_db
+        .query_row(
+            "SELECT COUNT(*) FROM notes
+             WHERE owner_id = ?1 AND sync_state NOT IN ('Synced', 'LocalOnly')",
+            rusqlite::params![user_id],
+            |row| row.get::<_, i64>(0),
+        )
+        .context("Failed to count unsynced notes")?;
+
+    Ok(count)
+}
+
+/// Removes notes (and their attachments) that are fully synced to the cloud.
+/// Notes in any other state (local-only, pending, failed, tombstone) are kept:
+/// removing them would destroy data that exists nowhere else.
 pub fn delete_synced_notes_on_logout(
     notes_db: &mut rusqlite::Connection,
     user_id: String,
@@ -166,7 +189,7 @@ pub fn delete_synced_notes_on_logout(
 
     // 1. Gather note file paths
     let mut note_stmt = tx
-        .prepare("SELECT content_path FROM notes WHERE owner_id = ?1 AND sync_state != 'LocalOnly'")
+        .prepare("SELECT content_path FROM notes WHERE owner_id = ?1 AND sync_state = 'Synced'")
         .context("Failed to prepare note paths statement")?;
 
     let note_paths: Vec<String> = note_stmt
@@ -178,11 +201,14 @@ pub fn delete_synced_notes_on_logout(
     drop(note_stmt);
 
     // 2. Gather attachment file paths (local_path can be NULL, so we fetch as Option<String>)
-    let mut attachment_stmt = tx.prepare(
-        "SELECT local_path FROM attachments 
-         WHERE sync_state != 'LocalOnly' 
-         OR note_local_id IN (SELECT local_id FROM notes WHERE owner_id = ?1 AND sync_state != 'LocalOnly')"
-    ).context("Failed to prepare attachment paths statement")?;
+    let mut attachment_stmt = tx
+        .prepare(
+            "SELECT local_path FROM attachments
+             WHERE note_local_id IN (
+                 SELECT local_id FROM notes WHERE owner_id = ?1 AND sync_state = 'Synced'
+             )",
+        )
+        .context("Failed to prepare attachment paths statement")?;
 
     let attachment_paths: Vec<String> = attachment_stmt
         .query_map(rusqlite::params![user_id], |row| {
@@ -195,15 +221,16 @@ pub fn delete_synced_notes_on_logout(
     drop(attachment_stmt);
 
     tx.execute(
-        "DELETE FROM attachments 
-         WHERE sync_state != 'LocalOnly' 
-         OR note_local_id IN (SELECT local_id FROM notes WHERE owner_id = ?1 AND sync_state != 'LocalOnly')",
+        "DELETE FROM attachments
+         WHERE note_local_id IN (
+             SELECT local_id FROM notes WHERE owner_id = ?1 AND sync_state = 'Synced'
+         )",
         rusqlite::params![user_id],
     )
     .context("Failed to delete attachments from DB")?;
 
     tx.execute(
-        "DELETE FROM notes WHERE owner_id = ?1 AND sync_state != 'LocalOnly'",
+        "DELETE FROM notes WHERE owner_id = ?1 AND sync_state = 'Synced'",
         rusqlite::params![user_id],
     )
     .context("Failed to delete notes from DB")?;
@@ -225,4 +252,50 @@ pub fn delete_synced_notes_on_logout(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::constants::NOTE_DB_SCHEMA;
+
+    fn insert_note(conn: &rusqlite::Connection, id: &str, state: &str) {
+        conn.execute(
+            "INSERT INTO notes (local_id, owner_id, title, summary, content_path,
+                                created_at, updated_at, sync_state, encrypted)
+             VALUES (?1, 'user', 't', '', ?2, 1, 1, ?3, 0)",
+            rusqlite::params![id, format!("/nonexistent/{id}.md"), state],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn logout_only_removes_fully_synced_notes() {
+        let mut conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(NOTE_DB_SCHEMA).unwrap();
+        for (id, state) in [
+            ("synced", "Synced"),
+            ("local", "LocalOnly"),
+            ("pending", "PendingUpload"),
+            ("deleted", "PendingDeleted"),
+            ("error", "Error"),
+            ("tomb", "WaitingForTombstone"),
+        ] {
+            insert_note(&conn, id, state);
+        }
+
+        assert_eq!(count_unsynced_notes(&conn, "user").unwrap(), 4);
+
+        delete_synced_notes_on_logout(&mut conn, "user".into()).unwrap();
+
+        let mut remaining: Vec<String> = conn
+            .prepare("SELECT local_id FROM notes ORDER BY local_id")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        remaining.sort();
+        assert_eq!(remaining, ["deleted", "error", "local", "pending", "tomb"]);
+    }
 }

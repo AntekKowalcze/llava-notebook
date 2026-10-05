@@ -105,6 +105,7 @@ Rules:
 12. If the user asks to rewrite or improve text, return the rewritten text directly.
 13. If the user asks to generate new content, return only the generated Markdown content.
 14. If the user's instruction is ambiguous, make the most reasonable interpretation based on the document and selection.
+15. Write every heading on its own line as the markers (#, ##, ###, ...), one space and the heading text, e.g. "## Section title", and end it with a newline followed by an empty line. Never put a line break between the # markers and the heading text.
 
 The output must always be valid Markdown suitable for direct insertion into the editor.`
 

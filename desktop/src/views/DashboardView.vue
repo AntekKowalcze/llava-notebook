@@ -11,7 +11,9 @@ import { useRouter } from 'vue-router';
 import { LockIcon, Calendar, ArrowBigLeftDash } from 'lucide-vue-next';
 import { invoke } from '@tauri-apps/api/core';
 import ActivityMapSquare from '../components/dashboard/ActivityMapSquare.vue';
+import StorageUsageCard from '../components/dashboard/StorageUsageCard.vue';
 import { onMounted } from 'vue';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 
 type ActivityRecord = {
   numberOfEditions: number;
@@ -51,7 +53,7 @@ const dateFormatted = computed(() =>
 );
 const activityMap = ref<Record<string, number>>({});
 
-onMounted(async () => {
+async function loadDashboard() {
   try {
     let dashboardData = await invoke<DashboardData>('get_dashboard_data', {
       userUuid: userId,
@@ -70,6 +72,21 @@ onMounted(async () => {
   } catch (err) {
     console.error(err);
   }
+}
+
+let unlistenSyncFinished: UnlistenFn | null = null;
+
+onMounted(async () => {
+  await loadDashboard();
+  // Counts and recent notes change when another device's edits arrive.
+  unlistenSyncFinished = await listen('sync_finished', () => {
+    void loadDashboard();
+  });
+});
+
+onUnmounted(() => {
+  unlistenSyncFinished?.();
+  unlistenSyncFinished = null;
 });
 const greeting = computed(() => {
   if (hours.value < 6) return 'Burning the midnight oil,';
@@ -292,6 +309,8 @@ onUnmounted(() => clearInterval(interval));
           <span>More</span>
         </div>
       </div>
+
+      <StorageUsageCard />
 
       <ScreenDeviderHorizontal class="my-6" />
 

@@ -7,7 +7,8 @@
 //! ## Exported functions
 //! * [`configure_logger`] — Full logger setup: renames any existing log file, opens a fresh
 //!   truncated log file, attaches a non-blocking `tracing_appender` writer, builds a
-//!   pretty-formatted `tracing_subscriber` layer filtered to `llava_core=trace`, and registers
+//!   pretty-formatted `tracing_subscriber` layer filtered to `llava_core=trace` and
+//!   `llava=info` (the desktop app crate), and registers
 //!   it as the global default subscriber. Returns a [`WorkerGuard`] that **must be kept alive**
 //!   for the lifetime of the application — dropping it flushes and closes the background writer
 //! * [`log_success`] — debug functions just printing to the console just prettier
@@ -17,7 +18,7 @@
 //! Each application run starts with a fresh log file: `rename_log_file` renames any existing
 //! `app.log` to `log_{timestamp}` before a new file is opened, giving per-run log history
 //! without an external log rotation daemon. The `EnvFilter` is hardcoded to
-//! `off,llava_core=trace` so that noisy dependency crates are silenced while all internal spans
+//! `off,llava_core=trace,llava=info` so that noisy dependency crates are silenced while all internal spans
 //! and events are captured at full verbosity. ANSI colours are enabled (`with_ansi(true)`) —
 //! set to `false` if the log files are consumed by tooling that does not handle escape codes.
 //! The non-blocking writer offloads I/O to a background thread to avoid blocking hot paths.
@@ -45,7 +46,9 @@ pub fn configure_logger(
     path_to_log_file: &PathBuf,
 ) -> Result<tracing_appender::non_blocking::WorkerGuard, crate::errors::Error> {
     rename_log_file(path_to_log_file)?;
-    let filter = tracing_subscriber::filter::EnvFilter::new("off,llava_core=trace");
+    // `llava` is the desktop app crate: its command-layer errors (sync loop,
+    // attachments, clipboard) were dropped by the old core-only filter.
+    let filter = tracing_subscriber::filter::EnvFilter::new("off,llava_core=trace,llava=info");
     let log_file = OpenOptions::new()
         .create(true)
         .write(true)

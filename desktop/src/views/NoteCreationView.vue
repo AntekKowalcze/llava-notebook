@@ -5,8 +5,9 @@ import { LockKeyhole, Cloud } from 'lucide-vue-next';
 import SwitchInput from '../components/settings/SwitchInput.vue';
 import TextInput from '../components/auth/forms/TextInput.vue';
 import { InputTypes } from '../types/inputTypes';
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import { useToast } from 'vue-toastification';
+import { errorKey } from '../lib/errors';
 import { invoke } from '@tauri-apps/api/core';
 import { Note } from '../types/note.ts';
 import { useCurrentNoteStore } from '../stores/currentNoteStore.ts';
@@ -48,7 +49,19 @@ onMounted(async () => {
   await userSettings.init();
 });
 
+// Follow config changes (late load, `config-updated`) until the user picks a
+// value on this page themselves.
+const touched = new Set<string>();
+watch(
+  () => [userSettings.config['online.sync'], userSettings.config['local.encryption']],
+  ([onlineSync, localEncryption]) => {
+    if (!touched.has('sync')) sync.value = onlineSync;
+    if (!touched.has('encryption')) encryption.value = localEncryption;
+  }
+);
+
 function settingChanged(id: string, value: string) {
+  touched.add(id);
   if (id === 'sync') {
     sync.value = value;
   }
@@ -56,34 +69,6 @@ function settingChanged(id: string, value: string) {
     encryption.value = value;
   }
 }
-function getErrorText(err: unknown): string {
-  if (typeof err === 'string') {
-    return err;
-  }
-
-  if (err && typeof err === 'object') {
-    const typedErr = err as {
-      message?: unknown;
-      error?: unknown;
-      reason?: unknown;
-    };
-
-    if (typeof typedErr.message === 'string') {
-      return typedErr.message;
-    }
-
-    if (typeof typedErr.error === 'string') {
-      return typedErr.error;
-    }
-
-    if (typeof typedErr.reason === 'string') {
-      return typedErr.reason;
-    }
-  }
-
-  return String(err ?? '');
-}
-
 async function createNote(): Promise<void> {
   if (title.value.trim().length === 0) {
     toast.warning('Title cannot be empty');
@@ -111,24 +96,32 @@ async function createNote(): Promise<void> {
   } catch (err: unknown) {
     console.error('Failed to create note:', err);
 
-    const message = getErrorText(err).toLowerCase();
-
-    if (message.includes('note name already exists')) {
-      toast.warning('A note with this name already exists.');
-    } else if (message.includes('note name after sanitization is empty')) {
-      toast.warning('The note title is invalid.');
-    } else if (message.includes('title too long')) {
-      toast.warning('The note title is too long.');
-    } else if (message.includes('encryption key is unavailable')) {
-      toast.error('Encryption key is unavailable.');
-    } else if (message.includes('file operation error')) {
-      toast.error('Failed to create the note file.');
-    } else if (message.includes("couldn't lock state")) {
-      toast.error('Failed to access application state.');
-    } else if (message.includes('internal error')) {
-      toast.error('An internal error occurred while creating the note.');
-    } else {
-      toast.error('Failed to create note.');
+    switch (errorKey(err)) {
+      case 'NoteNameExistsError':
+      case 'FileAlreadyExists':
+        toast.warning('A note with this name already exists.');
+        break;
+      case 'NoteNameError':
+        toast.warning('The note title is invalid.');
+        break;
+      case 'TitleTooLong':
+      case 'NoteNameTooLong':
+        toast.warning('The note title is too long.');
+        break;
+      case 'NoKeyToDecryptANote':
+        toast.error('Encryption key is unavailable.');
+        break;
+      case 'FileOperationError':
+        toast.error('Failed to create the note file.');
+        break;
+      case 'LockError':
+        toast.error('Failed to access application state.');
+        break;
+      case 'InternalError':
+        toast.error('An internal error occurred while creating the note.');
+        break;
+      default:
+        toast.error('Failed to create note.');
     }
   }
 }
@@ -139,9 +132,7 @@ async function createNote(): Promise<void> {
   >
     <div class="min-h-0 w-full shrink grow-[1.5]"></div>
 
-  
     <div class="w-full max-w-2xl shrink-0 py-2 min-[1600px]:max-w-4xl">
-      
       <!-- Responsive Icon Sizing -->
       <div class="flex justify-center">
         <IconComponent
@@ -184,8 +175,9 @@ async function createNote(): Promise<void> {
         </div>
 
         <!-- Responsive Settings Stack -->
-        <div class="mt-[2.5vh] space-y-2.5 sm:space-y-3 min-[1600px]:mt-[3.5vh] min-[1600px]:space-y-4">
-          
+        <div
+          class="mt-[2.5vh] space-y-2.5 sm:space-y-3 min-[1600px]:mt-[3.5vh] min-[1600px]:space-y-4"
+        >
           <!-- Encryption Row -->
           <div
             class="flex items-center justify-between rounded-xl border border-note-pumice/10 bg-black/30 px-4 py-3 sm:rounded-2xl sm:px-5 sm:py-3.5 min-[1600px]:px-6 min-[1600px]:py-5"
@@ -194,7 +186,9 @@ async function createNote(): Promise<void> {
               <div
                 class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-note-paprika/10 sm:h-11 sm:w-11 min-[1600px]:h-14 min-[1600px]:w-14"
               >
-                <LockKeyhole class="h-5 w-5 text-note-paprika sm:h-6 sm:w-6 min-[1600px]:h-7 min-[1600px]:w-7" />
+                <LockKeyhole
+                  class="h-5 w-5 text-note-paprika sm:h-6 sm:w-6 min-[1600px]:h-7 min-[1600px]:w-7"
+                />
               </div>
 
               <div>
@@ -220,11 +214,15 @@ async function createNote(): Promise<void> {
               <div
                 class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-note-glow/10 sm:h-11 sm:w-11 min-[1600px]:h-14 min-[1600px]:w-14"
               >
-                <Cloud class="h-5 w-5 text-note-glow sm:h-6 sm:w-6 min-[1600px]:h-7 min-[1600px]:w-7" />
+                <Cloud
+                  class="h-5 w-5 text-note-glow sm:h-6 sm:w-6 min-[1600px]:h-7 min-[1600px]:w-7"
+                />
               </div>
 
               <div>
-                <p class="text-sm text-note-ivory sm:text-base min-[1600px]:text-lg">Synchronization</p>
+                <p class="text-sm text-note-ivory sm:text-base min-[1600px]:text-lg">
+                  Synchronization
+                </p>
                 <p class="text-[10px] text-note-pumice/50 sm:text-xs min-[1600px]:text-sm">
                   Keep your knowledge everywhere
                 </p>

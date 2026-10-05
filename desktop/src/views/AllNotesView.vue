@@ -17,12 +17,12 @@ import {
   X,
 } from 'lucide-vue-next';
 
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
 import { Listbox, ListboxButton, ListboxOptions, ListboxOption } from '@headlessui/vue';
 
 import { invoke } from '@tauri-apps/api/core';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useToast } from 'vue-toastification';
 
 import ScreenDeviderHorizontal from '../components/dashboard/ScreenDeviderHorizontal.vue';
@@ -31,7 +31,10 @@ import TagEdition from '../components/editor/tagEdition.vue';
 import { useAuthStore } from '../stores/auth';
 import { useCurrentNoteStore } from '../stores/currentNoteStore';
 import { useLayoutStore } from '../stores/layoutStore';
-import { emit } from '@tauri-apps/api/event';
+import { useUserConfigStore } from '../stores/userConfig';
+import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { formatTimeAgo } from '../lib/time';
+import { useShortcuts } from '../lib/shortcuts';
 interface UiTag {
   tag_id: string;
   name: string;
@@ -66,11 +69,32 @@ const toast = useToast();
 const authStore = useAuthStore();
 const currentNoteStore = useCurrentNoteStore();
 const layoutStore = useLayoutStore();
+const userConfig = useUserConfigStore();
 
 const notes = ref<NoteWithTags[]>([]);
 const loading = ref(true);
 
 const searchText = ref('');
+const searchInput = ref<HTMLInputElement | null>(null);
+const route = useRoute();
+
+function focusSearch() {
+  searchInput.value?.focus();
+  searchInput.value?.select();
+}
+
+useShortcuts({ focusSearch });
+
+// Ctrl+P (App.vue) navigates here with a fresh `search` value.
+watch(
+  () => route.query.search,
+  async (value) => {
+    if (!value) return;
+    await nextTick();
+    focusSearch();
+  },
+  { immediate: true }
+);
 const selectedDate = ref('all');
 const selectedStatus = ref('all');
 
@@ -102,49 +126,13 @@ const statusOptions = [
   },
   {
     value: 'synced',
-    label: 'Synced',
+    label: 'Sync on',
   },
   {
     value: 'local',
     label: 'Local only',
   },
 ];
-
-function formatTimeAgo(timestamp: number, now: number): string {
-  const milliseconds = Math.max(0, now - timestamp);
-
-  if (milliseconds < 60_000) {
-    return 'just now';
-  }
-
-  if (milliseconds < 3_600_000) {
-    const minutes = Math.floor(milliseconds / 60_000);
-
-    return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
-  }
-
-  if (milliseconds < 86_400_000) {
-    const hours = Math.floor(milliseconds / 3_600_000);
-
-    return `${hours} hour${hours === 1 ? '' : 's'} ago`;
-  }
-
-  if (milliseconds < 2_592_000_000) {
-    const days = Math.floor(milliseconds / 86_400_000);
-
-    return `${days} day${days === 1 ? '' : 's'} ago`;
-  }
-
-  if (milliseconds < 31_536_000_000) {
-    const weeks = Math.floor(milliseconds / 604_800_000);
-
-    return `${weeks} week${weeks === 1 ? '' : 's'} ago`;
-  }
-
-  const months = Math.floor(milliseconds / 2_592_000_000);
-
-  return `${months} month${months === 1 ? '' : 's'} ago`;
-}
 
 function formatDateKey(timestamp: number): string {
   const date = new Date(timestamp);
@@ -289,7 +277,7 @@ const filteredNotes = computed(() => {
       selectedStatus.value === 'all' ||
       (selectedStatus.value === 'encrypted' && note.encrypted) ||
       (selectedStatus.value === 'unencrypted' && !note.encrypted) ||
-      (selectedStatus.value === 'synced' && note.sync_state === 'Synced') ||
+      (selectedStatus.value === 'synced' && note.sync_state !== 'LocalOnly') ||
       (selectedStatus.value === 'local' && note.sync_state === 'LocalOnly');
 
     return matchesSearch && matchesDate && matchesStatus;
@@ -420,10 +408,8 @@ async function submitTitle(note: NoteWithTags) {
       title,
     });
 
-    note.title = title;
-    note.updated_at = Date.now();
-
     cancelTitleEdit();
+    await loadNotes(true);
 
     toast.success('Title changed successfully');
   } catch (err) {
@@ -465,7 +451,7 @@ async function toggleFavourite(note: NoteWithTags) {
         tagName: 'favourites',
       });
 
-      note.tags = note.tags.filter((tag) => tag.name.toLowerCase() !== 'favourites');
+      await loadNotes(true);
 
       toast.success('Removed from favourites');
     } else {
@@ -475,11 +461,7 @@ async function toggleFavourite(note: NoteWithTags) {
         tagColor: '#FACC15',
       });
 
-      note.tags.push({
-        tag_id: 'favourites',
-        name: 'favourites',
-        color: '#FACC15',
-      });
+      await loadNotes(true);
 
       toast.success('Added to favourites');
     }
@@ -501,15 +483,18 @@ async function toggleSync(note: NoteWithTags) {
 
   const nextValue = note.sync_state === 'LocalOnly' ? 'on' : 'off';
 
+  if (nextValue === 'on' && userConfig.config['local.mode'] === 'on') {
+    toast.info('Turn off local mode in settings to synchronize notes');
+    return;
+  }
+
   try {
     await invoke<void>('toggle_note_sync', {
       noteId: note.local_id,
       value: nextValue,
     });
 
-    note.sync_state = nextValue === 'off' ? 'LocalOnly' : 'PendingUpload';
-
-    note.updated_at = Date.now();
+    await loadNotes(true);
 
     toast.success(
       nextValue === 'on' ? 'Note synchronization enabled' : 'Note synchronization disabled'
@@ -539,43 +524,55 @@ async function deleteNote(note: NoteWithTags) {
   }
 }
 
-async function loadNotes() {
-  loading.value = true;
+let loadSequence = 0;
+
+async function loadNotes(silent = false) {
+  // Several reloads can overlap (a sync finishing while a menu action
+  // reloads); only the newest one may write the list.
+  const sequence = ++loadSequence;
+
+  if (!silent) {
+    loading.value = true;
+  }
 
   try {
     const loadedNotes = await invoke<Note[]>('get_all_notes_data', {
       userId: authStore.loggedInUserId,
     });
 
-    const result: NoteWithTags[] = [];
+    const result = await Promise.all(
+      loadedNotes.map(async (note): Promise<NoteWithTags> => {
+        try {
+          const tags = await invoke<UiTag[]>('get_all_tags_for_note', {
+            noteId: note.local_id,
+          });
 
-    for (const note of loadedNotes) {
-      try {
-        const tags = await invoke<UiTag[]>('get_all_tags_for_note', {
-          noteId: note.local_id,
-        });
+          return { ...note, tags };
+        } catch (err) {
+          console.error(`Failed to load tags for note ${note.local_id}:`, err);
 
-        result.push({
-          ...note,
-          tags,
-        });
-      } catch (err) {
-        console.error(`Failed to load tags for note ${note.local_id}:`, err);
+          return { ...note, tags: [] };
+        }
+      })
+    );
 
-        result.push({
-          ...note,
-          tags: [],
-        });
-      }
-    }
+    if (sequence !== loadSequence) return;
 
     notes.value = result;
+
+    // A date filter whose notes are gone would show an empty list.
+    if (
+      selectedDate.value !== 'all' &&
+      !result.some((note) => formatDateKey(note.updated_at) === selectedDate.value)
+    ) {
+      selectedDate.value = 'all';
+    }
   } catch (err) {
     console.error(err);
 
-    toast.error('Failed to load notes');
+    if (sequence === loadSequence) toast.error('Failed to load notes');
   } finally {
-    loading.value = false;
+    if (sequence === loadSequence) loading.value = false;
   }
 }
 
@@ -588,12 +585,21 @@ function redirect() {
   router.replace({ name: 'create' });
 }
 
-onMounted(() => {
+let unlistenSyncFinished: UnlistenFn | null = null;
+
+onMounted(async () => {
   loadNotes();
+  // Notes created, changed or deleted by a sync should show up without
+  // leaving and re-entering the page.
+  unlistenSyncFinished = await listen('sync_finished', () => {
+    void loadNotes(true);
+  });
 });
 
 onUnmounted(() => {
   window.clearInterval(timeAgoInterval);
+  unlistenSyncFinished?.();
+  unlistenSyncFinished = null;
 });
 </script>
 
@@ -735,6 +741,7 @@ onUnmounted(() => {
           <Search class="mr-2 h-4 w-4 shrink-0 text-note-paprika" />
 
           <input
+            ref="searchInput"
             v-model="searchText"
             type="text"
             placeholder="Search by note title..."

@@ -3,26 +3,31 @@ import { Star, Tag } from 'lucide-vue-next';
 import ScreenDeviderHorizontal from '../dashboard/ScreenDeviderHorizontal.vue';
 import SwitchInput from '../settings/SwitchInput.vue';
 import { useCurrentNoteStore } from '../../stores/currentNoteStore.ts';
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import { useToast } from 'vue-toastification';
 import { useLayoutStore } from '../../stores/layoutStore';
+import { useUserConfigStore } from '../../stores/userConfig';
 import SubmitButton from '../commons/SubmitButton.vue';
 import TextInput from '../auth/forms/TextInput.vue';
 import { InputTypes } from '../../types/inputTypes.ts';
 import { emit as emitTauri } from '@tauri-apps/api/event';
+import { isError } from '../../lib/errors';
 const layoutStore = useLayoutStore();
 const toast = useToast();
 const emit = defineEmits<{ (e: 'change_encryption_method', to: boolean): void }>();
 const currentNoteStore = useCurrentNoteStore();
+const userConfig = useUserConfigStore();
+// Bumped to re-render the switch from the real value after a refused change.
+const syncSwitchKey = ref(0);
 const isChangingTitle = ref(false);
 const newTitle = ref('');
+const menuRoot = ref<HTMLElement | null>(null);
 const encryptionState = computed(() => (currentNoteStore.currentNote?.encrypted ? 'on' : 'off'));
 
-const syncState = computed(() =>{
- return  currentNoteStore.currentNote?.sync_state === 'LocalOnly' ? 'off' : 'on'
-}
-);
+const syncState = computed(() => {
+  return currentNoteStore.currentNote?.sync_state === 'LocalOnly' ? 'off' : 'on';
+});
 
 async function settingChanged(id: string, value: string) {
   const note = currentNoteStore.currentNote;
@@ -35,13 +40,19 @@ async function settingChanged(id: string, value: string) {
       break;
     }
     case 'sync': {
+      if (value === 'on' && userConfig.config['local.mode'] === 'on') {
+        toast.info('Turn off local mode in settings to synchronize notes');
+        syncSwitchKey.value++;
+        break;
+      }
       try {
         await invoke<void>('toggle_note_sync', { noteId, value });
         if (currentNoteStore.currentNote) {
           currentNoteStore.currentNote.sync_state = value === 'off' ? 'LocalOnly' : 'PendingUpload';
         }
       } catch (err) {
-        useToast().warning('Failed to change sync state');
+        syncSwitchKey.value++;
+        toast.warning('Failed to change sync state');
       }
       break;
     }
@@ -52,15 +63,15 @@ async function addToFavourites() {
   if (currentNoteStore.currentNote) {
     let currentNoteId = currentNoteStore.currentNote.local_id;
     try {
-      invoke<void>('add_tag_to_note', {
+      await invoke<void>('add_tag_to_note', {
         noteId: currentNoteId,
         tagName: 'favourites',
         tagColor: '#FACC15',
       });
-      toast.success('Successfuly added to favourites');
-      emitTauri('tags_changed');
+      toast.success('Added to favourites');
+      await emitTauri('tags_changed');
     } catch (err) {
-      useToast().warning('Failed to add note to favourites');
+      toast.warning('Failed to add note to favourites');
     }
   }
 }
@@ -72,6 +83,18 @@ function changeTitle() {
     newTitle.value = currentNoteStore.currentNote?.title ?? '';
   }
 }
+
+watch(
+  () => layoutStore.titleEditRequested,
+  async (requested) => {
+    if (!requested) return;
+    layoutStore.titleEditRequested = false;
+    if (!isChangingTitle.value) changeTitle();
+    await nextTick();
+    menuRoot.value?.querySelector<HTMLInputElement>('input[name="title"]')?.focus();
+  },
+  { immediate: true }
+);
 
 async function submitTitle() {
   const note = currentNoteStore.currentNote;
@@ -97,7 +120,9 @@ async function submitTitle() {
     toast.success('Title changed successfully');
   } catch (err) {
     console.error(err);
-    toast.warning('Failed to change title');
+    toast.warning(
+      isError(err, 'TitleTooLong') ? 'Title can be at most 30 characters' : 'Failed to change title'
+    );
   }
 }
 </script>
@@ -105,6 +130,7 @@ async function submitTitle() {
 <template>
   <div
     v-if="currentNoteStore.currentNote"
+    ref="menuRoot"
     class="absolute bottom-full right-full z-[50] w-60 rounded-lg border-2 border-note-paprika bg-black p-4 shadow-2xl"
   >
     <button
@@ -203,6 +229,7 @@ async function submitTitle() {
         Note synchronization
       </span>
       <SwitchInput
+        :key="syncSwitchKey"
         class="scale-[0.8]"
         id="sync"
         :current-value="syncState"

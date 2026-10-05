@@ -67,10 +67,11 @@ export const useMetaStore = defineStore('metaStore', () => {
     (newValue) => {
       if (newValue === null) return;
       const toast = useToast();
-      if (newValue && location.hash != '/login') {
-        toast.success('Internet connected');
-      } else {
+      if (!newValue) {
         toast.error('Lost internet connection');
+      } else if (!location.hash.startsWith('#/login')) {
+        // The login screens are shown before a session exists; the toast is noise there.
+        toast.success('Internet connected');
       }
     },
     { immediate: true }

@@ -14,6 +14,7 @@
     "windows": [
       {
         "decorations": false,
+        "dragDropEnabled": false,
         "title": "llava",
         "maximized": true,
         "resizable": true,

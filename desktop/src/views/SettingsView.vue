@@ -19,6 +19,8 @@ import { useUserConfigStore } from '../stores/userConfig';
 import { storeToRefs } from 'pinia';
 import { useOnlineAuthStore } from '../stores/onlineAuth';
 import { emit } from '@tauri-apps/api/event';
+import { errorKey } from '../lib/errors';
+import { resetSessionState } from '../lib/session';
 const toast = useToast();
 const authStore = useAuthStore();
 const onlineAuthStore = useOnlineAuthStore();
@@ -40,10 +42,7 @@ const id = authStore.loggedInUserId;
 const showFilter = ref<boolean>(false);
 let filters = ['local', 'local.core', 'local.danger', 'online', 'online.core', 'online.ai'];
 const searchText = ref<string>('');
-let settingsToShow: string[]; //list of setting ids got from metaphone
-let previousSearchTextLength: number = 0;
-let metaphoneCache: string[][] = [];
-let metaphoneMap: Record<string, string[]>;
+let metaphoneMap: Record<string, string[]> = {};
 let showLogs = ref<boolean>(false);
 const logContents = ref<string>('');
 const showPasswordInput = ref<boolean>(false);
@@ -53,40 +52,12 @@ const usernameLoading = ref<boolean>(false);
 const codesLoading = ref<boolean>(false);
 function search() {
   if (settingList.value == null) return;
-  if (searchText.value.length == 0) {
-    initSettingVisibilityOnInputEnter(settingList.value.sections); //set all to false
-    metaphoneCache = [];
-  }
-  if (searchText.value.length > 0 && searchText.value.length < previousSearchTextLength) {
-    metaphoneCache.pop(); //if length was 5 and we went to 4 pop this 5 searech because there is sall change same letter will be written
-    settingsToShow = metaphoneCache[searchText.value.length - 1];
-    for (let settingId of settingsToShow) {
-      changeSettingVisibility(settingList.value.sections, settingId);
-    }
-    return;
-  }
-  previousSearchTextLength = searchText.value.length;
-  let processedString = metaphone(searchText.value);
-  settingsToShow = metaphoneMap[processedString];
-  if (settingsToShow == undefined) {
-    settingsToShow = [];
-  }
-  for (let settingId of settingsToShow) {
+  initSettingVisibility(settingList.value.sections, false);
+  if (searchText.value.length == 0) return;
+
+  const settingsToShow = metaphoneMap[metaphone(searchText.value)] ?? [];
+  for (const settingId of settingsToShow) {
     changeSettingVisibility(settingList.value.sections, settingId);
-  }
-  metaphoneCache.push(settingsToShow);
-
-  return;
-}
-
-function initSettingVisibilityOnInputEnter(sections: Section[]) {
-  for (let section of sections) {
-    for (let setting of section.sectionSettings) {
-      setting.show = false;
-    }
-    if (section.subsections) {
-      initSettingVisibilityOnInputEnter(section.subsections);
-    }
   }
 }
 
@@ -171,33 +142,27 @@ function showFilters() {
 }
 async function handleChange(id: string, value: string) {
   if (!settingList.value) return;
+  const previous = userConfigStore.getValueBySettingId(settingList.value.sections, id);
   userConfigStore.updateSettingValue(id, value);
   try {
     if (id != 'local.loadConfigBackup' && id != 'local.logout') {
       await invoke('update_settings', { userConfig: settingList.value });
     }
   } catch (err) {
+    // Show what is actually stored instead of a value that was never saved.
+    if (previous !== 'ID NOT EXISTS') userConfigStore.updateSettingValue(id, previous);
     toast.error('Failed to save config');
+    return;
   }
-  await handleUpdate(id);
+  await handleUpdate(id, value);
 }
 
-async function handleUpdate(id: string) {
+async function handleUpdate(id: string, value: string) {
   switch (id) {
     case 'local.logout': {
       try {
         await invoke<void>('local_logout_command', {});
-        authStore.$patch({
-          loggedIn: false,
-          loggedInUsername: null,
-          loggedInUserId: null,
-        });
-        userConfigStore.settingList = null;
-        onlineAuthStore.$patch({
-          loggedIn: false,
-          loggedInEmail: null,
-          loggedInId: null,
-        });
+        resetSessionState();
 
         toast.success('logged out successfully');
         router.replace('/');
@@ -259,8 +224,10 @@ async function handleUpdate(id: string) {
       break;
     }
     case 'online.logout': {
+      const keepUnsyncedNotes = !shouldSyncOnLogout.value;
       try {
         await invoke<void>('online_logout', { sync: shouldSyncOnLogout.value });
+        shouldSyncOnLogout.value = true;
         onlineAuthStore.$patch({
           loggedIn: false,
           loggedInEmail: null,
@@ -268,31 +235,34 @@ async function handleUpdate(id: string) {
         });
         authStore.linked = false;
         toast.success(
-          'Disconnected online account from local account successfully. Notes synchronized with this account will be removed from this device. Local-only notes will remain.'
+          keepUnsyncedNotes
+            ? 'Disconnected online account from local account. All notes stay on this device.'
+            : 'Disconnected online account from local account successfully. Notes synchronized with this account will be removed from this device. Local-only notes will remain.'
         );
-      } catch (err: any) {
-        if (err?.NoInternetConnection) {
-          toast.error('No internet connection. Try again later.');
-        } else if (err?.RequestError) {
-          toast.error('Server error. Try again later.');
-        } else if (err?.ServerNotAvailable) {
-          toast.error('Server unavailable. Try again later.');
-        } else if (err?.SyncFailed) {
-          toast.error(
-            'Synchronization failed, some notes may be lost if you proceed to disconnect accounts, to disconnect, click disconnect again'
-          );
-          shouldSyncOnLogout.value = false;
-          try {
-            await invoke<void>('online_logout', { sync: shouldSyncOnLogout.value });
-            toast.success(
-              'Disconnected online account from local account successfully. Notes synchronized with this account will be removed from this device. Local-only notes will remain.'
+      } catch (err) {
+        switch (errorKey(err)) {
+          case 'NoInternetConnection':
+            toast.error('No internet connection. Try again later.');
+            break;
+          case 'RequestError':
+            toast.error('Server error. Try again later.');
+            break;
+          case 'ServerNotAvailable':
+            toast.error('Server unavailable. Try again later.');
+            break;
+          case 'SyncFailed':
+            // Nothing was deleted. The next click disconnects without syncing
+            // and keeps every note on this device; the choice expires so a
+            // forgotten click later does not skip the sync.
+            shouldSyncOnLogout.value = false;
+            setTimeout(() => (shouldSyncOnLogout.value = true), 20000);
+            toast.warning(
+              'Some notes are not synchronized yet. Click disconnect again to disconnect anyway - those notes will stay on this device.',
+              { timeout: 10000 }
             );
-          } catch (err) {
-            toast.error('Couldnt disconnect accounts, try again later');
-          }
-          shouldSyncOnLogout.value = true;
-        } else {
-          toast.error('Logout failed');
+            break;
+          default:
+            toast.error('Logout failed');
         }
       }
       break;
@@ -314,6 +284,8 @@ async function handleUpdate(id: string) {
       break;
     }
     case 'online.aiFeatures': {
+      // The reminder is only relevant when the features are being turned on.
+      if (value !== 'on') break;
       toast.success(
         'Remember that using Ai features means that your information may be used to train Ai models. Use it responsibly.'
       );
@@ -412,15 +384,26 @@ function handlePasswordCancel() {
 
 async function handleUsername(newUsername: string) {
   usernameLoading.value = true;
-  await invoke<void>('change_username', { newUsername: newUsername });
-  if (!username) return;
-  username.value = newUsername;
-  authStore.$patch({
-    loggedInUsername: newUsername,
-  });
-  usernameLoading.value = false;
-  showUsernameInput.value = false;
-  return;
+  try {
+    await invoke<void>('change_username', { newUsername: newUsername });
+    username.value = newUsername;
+    authStore.$patch({
+      loggedInUsername: newUsername,
+    });
+    showUsernameInput.value = false;
+    toast.success('Username changed');
+  } catch (err) {
+    switch (errorKey(err)) {
+      case 'UsernameExistsError':
+        toast.warning('This username is already taken');
+        break;
+      default:
+        console.error('Failed to change username:', err);
+        toast.error('Failed to change username');
+    }
+  } finally {
+    usernameLoading.value = false;
+  }
 }
 function handleUsernameCancel() {
   showUsernameInput.value = false;
@@ -460,10 +443,12 @@ function handleUsernameCancel() {
 
     <header class="shrink-0 pb-4 pt-8">
       <div class="flex items-start justify-between gap-8">
-        <div class="flex h-[27vh] min-h-60 flex-col justify-between">
+        <div
+          class="flex min-h-40 min-w-0 flex-col justify-between gap-4 [@media(min-height:850px)]:h-[27vh] [@media(min-height:850px)]:min-h-60"
+        >
           <div class="flex flex-col">
             <h1
-              class="text-3xl font-semibold tracking-tight text-note-ivory lg:text-5xl xl:text-6xl"
+              class="break-words text-3xl font-semibold tracking-tight text-note-ivory lg:text-5xl xl:text-6xl"
             >
               Settings of
               <span class="text-note-paprika">{{ username }}</span>
@@ -472,7 +457,7 @@ function handleUsernameCancel() {
           </div>
 
           <span
-            class="flex h-10 w-80 items-center rounded-md border-2 border-note-pumice/50 bg-black/40 p-2 transition duration-1000 ease-out focus-within:border-note-paprika/80 focus-within:bg-black/60"
+            class="flex h-10 w-full max-w-80 items-center rounded-md border-2 border-note-pumice/50 bg-black/40 p-2 transition duration-1000 ease-out focus-within:border-note-paprika/80 focus-within:bg-black/60"
           >
             <input
               class="w-[90%] select-none bg-note-graphite text-note-ivory outline-none transition duration-1000 ease-out placeholder:text-note-pumice/70 focus:border-transparent focus:bg-black/50 focus:shadow-none focus:outline-none focus:ring-0"

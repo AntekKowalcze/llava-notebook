@@ -40,7 +40,7 @@ pub mod storage {
     pub use crate::services::storage::note_operations::{
         change_sync_to_pending_upload, check_if_note_is_encrypted, check_if_note_is_synced,
         get_note, get_note_content, resolve_attachment_protocol, toggle_note_encryption,
-        toggle_note_sync, verify_note_owner,
+        toggle_note_sync, validate_title, verify_note_owner,
     };
     pub use crate::services::storage::update::update_md;
 }
@@ -67,12 +67,16 @@ pub mod settings {
 pub mod stats {
     pub use crate::services::user_stats::dashboard_stats::{DashboardData, get_dashboard_stats};
     pub use crate::services::user_stats::sliding_panel::{PanelData, get_sliding_panel_stats};
+    pub use crate::services::user_stats::storage_usage::{
+        CloudStorageUsage, LocalStorageUsage, fetch_cloud_storage_usage, get_local_storage_usage,
+    };
 }
 
 pub mod online_auth {
     pub use crate::models::online_account::AccessToken;
     pub use crate::services::online_auth::login::check_if_logged_in_online;
     pub use crate::services::online_auth::login::login;
+    pub use crate::services::online_auth::logout::count_unsynced_notes;
     pub use crate::services::online_auth::logout::delete_synced_notes_on_logout;
     pub use crate::services::online_auth::logout::logout;
     pub use crate::services::online_auth::logout::set_account_to_offline_in_db;
@@ -115,13 +119,12 @@ pub mod attachments {
     pub use crate::models::attachment::Attachment;
     pub use crate::services::attachment::check_attachment_existance;
     pub use crate::services::attachment::check_if_attachment_is_encrypted;
+    pub use crate::services::attachment::copy_attachment_with_encryption;
     pub use crate::services::attachment::create_attachment;
     pub use crate::services::attachment::delete_attachment;
     pub use crate::services::attachment::get_attachments_for_note;
     pub use crate::services::attachment::read_attachment;
-    pub use crate::services::attachment::toggle_attachments_encryption_for_note;
     pub use crate::services::attachment::toggle_attachments_sync_for_note;
-    pub use crate::services::attachment::update_attachment_file;
 }
 
 pub mod sync {
@@ -132,6 +135,7 @@ pub mod sync {
     pub use crate::models::sync::UploadAttachment;
     pub use crate::services::sync::DbOperation;
     pub use crate::services::sync::download_attachment;
+    pub use crate::services::sync::drop_instructions_for_local_only_notes;
     pub use crate::services::sync::execute_db_operations;
     pub use crate::services::sync::execute_server_operations;
     pub use crate::services::sync::get_all_notes_to_sync;

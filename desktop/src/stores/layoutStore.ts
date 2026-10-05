@@ -6,6 +6,8 @@ const toast = useToast();
 export const useLayoutStore = defineStore('layout', () => {
   const leftPanelOpen = ref<boolean>(false);
   const isTagEditorOpen = ref(false);
+  // Set by the F2 shortcut; the note's plus menu opens its title editor.
+  const titleEditRequested = ref(false);
   const reencrypting = ref(false);
   let reencryptingStatusListener: (() => void) | null = null;
   let reencryptingFinishedListener: (() => void) | null = null;
@@ -37,6 +39,9 @@ export const useLayoutStore = defineStore('layout', () => {
   function closeTagEditor() {
     isTagEditorOpen.value = false;
   }
+  function requestTitleEdit() {
+    titleEditRequested.value = true;
+  }
   function toggleLeftPanel() {
     leftPanelOpen.value = !leftPanelOpen.value;
   }
@@ -48,5 +53,7 @@ export const useLayoutStore = defineStore('layout', () => {
     isTagEditorOpen,
     openTagEditor,
     closeTagEditor,
+    titleEditRequested,
+    requestTitleEdit,
   };
 });

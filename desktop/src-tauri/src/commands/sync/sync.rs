@@ -107,6 +107,77 @@ enum SyncResult {
 }
 use tauri::Manager;
 
+/// Sent after a sync pass changed local data, so open views can refresh.
+#[derive(Serialize, Clone)]
+struct SyncFinishedPayload {
+    /// Notes inserted or overwritten from the cloud, plus conflict copies.
+    changed_note_ids: Vec<String>,
+    /// Notes removed locally because they were deleted in the cloud.
+    removed_note_ids: Vec<String>,
+}
+
+/// Only one sync cycle may run at a time. The 60 s timer, the first sync
+/// after login and a manual trigger can otherwise overlap; both runs then
+/// act on the same server answer and, for example, insert a note downloaded
+/// from the cloud twice.
+static SYNC_RUNNING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Held while a sync cycle (or an operation that must not race with one, such
+/// as deleting local data on logout) is running.
+pub struct SyncRunGuard;
+
+impl SyncRunGuard {
+    fn try_acquire() -> Option<SyncRunGuard> {
+        if SYNC_RUNNING.swap(true, std::sync::atomic::Ordering::AcqRel) {
+            None
+        } else {
+            Some(SyncRunGuard)
+        }
+    }
+}
+
+impl Drop for SyncRunGuard {
+    fn drop(&mut self) {
+        SYNC_RUNNING.store(false, std::sync::atomic::Ordering::Release);
+    }
+}
+
+/// Waits (up to `max_wait`) for a running sync cycle to finish and takes the
+/// sync lock, so nothing else syncs until the guard is dropped.
+pub async fn acquire_sync_lock(
+    max_wait: std::time::Duration,
+) -> Result<SyncRunGuard, llava_core::Error> {
+    let deadline = tokio::time::Instant::now() + max_wait;
+
+    loop {
+        if let Some(guard) = SyncRunGuard::try_acquire() {
+            return Ok(guard);
+        }
+
+        if tokio::time::Instant::now() >= deadline {
+            return Err(llava_core::Error::SyncFailed);
+        }
+
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    }
+}
+
+/// Reads a `"on"`/`"off"` style user setting; `None` when unavailable.
+fn config_value(state: &tauri::State<'_, AppState>, key: &str) -> Option<String> {
+    state
+        .user_config
+        .lock()
+        .ok()
+        .and_then(|config| config.as_ref().and_then(|map| map.get(key).cloned()))
+}
+
+/// Whether online sync is switched off in settings.
+pub fn is_online_sync_off(state: &tauri::State<'_, AppState>) -> bool {
+    config_value(state, "online.sync")
+        .map(|value| value == "off")
+        .unwrap_or(false)
+}
+
 #[tauri::command]
 pub async fn synchronize_all(
     state: tauri::State<'_, AppState>,
@@ -120,22 +191,27 @@ pub async fn synchronize_all(
             .unwrap_or(false),
         Err(_) => true,
     };
-    let is_online_sync_off: bool = match state.user_config.lock() {
-        Ok(config) => config
-            .as_ref()
-            .and_then(|map| map.get("online.sync"))
-            .map(|value| value == "off")
-            .unwrap_or(false),
-        Err(_) => true,
-    };
     if is_local_only {
         return Err(llava_core::Error::InternalError(
             "cannot sync in local mode".to_string(),
         ));
-    } else if is_online_sync_off {
+    } else if is_online_sync_off(&state) {
         return Ok(());
     }
 
+    let Some(_run_guard) = SyncRunGuard::try_acquire() else {
+        tracing::debug!(task = "sync", "sync already running, skipping this trigger");
+        return Ok(());
+    };
+
+    sync_cycle(state, app_handle).await
+}
+
+/// One complete sync cycle. The caller must hold the [`SyncRunGuard`].
+pub async fn sync_cycle(
+    state: tauri::State<'_, AppState>,
+    app_handle: AppHandle,
+) -> Result<(), llava_core::Error> {
     let _ = app_handle.emit("sync_progress", SyncResult::InProgress);
     let result = async {
         crate::commands::utils::check_connection_before_request(state.clone())?;
@@ -191,6 +267,7 @@ pub async fn synchronize_all(
 
         let mut process_result = process_sync_response(
             state.clone(),
+            &app_handle,
             client.clone(),
             first_response,
             access_token.clone(),
@@ -228,6 +305,7 @@ pub async fn synchronize_all(
 
                 let second_result = process_sync_response(
                     state.clone(),
+                    &app_handle,
                     client.clone(),
                     second_response,
                     access_token.clone(),
@@ -271,6 +349,7 @@ pub async fn synchronize_all(
 
         let retry_result = process_sync_response(
             state.clone(),
+            &app_handle,
             client,
             retry_response,
             access_token,
@@ -300,12 +379,22 @@ pub async fn synchronize_all(
         Ok::<(), llava_core::Error>(())
     }
     .await;
-    if result.is_err() {
-        let _ = app_handle.emit("sync_progress", SyncResult::Error);
-    } else {
-        let _ = app_handle.emit("sync_progress", SyncResult::Done);
+    match result {
+        // Another sync (e.g. from a second device) holds the server-side lock.
+        // Nothing went wrong; the next tick tries again.
+        Err(llava_core::Error::SyncInProgress) => {
+            let _ = app_handle.emit("sync_progress", SyncResult::Done);
+            Ok(())
+        }
+        Err(err) => {
+            let _ = app_handle.emit("sync_progress", SyncResult::Error);
+            Err(err)
+        }
+        Ok(()) => {
+            let _ = app_handle.emit("sync_progress", SyncResult::Done);
+            Ok(())
+        }
     }
-    result
 }
 
 pub async fn refresh_access_token(
@@ -370,12 +459,26 @@ fn get_notes_by_local_ids(
 
 async fn process_sync_response(
     state: tauri::State<'_, AppState>,
+    app_handle: &AppHandle,
     client: reqwest::Client,
-    next_steps: llava_core::sync::CheckSyncResponse,
+    mut next_steps: llava_core::sync::CheckSyncResponse,
     access_token: AccessToken,
     online_id: String,
 ) -> Result<SyncProcessResult, llava_core::Error> {
     let mut db_operations = Vec::<DbOperation>::new();
+
+    {
+        let notes_db_guard = state
+            .notes_db
+            .lock()
+            .map_err(|_| llava_core::Error::LockError)?;
+
+        let notes_db = notes_db_guard
+            .as_ref()
+            .ok_or(llava_core::Error::LockError)?;
+
+        llava_core::sync::drop_instructions_for_local_only_notes(notes_db, &mut next_steps)?;
+    }
 
     let paths: ProgramFiles = {
         let guard = state
@@ -515,6 +618,20 @@ async fn process_sync_response(
         online_id,
     ));
 
+    let mut changed_note_ids = Vec::new();
+    let mut removed_note_ids = Vec::new();
+    for operation in &db_operations {
+        match operation {
+            DbOperation::InsertNote { local_id, .. }
+            | DbOperation::UpdateNoteFromCloud { local_id, .. }
+            | DbOperation::InsertConflictCopy { local_id, .. } => {
+                changed_note_ids.push(local_id.clone())
+            }
+            DbOperation::DeleteNote { local_id } => removed_note_ids.push(local_id.clone()),
+            _ => {}
+        }
+    }
+
     {
         let mut notes_db_guard = state
             .notes_db
@@ -526,6 +643,16 @@ async fn process_sync_response(
             .ok_or(llava_core::Error::LockError)?;
 
         llava_core::sync::execute_db_operations(notes_db, db_operations)?;
+    }
+
+    if !changed_note_ids.is_empty() || !removed_note_ids.is_empty() {
+        let _ = app_handle.emit(
+            "sync_finished",
+            SyncFinishedPayload {
+                changed_note_ids,
+                removed_note_ids,
+            },
+        );
     }
 
     Ok(SyncProcessResult {
@@ -546,37 +673,51 @@ fn deduplicate_ids(ids: Vec<String>) -> Vec<String> {
     result
 }
 
-pub async fn run_sync_loop(app_handle: AppHandle) {
-    let mut ticker = tokio::time::interval(tokio::time::Duration::from_secs(60));
-    loop {
-        ticker.tick().await;
+/// Upper bound for one background sync cycle. The HTTP client has no request
+/// timeout, so a stalled connection would otherwise keep the sync lock forever
+/// and every later tick would be skipped silently.
+const SYNC_CYCLE_TIMEOUT: tokio::time::Duration = tokio::time::Duration::from_secs(300);
 
-        let state: tauri::State<'_, AppState> = app_handle.state::<AppState>();
+/// Why a background sync should not run right now, if any reason applies.
+fn background_sync_skip_reason(state: &tauri::State<'_, AppState>) -> Option<&'static str> {
+    if config_value(state, "local.mode").as_deref() == Some("on") {
+        return Some("local mode is on");
+    }
 
-        let (is_local_only, is_online_sync_off, has_user_id) = {
-            let config = state.user_config.lock().unwrap();
-            let user_id = state.online_user_id.lock().unwrap();
+    if is_online_sync_off(state) {
+        return Some("online sync is off");
+    }
 
-            let local = config
-                .as_ref()
-                .and_then(|m| m.get("local.mode"))
-                .map(|v| v == "on")
-                .unwrap_or(false);
+    // A poisoned lock is treated like "not logged in" so the loop survives.
+    let has_user_id = state
+        .online_user_id
+        .lock()
+        .map(|user_id| user_id.is_some())
+        .unwrap_or(false);
 
-            let sync_off = config
-                .as_ref()
-                .and_then(|m| m.get("online.sync"))
-                .map(|v| v == "off")
-                .unwrap_or(false);
+    if !has_user_id {
+        return Some("not logged in online");
+    }
 
-            (local, sync_off, user_id.is_some())
-        };
+    None
+}
 
-        if is_local_only || is_online_sync_off || !has_user_id {
-            continue;
-        }
+async fn run_background_sync(app_handle: &AppHandle) {
+    let state: tauri::State<'_, AppState> = app_handle.state::<AppState>();
 
-        if let Err(e) = synchronize_all(state, app_handle.clone()).await {
+    if let Some(reason) = background_sync_skip_reason(&state) {
+        tracing::debug!(task = "auto sync", reason, "background sync skipped");
+        return;
+    }
+
+    match tokio::time::timeout(
+        SYNC_CYCLE_TIMEOUT,
+        synchronize_all(state, app_handle.clone()),
+    )
+    .await
+    {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => {
             tracing::error!(
                 task = "auto sync",
                 status = "error",
@@ -584,46 +725,26 @@ pub async fn run_sync_loop(app_handle: AppHandle) {
                 "error"
             );
         }
+        Err(_) => {
+            tracing::error!(
+                task = "auto sync",
+                status = "error",
+                "sync cycle timed out and was cancelled"
+            );
+            let _ = app_handle.emit("sync_progress", SyncResult::Error);
+        }
+    }
+}
+
+pub async fn run_sync_loop(app_handle: AppHandle) {
+    let mut ticker = tokio::time::interval(tokio::time::Duration::from_secs(60));
+    ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    loop {
+        ticker.tick().await;
+        run_background_sync(&app_handle).await;
     }
 }
 pub async fn first_sync(app_handle: AppHandle) {
     tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
-    let state: tauri::State<'_, AppState> = app_handle.state::<AppState>();
-
-    let (is_local_only, is_online_sync_off, has_user_id) = {
-        let config = state.user_config.lock().unwrap();
-        let user_id = state.online_user_id.lock().unwrap();
-
-        let local = config
-            .as_ref()
-            .and_then(|m| m.get("local.mode"))
-            .map(|v| v == "on")
-            .unwrap_or(false);
-
-        let sync_off = config
-            .as_ref()
-            .and_then(|m| m.get("online.sync"))
-            .map(|v| v == "off")
-            .unwrap_or(false);
-
-        (local, sync_off, user_id.is_some())
-    };
-
-    if is_local_only || is_online_sync_off || !has_user_id {
-        tracing::warn!(
-            is_local_only,
-            is_online_sync_off,
-            has_user_id,
-            "first_sync skipped"
-        );
-        return;
-    }
-    if let Err(e) = synchronize_all(state, app_handle.clone()).await {
-        tracing::error!(
-            task = "auto sync",
-            status = "error",
-            %e,
-            "error"
-        );
-    }
+    run_background_sync(&app_handle).await;
 }

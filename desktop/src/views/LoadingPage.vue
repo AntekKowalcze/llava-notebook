@@ -4,33 +4,19 @@ import LoadingCircle from '../components/main/LoadingCircle.vue';
 
 import IconComponent from '../components/main/IconComponent.vue';
 import SubmitButton from '../components/commons/SubmitButton.vue';
-import { useAuthStore } from '../stores/auth';
 import { useToast } from 'vue-toastification';
 import { useRouter } from 'vue-router';
 import { useOnlineAuthStore } from '../stores/onlineAuth';
-import { useUserConfigStore } from '../stores/userConfig';
+import { resetSessionState } from '../lib/session';
 import { UserRoundCheck, UserRoundX } from 'lucide-vue-next';
 const router = useRouter();
-const authStore = useAuthStore();
 const onlineAuthStore = useOnlineAuthStore();
-const userConfigStore = useUserConfigStore();
 const toast = useToast();
 let buttonContent = 'logout';
 async function logout() {
   try {
     await invoke<void>('local_logout_command');
-    authStore.$patch({
-      loggedIn: false,
-      loggedInUsername: null,
-      loggedInUserId: null,
-    });
-    userConfigStore.settingList = null;
-
-    onlineAuthStore.$patch({
-      loggedIn: false,
-      loggedInEmail: null,
-      loggedInId: null,
-    });
+    resetSessionState();
 
     toast.success('logged out successfully');
     router.replace('/');

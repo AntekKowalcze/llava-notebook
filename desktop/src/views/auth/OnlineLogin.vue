@@ -12,6 +12,8 @@ import { useAuthStore } from '../../stores/auth';
 import { useUserConfigStore } from '../../stores/userConfig';
 import LoadingCircle from '../../components/main/LoadingCircle.vue';
 import { useLayoutStore } from '../../stores/layoutStore.ts';
+import { errorKey, errorPayload } from '../../lib/errors';
+import { isValidEmail } from '../../lib/validation';
 const isLoading = ref<boolean>(false);
 const toast = useToast();
 const authStore = useAuthStore();
@@ -27,10 +29,8 @@ const layoutStore = useLayoutStore();
 onMounted(async () => {
   await layoutStore.setupReencryptingListener();
 });
-const emailPattern =
-  /^[\p{L}\p{N}!#$%&'*+/=?^_`{|}~-]+(?:\.[\p{L}\p{N}!#$%&'*+/=?^_`{|}~-]+)*@(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?\.)+[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?$/u;
 const correctEmail = computed(() => {
-  return emailPattern.test(email.value);
+  return isValidEmail(email.value);
 });
 
 const submitDisabled = computed(() => {
@@ -55,21 +55,12 @@ function applyLockout(timeoutMs: number) {
   }, timeoutMs);
 }
 
-function extractTimeout(err: unknown): number | null {
-  if (err && typeof err === 'object') {
-    const typedErr = err as { AccountLocked?: unknown };
-    if (typeof typedErr.AccountLocked === 'number') {
-      return typedErr.AccountLocked;
-    }
-  }
-  return null;
-}
-
 async function submitLogin() {
   if (submitDisabled.value) {
     return;
   }
 
+  let previousMode: string | null = null;
   try {
     await userConfig.init();
     if (!userConfig.settingList) {
@@ -77,6 +68,7 @@ async function submitLogin() {
       return;
     }
 
+    previousMode = userConfig.getValueBySettingId(userConfig.settingList.sections, 'local.mode');
     userConfig.updateSettingValue('local.mode', 'off');
 
     isLoading.value = true;
@@ -100,33 +92,41 @@ async function submitLogin() {
     await onlineAuthStore.fetchEmail();
     void invoke<void>('synchronize_all');
     router.replace('/main/');
-  } catch (err: any) {
-    console.log(err);
-    userConfig.updateSettingValue('local.mode', 'on');
-    const timeout = extractTimeout(err);
-    if (timeout !== null) {
-      applyLockout(timeout);
-      showTimeout(timeout);
-      return;
+  } catch (err) {
+    console.error('Online login failed:', err);
+    // Put back what was there instead of assuming local mode was on.
+    if (previousMode !== null && previousMode !== 'ID NOT EXISTS') {
+      userConfig.updateSettingValue('local.mode', previousMode);
     }
 
-    if (err?.NoInternetConnection) {
-      toast.error('No internet connection');
-      return;
-    }
-
-    if (err?.ServerNotAvailable) {
-      toast.error('Server unavailable. Try again later.');
-      return;
-    }
-    if (err?.WrongPassword) {
-      toast.warning('Wrong password');
-    } else if (err?.WrongCredentials) {
-      toast.warning('Wrong email or password');
-    } else if (err?.RequestError) {
-      toast.error('Server error. Try again later.');
-    } else {
-      toast.error('Login failed');
+    switch (errorKey(err)) {
+      case 'AccountLocked': {
+        const timeout = errorPayload<number>(err) ?? 0;
+        if (timeout > 0) {
+          applyLockout(timeout);
+          showTimeout(timeout);
+        } else {
+          toast.error('Too many failed attempts. Try again in a moment.');
+        }
+        break;
+      }
+      case 'NoInternetConnection':
+        toast.error('No internet connection');
+        break;
+      case 'ServerNotAvailable':
+        toast.error('Server unavailable. Try again later.');
+        break;
+      case 'WrongPassword':
+        toast.warning('Wrong password');
+        break;
+      case 'WrongCredentials':
+        toast.warning('Wrong email or password');
+        break;
+      case 'RequestError':
+        toast.error('Server error. Try again later.');
+        break;
+      default:
+        toast.error('Login failed');
     }
     return;
   } finally {

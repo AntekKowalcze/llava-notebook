@@ -60,6 +60,7 @@ pub async fn create_local_note(
     path: &Path,
     notes_key: chacha20poly1305::Key,
 ) -> Result<Note, crate::errors::Error> {
+    title = crate::services::storage::note_operations::validate_title(&title)?;
     let id = uuid::Uuid::new_v4();
 
     tracing::debug!(
